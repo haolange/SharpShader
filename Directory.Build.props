@@ -1,0 +1,7 @@
+<Project>
+  <PropertyGroup>
+    <MSBuildProjectExtensionsPath>$(ProjectDir)../../../Intermediate/Graphics/Shaderlib/</MSBuildProjectExtensionsPath>
+    <BaseIntermediateOutputPath>$(ProjectDir)../../../Intermediate/Graphics/Shaderlib/</BaseIntermediateOutputPath>
+    <UseHostCompilerIfAvailable>false</UseHostCompilerIfAvailable>
+  </PropertyGroup>
+</Project>

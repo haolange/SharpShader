@@ -1,0 +1,16 @@
+Pending.txt*
+
+# Visual Studio cache directory
+.vs/
+.idea/
+.vscode/
+
+# Binary Files
+Binaries/*
+Intermediate/*
+
+# compiled files
+obj
+bin
+Binaries
+Intermediate
