@@ -365,7 +365,7 @@ namespace Infinity.Shaderlib
             return new ShaderConductorBlob(desc4);
         }
 
-        public static EFunctionStage ToShaderConductorStage(this Graphics.EFunctionStage functionStage)
+        /*public static EFunctionStage ToShaderConductorStage(this Graphics.EFunctionStage functionStage)
         {
             switch (functionStage)
             {
@@ -382,7 +382,7 @@ namespace Infinity.Shaderlib
                     return EFunctionStage.Fragment;
             }
             throw new Exception($"Stage:{functionStage} not supported");
-        }
+        }*/
 
         /*public static Vortice.Dxc.DxcShaderStage ToSDxcShaderStage(this EFunctionStage functionStage)
         {
