@@ -137,10 +137,10 @@ namespace Infinity.Shaderlib
         public static bool G_EnableHalfPrecision = true;
         internal static ShaderModel G_ShaderModelLevel = new ShaderModel(6, 2);
 
-        public static string DisassemblySPIRV(byte[] bytecode)
+        public static string DisassemblyMangedSpirVToString(byte[] bytecode)
         {
             ResultDesc desc2;
-            IntPtr destination = Marshal.AllocHGlobal((int) bytecode.Length);
+            IntPtr destination = Marshal.AllocHGlobal(bytecode.Length);
             Marshal.Copy(bytecode, 0, destination, bytecode.Length);
             DisassembleDesc source = new DisassembleDesc {
                 language = EShadingLanguage.SpirV,
@@ -149,6 +149,21 @@ namespace Infinity.Shaderlib
             };
             Disassemble(ref source, out desc2);
             Marshal.FreeHGlobal(destination);
+            DestroyShaderConductorBlob(desc2.target);
+            DestroyShaderConductorBlob(desc2.errorWarningMsg);
+            return Marshal.PtrToStringAnsi(GetShaderConductorBlobData(desc2.target), GetShaderConductorBlobSize(desc2.target));
+        }
+
+        public static string DisassemblyNativeSpirVToString(in uint byteSize, in IntPtr byteData)
+        {
+            ResultDesc desc2;
+            DisassembleDesc source = new DisassembleDesc
+            {
+                language = EShadingLanguage.SpirV,
+                binary = byteData,
+                binarySize = (int)byteSize
+            };
+            Disassemble(ref source, out desc2);
             DestroyShaderConductorBlob(desc2.target);
             DestroyShaderConductorBlob(desc2.errorWarningMsg);
             return Marshal.PtrToStringAnsi(GetShaderConductorBlobData(desc2.target), GetShaderConductorBlobSize(desc2.target));
@@ -209,7 +224,7 @@ namespace Infinity.Shaderlib
             return str2;
         }
 
-        public static byte[] HLSLToBinaryDxil(string hlslSource, string entryPoint, in EFunctionStage stage, in bool keepDebugInfo = false, in bool disableOptimization = false)
+        public static byte[] HLSLToMangedDxil(string hlslSource, string entryPoint, in EFunctionStage stage, in bool keepDebugInfo = false, in bool disableOptimization = false)
         {
             ResultDesc desc4;
             SourceDesc source = new SourceDesc
@@ -287,7 +302,7 @@ namespace Infinity.Shaderlib
             return new ShaderConductorBlob(dxcBlob.BufferSize, dxcBlob.BufferPointer);*/
         }
 
-        public static byte[] HLSLToBinarySpirV(string hlslSource, string entryPoint, in EFunctionStage stage, in bool keepDebugInfo = false, in bool disableOptimization = false)
+        public static byte[] HLSLToMangedSpirV(string hlslSource, string entryPoint, in EFunctionStage stage, in bool keepDebugInfo = false, in bool disableOptimization = false)
         {
             ResultDesc desc4;
             SourceDesc source = new SourceDesc {
