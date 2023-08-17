@@ -134,6 +134,7 @@ namespace Infinity.Shaderlib
     public static class ShaderCompiler
     {
         public static int G_OpenGLVersion = 310;
+        public static int G_OptimizationLevel = 3;
         public static bool G_EnableHalfPrecision = true;
         internal static ShaderModel G_ShaderModelLevel = new ShaderModel(6, 2);
 
@@ -182,7 +183,7 @@ namespace Infinity.Shaderlib
             options.shaderModel = G_ShaderModelLevel;
             options.enable16bitTypes = G_EnableHalfPrecision;
             options.enableDebugInfo = keepDebugInfo;
-            options.optimizationLevel = 3;
+            options.optimizationLevel = G_OptimizationLevel;
             options.disableOptimizations = disableOptimization;
             options.packMatricesInRowMajor = false;
             if (language == EShadingLanguage.SpirV)
@@ -237,7 +238,7 @@ namespace Infinity.Shaderlib
             options.shaderModel = G_ShaderModelLevel;
             options.enable16bitTypes = G_EnableHalfPrecision;
             options.enableDebugInfo = keepDebugInfo;
-            options.optimizationLevel = 3;
+            options.optimizationLevel = G_OptimizationLevel;
             options.disableOptimizations = disableOptimization;
             options.packMatricesInRowMajor = false;
             TargetDesc target = new TargetDesc
@@ -272,7 +273,7 @@ namespace Infinity.Shaderlib
             options.shaderModel = G_ShaderModelLevel;
             options.enable16bitTypes = G_EnableHalfPrecision;
             options.enableDebugInfo = keepDebugInfo;
-            options.optimizationLevel = 3;
+            options.optimizationLevel = G_OptimizationLevel;
             options.disableOptimizations = disableOptimization;
             options.packMatricesInRowMajor = false;
             TargetDesc target = new TargetDesc
@@ -314,7 +315,7 @@ namespace Infinity.Shaderlib
             options.shaderModel = G_ShaderModelLevel;
             options.enable16bitTypes = G_EnableHalfPrecision;
             options.enableDebugInfo = keepDebugInfo;
-            options.optimizationLevel = 3;
+            options.optimizationLevel = G_OptimizationLevel;
             options.disableOptimizations = disableOptimization;
             options.packMatricesInRowMajor = false;
             options.shiftAllUABuffersBindings = 20;
@@ -356,7 +357,7 @@ namespace Infinity.Shaderlib
             options.shaderModel = G_ShaderModelLevel;
             options.enable16bitTypes = G_EnableHalfPrecision;
             options.enableDebugInfo = keepDebugInfo;
-            options.optimizationLevel = 3;
+            options.optimizationLevel = G_OptimizationLevel;
             options.disableOptimizations = disableOptimization;
             options.packMatricesInRowMajor = false;
             options.shiftAllUABuffersBindings = 20;
