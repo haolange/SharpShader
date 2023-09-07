@@ -170,8 +170,13 @@ namespace Infinity.Shaderlib
             return Marshal.PtrToStringAnsi(GetShaderConductorBlobData(desc2.target), GetShaderConductorBlobSize(desc2.target));
         }
 
-        public static string HLSLTo(string hlslSource, string entryPoint, in EFunctionStage stage, in EShadingLanguage language, in bool keepDebugInfo = false, in bool disableOptimization = false)
+        public static string HLSLTo(string hlslSource, string entryPoint, in EFunctionStage stage, in EShadingLanguage language, in bool keepDebugInfo = false, bool disableOptimization = false)
         {
+            if (language == EShadingLanguage.Msl_iOS || language == EShadingLanguage.Msl_macOS)
+            {
+                disableOptimization = true;
+            }
+
             string str2;
             ResultDesc desc4;
             SourceDesc source = new SourceDesc {
