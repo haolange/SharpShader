@@ -1,8 +1,8 @@
 ﻿using System;
 using System.Diagnostics;
+using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using System.Text.RegularExpressions;
-using System.Collections.Generic;
 using static Infinity.Shaderlib.ShaderConductorWrapper;
 
 namespace Infinity.Shaderlib
@@ -386,36 +386,36 @@ namespace Infinity.Shaderlib
             return new ShaderConductorBlob(desc4);
         }
 
-        /*public static EFunctionStage ToShaderConductorStage(this Graphics.EFunctionStage functionStage)
+        /*public static ERHIFunctionStage ToShaderConductorStage(this Graphics.ERHIFunctionStage functionStage)
         {
             switch (functionStage)
             {
-                case Graphics.EFunctionStage.Vertex:
-                    return EFunctionStage.Vertex;
+                case Graphics.ERHIFunctionStage.Vertex:
+                    return ERHIFunctionStage.Vertex;
 
-                case Graphics.EFunctionStage.Fragment:
-                    return EFunctionStage.Fragment;
+                case Graphics.ERHIFunctionStage.Fragment:
+                    return ERHIFunctionStage.Fragment;
 
-                case Graphics.EFunctionStage.Compute:
-                    return EFunctionStage.Compute;
+                case Graphics.ERHIFunctionStage.Compute:
+                    return ERHIFunctionStage.Compute;
 
                 default:
-                    return EFunctionStage.Fragment;
+                    return ERHIFunctionStage.Fragment;
             }
             throw new Exception($"Stage:{functionStage} not supported");
         }*/
 
-        /*public static Vortice.Dxc.DxcShaderStage ToSDxcShaderStage(this EFunctionStage functionStage)
+        /*public static Vortice.Dxc.DxcShaderStage ToSDxcShaderStage(this ERHIFunctionStage functionStage)
         {
             switch (functionStage)
             {
-                case EFunctionStage.Vertex:
+                case ERHIFunctionStage.Vertex:
                     return Vortice.Dxc.DxcShaderStage.Vertex;
 
-                case EFunctionStage.Fragment:
+                case ERHIFunctionStage.Fragment:
                     return Vortice.Dxc.DxcShaderStage.Pixel;
 
-                case EFunctionStage.Compute:
+                case ERHIFunctionStage.Compute:
                     return Vortice.Dxc.DxcShaderStage.Compute;
 
                 default:
