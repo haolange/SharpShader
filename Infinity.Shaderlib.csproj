@@ -60,7 +60,7 @@
 	</ItemGroup>
 
 	<ItemGroup>
-	  <PackageReference Include="Vortice.Dxc" Version="3.2.0" />
+	  <PackageReference Include="Vortice.Dxc" Version="3.3.4" />
 	</ItemGroup>
 
 </Project>
