@@ -1,4 +1,4 @@
-# SharpShaderlib
+# SharpShader
 A Shaderlab like shader framework.
 
 # Example Shader
