@@ -54,7 +54,6 @@
 	</PropertyGroup>
 
 	<ItemGroup>
-		<ProjectReference Include="..\..\Core\Infinity.Core.csproj" />
 		<Content Include="build\net461\Infinity.Shaderlib.props" PackagePath="build\net461\Infinity.Shaderlib.props" />
 		<Content Include="runtimes\**" PackagePath="runtimes" Pack="true" CopyToOutputDirectory="PreserveNewest" />
 	</ItemGroup>
