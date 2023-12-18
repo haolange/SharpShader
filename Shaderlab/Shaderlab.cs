@@ -2,110 +2,9 @@
 using System.Numerics;
 using System.Collections.Generic;
 
-/*namespace Infinity.Shaderlib
+namespace SharpShader.ShaderLab
 {
-    public enum EShaderlabCullMode : byte
-    {
-        Front = 0,
-        Back = 1,
-        None = 2
-    };
-
-    public enum EShaderlabComparator : byte
-    {
-        Less = 0,
-        Greater = 1,
-        LEqual = 2,
-        GEqual = 3,
-        NotEqual = 4,
-        Always = 5,
-        Never = 6
-    };
-
-    public enum EShaderlabZWriteMode : byte
-    {
-        On = 0,
-        Off = 1
-    };
-
-    public enum EShaderlabChannel : byte
-    {
-        Off = 0,
-        R = 1,
-        G = 2,
-        B = 4,
-        A = 8,
-    };
-
-    public enum EShaderlabStateType : byte
-    {
-        CullMode = 0,
-        ZTest = 1,
-        ZWriteMode = 2,
-        ColorMask = 3
-    };
-
-    public enum EShaderlabPropertyType
-    {
-        Int = 0,
-        Float = 1,
-        Vector = 2,
-    };
-
-    public struct ShaderlabPropertyValue
-    {
-        public string Name;
-        public int IntParam;
-        public float FloatParam;
-        public float4 VectorParam;
-    };
-
-    public struct ShaderlabProperty
-    {
-        public float2 Range;
-        public ShaderlabPropertyValue Value;
-        public string ParamName;
-        public string DisplayName;
-        public List<string> Metas;
-    };
-
-    public struct ShaderlabCommonState
-    {
-        public EShaderlabCullMode CullMode;
-        public EShaderlabComparator ZTestMode;
-        public EShaderlabZWriteMode ZWriteMode;
-        public EShaderlabChannel ColorMaskChannel;
-    };
-
-    // Same as Pass in unity
-    public struct ShaderlabKernel
-    {
-        public string HlslCode;
-        public ShaderlabCommonState CommonState;
-        public Dictionary<string, string> Tags;
-    };
-
-    // Same as SubShader in unity, we assusme there is always only one category in one shader file
-    public struct ShaderlabCategory
-    {
-        public List<ShaderlabKernel> Kernels;
-        public Dictionary<string, string> Tags;
-    };
-
-    // ShaderLab is designed like unity shaderlab
-    public struct Shaderlab
-    {
-        public string Name;
-        public ShaderlabCategory Category;
-        public uint PropertyCapacity;
-        public List<uint> Offsets;
-        public List<ShaderlabProperty> Properties;
-    };
-}*/
-
-namespace Infinity.Shaderlib
-{
-    public enum EShaderlabBlendOp
+    public enum EShaderLabBlendOp
     {
         BlendOpAdd = 0,
         BlendOpSub,
@@ -131,7 +30,7 @@ namespace Infinity.Shaderlib
         Undefined,
     };
 
-    public enum EShaderlabCullMode
+    public enum EShaderLabCullMode
     {
         Unknown = -1,
         CullOff = 0,
@@ -141,7 +40,7 @@ namespace Infinity.Shaderlib
         Undefined
     };
 
-    public enum EShaderlabStencilOp
+    public enum EShaderLabStencilOp
     {
         StencilOpKeep = 0,
         StencilOpZero,
@@ -154,7 +53,7 @@ namespace Infinity.Shaderlib
         Undefined
     };
 
-    public enum EShaderlabBlendMode
+    public enum EShaderLabBlendMode
     {
         BlendZero = 0,
         BlendOne,
@@ -170,7 +69,7 @@ namespace Infinity.Shaderlib
         Undefined
     };
 
-    public enum EShaderlabShaderStage
+    public enum EShaderLabShaderStage
     {
         ProgramVertex = 0,
         ProgramFragment,
@@ -186,7 +85,7 @@ namespace Infinity.Shaderlib
         Undefined
     };
 
-    public enum EShaderlabPropertyType
+    public enum EShaderLabPropertyType
     {
         Int,
         Float,
@@ -197,7 +96,7 @@ namespace Infinity.Shaderlib
         Undefined
     };
 
-    public enum EShaderlabShaderTarget
+    public enum EShaderLabShaderTarget
     {
         ShaderTargetHLSL,
         ShaderTargetVulkan,
@@ -206,7 +105,7 @@ namespace Infinity.Shaderlib
         Undefined
     };
 
-    public enum EShaderlabColorWriteMask
+    public enum EShaderLabColorWriteMask
     {
         ColorWriteNone = 0,
         ColorWriteA = 1,
@@ -217,7 +116,7 @@ namespace Infinity.Shaderlib
         Undefined
     };
 
-    public enum EShaderlabCompareFunction
+    public enum EShaderLabCompareFunction
     {
         FuncDisabled = 0,
         FuncNever,
@@ -231,7 +130,7 @@ namespace Infinity.Shaderlib
         Undefined
     };
 
-    public enum EShaderlabTextureDimension
+    public enum EShaderLabTextureDimension
     {
         Tex2D,
         Tex2DArray,
@@ -240,27 +139,27 @@ namespace Infinity.Shaderlib
         Undefined
     };
 
-    public class Shaderlab : IDisposable
+    public class ShaderLab : IDisposable
     {
         public string Name
         {
             get { return m_Name; }
             set { m_Name = value; }
         }
-        public ShaderlabCategory Category
+        public ShaderLabCategory Category
         {
             get { return m_Category; }
             set { m_Category = value; }
         }
-        public List<ShaderlabProperty> Properties
+        public List<ShaderLabProperty> Properties
         {
             get { return m_Properties; }
             set { m_Properties = value; }
         }
 
         private string m_Name;
-        private ShaderlabCategory m_Category;
-        private List<ShaderlabProperty> m_Properties;
+        private ShaderLabCategory m_Category;
+        private List<ShaderLabProperty> m_Properties;
 
         public void Dispose()
         {
@@ -268,7 +167,7 @@ namespace Infinity.Shaderlib
         }
     }
 
-    public struct ShaderlabPass
+    public struct ShaderLabPass
     {
         public string? Name
         {
@@ -278,12 +177,12 @@ namespace Infinity.Shaderlib
                 return name;
             }
         }
-        public ShaderlabProgram Program
+        public ShaderLabProgram Program
         {
             get { return m_Program; }
             set { m_Program = value; }
         }
-        public ShaderlabRenderState? State
+        public ShaderLabRenderState? State
         {
             get { return m_State; }
             set { m_State = value; }
@@ -294,17 +193,17 @@ namespace Infinity.Shaderlib
             set { m_Tags = value; }
         }
 
-        private ShaderlabProgram m_Program;
-        private ShaderlabRenderState? m_State;
+        private ShaderLabProgram m_Program;
+        private ShaderLabRenderState? m_State;
         private Dictionary<string, string> m_Tags;
 
-        public ShaderlabPass(in int capcity = 4)
+        public ShaderLabPass(in int capcity = 4)
         {
             m_Tags = new Dictionary<string, string>(capcity);
         }
     };
 
-    public struct ShaderlabProgram
+    public struct ShaderLabProgram
     {
         public string Source
         {
@@ -315,9 +214,9 @@ namespace Infinity.Shaderlib
         private string m_Source;
     };
 
-    public struct ShaderlabCategory : IDisposable
+    public struct ShaderLabCategory : IDisposable
     {
-        public List<ShaderlabPass> Passes
+        public List<ShaderLabPass> Passes
         {
             get { return m_Passes; }
             set { m_Passes = value; }
@@ -328,12 +227,12 @@ namespace Infinity.Shaderlib
             set { m_Tags = value; }
         }
 
-        private List<ShaderlabPass> m_Passes;
+        private List<ShaderLabPass> m_Passes;
         private Dictionary<string, string> m_Tags;
 
-        public ShaderlabCategory(in int capcity = 3)
+        public ShaderLabCategory(in int capcity = 3)
         {
-            m_Passes = new List<ShaderlabPass>(capcity);
+            m_Passes = new List<ShaderLabPass>(capcity);
             m_Tags = new Dictionary<string, string>(capcity);
         }
 
@@ -343,36 +242,36 @@ namespace Infinity.Shaderlib
         }
     };
 
-    public struct ShaderlabStencilOp
+    public struct ShaderLabStencilOp
     {
-        public ShaderlabFloatProperty Comp
+        public ShaderLabFloatProperty Comp
         {
             get { return m_Comp; }
             set { m_Comp = value; }
         }
-        public ShaderlabFloatProperty Pass
+        public ShaderLabFloatProperty Pass
         {
             get { return m_Pass; }
             set { m_Pass = value; }
         }
-        public ShaderlabFloatProperty Fail
+        public ShaderLabFloatProperty Fail
         {
             get { return m_Fail; }
             set { m_Fail = value; }
         }
-        public ShaderlabFloatProperty ZFail
+        public ShaderLabFloatProperty ZFail
         {
             get { return m_ZFail; }
             set { m_ZFail = value; }
         }
 
-        private ShaderlabFloatProperty m_Comp;
-        private ShaderlabFloatProperty m_Pass;
-        private ShaderlabFloatProperty m_Fail;
-        private ShaderlabFloatProperty m_ZFail;
+        private ShaderLabFloatProperty m_Comp;
+        private ShaderLabFloatProperty m_Pass;
+        private ShaderLabFloatProperty m_Fail;
+        private ShaderLabFloatProperty m_ZFail;
     };
 
-    public struct ShaderlabProperty
+    public struct ShaderLabProperty
     {
         public string DisplayName
         {
@@ -389,7 +288,7 @@ namespace Infinity.Shaderlib
             get { return m_Attributes; }
             set { m_Attributes = value; }
         }
-        public EShaderlabPropertyType Type
+        public EShaderLabPropertyType Type
         {
             get { return m_Type; }
             set { m_Type = value; }
@@ -399,7 +298,7 @@ namespace Infinity.Shaderlib
             get { return m_ValueProperty; }
             set { m_ValueProperty = value; }
         }
-        public ShaderlabTextureProperty? TextureProperty
+        public ShaderLabTextureProperty? TextureProperty
         {
             get { return m_TextureProperty; }
             set { m_TextureProperty = value; }
@@ -408,11 +307,11 @@ namespace Infinity.Shaderlib
         private string m_DisplayName;
         private string m_PropertyName;
         private List<string>? m_Attributes;
-        private EShaderlabPropertyType m_Type;
+        private EShaderLabPropertyType m_Type;
         private Vector4? m_ValueProperty;
-        private ShaderlabTextureProperty? m_TextureProperty;
+        private ShaderLabTextureProperty? m_TextureProperty;
 
-        public ShaderlabProperty(string displayName, string propertyName, List<string>? attributes, in EShaderlabPropertyType type, in Vector4 valueProperty)
+        public ShaderLabProperty(string displayName, string propertyName, List<string>? attributes, in EShaderLabPropertyType type, in Vector4 valueProperty)
         {
             m_DisplayName = displayName;
             m_PropertyName = propertyName;
@@ -422,7 +321,7 @@ namespace Infinity.Shaderlib
             m_TextureProperty = null;
         }
 
-        public ShaderlabProperty(string displayName, string propertyName, List<string>? attributes, in EShaderlabPropertyType type, in ShaderlabTextureProperty textureProperty)
+        public ShaderLabProperty(string displayName, string propertyName, List<string>? attributes, in EShaderLabPropertyType type, in ShaderLabTextureProperty textureProperty)
         {
             m_DisplayName = displayName;
             m_PropertyName = propertyName;
@@ -433,7 +332,7 @@ namespace Infinity.Shaderlib
         }
     };
 
-    public struct ShaderlabRenderState
+    public struct ShaderLabRenderState
     {
         public int? Cull
         {
@@ -450,82 +349,82 @@ namespace Infinity.Shaderlib
             get { return m_ZWrite; }
             set { m_ZWrite = value; }
         }
-        public ShaderlabStencilOp? StencilOp
+        public ShaderLabStencilOp? StencilOp
         {
             get { return m_StencilOp; }
             set { m_StencilOp = value; }
         }
-        public ShaderlabStencilOp? StencilOpBack
+        public ShaderLabStencilOp? StencilOpBack
         {
             get { return m_StencilOpBack; }
             set { m_StencilOpBack = value; }
         }
-        public ShaderlabStencilOp? StencilOpFront
+        public ShaderLabStencilOp? StencilOpFront
         {
             get { return m_StencilOpFront; }
             set { m_StencilOpFront = value; }
         }
-        public ShaderlabFloatProperty? ColorMask
+        public ShaderLabFloatProperty? ColorMask
         {
             get { return m_ColorMask; }
             set { m_ColorMask = value; }
         }
-        public ShaderlabFloatProperty? AlphaToMask
+        public ShaderLabFloatProperty? AlphaToMask
         {
             get { return m_AlphaToMask; }
             set { m_AlphaToMask = value; }
         }
-        public ShaderlabFloatProperty? OffsetFactor
+        public ShaderLabFloatProperty? OffsetFactor
         {
             get { return m_OffsetFactor; }
             set { m_OffsetFactor = value; }
         }
-        public ShaderlabFloatProperty? OffsetUnits
+        public ShaderLabFloatProperty? OffsetUnits
         {
             get { return m_OffsetUnits; }
             set { m_OffsetUnits = value; }
         }
-        public ShaderlabFloatProperty? BlendOp
+        public ShaderLabFloatProperty? BlendOp
         {
             get { return m_BlendOp; }
             set { m_BlendOp = value; }
         }
-        public ShaderlabFloatProperty? BlendOpAlpha
+        public ShaderLabFloatProperty? BlendOpAlpha
         {
             get { return m_BlendOpAlpha; }
             set { m_BlendOpAlpha = value; }
         }
-        public ShaderlabFloatProperty? SrcBlend
+        public ShaderLabFloatProperty? SrcBlend
         {
             get { return m_SrcBlend; }
             set { m_SrcBlend = value; }
         }
-        public ShaderlabFloatProperty? DstBlend
+        public ShaderLabFloatProperty? DstBlend
         {
             get { return m_DstBlend; }
             set { m_DstBlend = value; }
         }
-        public ShaderlabFloatProperty? SrcBlendAlpha
+        public ShaderLabFloatProperty? SrcBlendAlpha
         {
             get { return m_SrcBlendAlpha; }
             set { m_SrcBlendAlpha = value; }
         }
-        public ShaderlabFloatProperty? DstBlendAlpha
+        public ShaderLabFloatProperty? DstBlendAlpha
         {
             get { return m_DstBlendAlpha; }
             set { m_DstBlendAlpha = value; }
         }
-        public ShaderlabFloatProperty? StencilRef
+        public ShaderLabFloatProperty? StencilRef
         {
             get { return m_StencilRef; }
             set { m_StencilRef = value; }
         }
-        public ShaderlabFloatProperty? StencilReadMask
+        public ShaderLabFloatProperty? StencilReadMask
         {
             get { return m_StencilReadMask; }
             set { m_StencilReadMask = value; }
         }
-        public ShaderlabFloatProperty? StencilWriteMask
+        public ShaderLabFloatProperty? StencilWriteMask
         {
             get { return m_StencilWriteMask; }
             set { m_StencilWriteMask = value; }
@@ -534,33 +433,33 @@ namespace Infinity.Shaderlib
         private int? m_Cull;
         private int? m_ZTest;
         private int? m_ZWrite;
-        private ShaderlabStencilOp? m_StencilOp;
-        private ShaderlabStencilOp? m_StencilOpBack;
-        private ShaderlabStencilOp? m_StencilOpFront;
-        private ShaderlabFloatProperty? m_ColorMask;
-        private ShaderlabFloatProperty? m_AlphaToMask;
-        private ShaderlabFloatProperty? m_OffsetFactor;
-        private ShaderlabFloatProperty? m_OffsetUnits;
-        private ShaderlabFloatProperty? m_BlendOp;
-        private ShaderlabFloatProperty? m_BlendOpAlpha;
-        private ShaderlabFloatProperty? m_SrcBlend;
-        private ShaderlabFloatProperty? m_DstBlend;
-        private ShaderlabFloatProperty? m_SrcBlendAlpha;
-        private ShaderlabFloatProperty? m_DstBlendAlpha;
-        private ShaderlabFloatProperty? m_StencilRef;
-        private ShaderlabFloatProperty? m_StencilReadMask;
-        private ShaderlabFloatProperty? m_StencilWriteMask;
+        private ShaderLabStencilOp? m_StencilOp;
+        private ShaderLabStencilOp? m_StencilOpBack;
+        private ShaderLabStencilOp? m_StencilOpFront;
+        private ShaderLabFloatProperty? m_ColorMask;
+        private ShaderLabFloatProperty? m_AlphaToMask;
+        private ShaderLabFloatProperty? m_OffsetFactor;
+        private ShaderLabFloatProperty? m_OffsetUnits;
+        private ShaderLabFloatProperty? m_BlendOp;
+        private ShaderLabFloatProperty? m_BlendOpAlpha;
+        private ShaderLabFloatProperty? m_SrcBlend;
+        private ShaderLabFloatProperty? m_DstBlend;
+        private ShaderLabFloatProperty? m_SrcBlendAlpha;
+        private ShaderLabFloatProperty? m_DstBlendAlpha;
+        private ShaderLabFloatProperty? m_StencilRef;
+        private ShaderLabFloatProperty? m_StencilReadMask;
+        private ShaderLabFloatProperty? m_StencilWriteMask;
 
-        public ShaderlabRenderState(in int cull, in int zTest, in int zWrite)
+        public ShaderLabRenderState(in int cull, in int zTest, in int zWrite)
         {
-            //this = new ShaderlabRenderState();
+            //this = new ShaderLabRenderState();
             m_Cull = cull;
             m_ZTest = zTest;
             m_ZWrite = zWrite;
         }
     };
 
-    public struct ShaderlabFloatProperty
+    public struct ShaderLabFloatProperty
     {
         public float Value
         {
@@ -577,7 +476,7 @@ namespace Infinity.Shaderlib
         private string m_Name;
     };
 
-    public struct ShaderlabVectorProperty
+    public struct ShaderLabVectorProperty
     {
         public float X
         {
@@ -612,23 +511,23 @@ namespace Infinity.Shaderlib
         private string m_Name;
     };
 
-    public struct ShaderlabTextureProperty
+    public struct ShaderLabTextureProperty
     {
         public string Name
         {
             get { return m_Name; }
             set { m_Name = value; }
         }
-        public EShaderlabTextureDimension Dimension
+        public EShaderLabTextureDimension Dimension
         {
             get { return m_Dimension; }
             set { m_Dimension = value; }
         }
 
         private string m_Name;
-        private EShaderlabTextureDimension m_Dimension;
+        private EShaderLabTextureDimension m_Dimension;
 
-        public ShaderlabTextureProperty(string name, in EShaderlabTextureDimension dimension)
+        public ShaderLabTextureProperty(string name, in EShaderLabTextureDimension dimension)
         {
             m_Name = name;
             Dimension= dimension;

@@ -3,26 +3,26 @@ using System.IO;
 using System.Collections.Generic;
 using System.Text.RegularExpressions;
 
-namespace Infinity.Shaderlib
+namespace SharpShader.ShaderLab
 {
-    public static class ShaderlabUtility
+    public static class ShaderLabUtil
     {
-        public static Shaderlab ParseShaderlabFromFile(string filePath)
+        public static ShaderLab ParseShaderLabFromFile(string filePath)
         {
             string source = File.ReadAllText(filePath);
-            return ParseShaderlabFromSource(source);
+            return ParseShaderLabFromSource(source);
         }
 
-        public static Shaderlab ParseShaderlabFromSource(string source)
+        public static ShaderLab ParseShaderLabFromSource(string source)
         {
-            Shaderlab shaderlab = new Shaderlab();
-            shaderlab.Name = ParseShaderlabName(source);
-            shaderlab.Category = ParseShaderlabCategory(source);
-            shaderlab.Properties = ParseShaderlabProperties(source);
-            return shaderlab;
+            ShaderLab ShaderLab = new ShaderLab();
+            ShaderLab.Name = ParseShaderLabName(source);
+            ShaderLab.Category = ParseShaderLabCategory(source);
+            ShaderLab.Properties = ParseShaderLabProperties(source);
+            return ShaderLab;
         }
 
-        internal static string ParseShaderlabName(string source)
+        internal static string ParseShaderLabName(string source)
         {
             Regex regex = new Regex(@"Shader "".+""");
             foreach (Match match in regex.Matches(source))
@@ -30,15 +30,15 @@ namespace Infinity.Shaderlib
                 int count = match.Value.Length;
                 return match.Value.Substring(8, count - 9);
             }
-            throw new NotImplementedException("Shaderlab name is illegal");
+            throw new NotImplementedException("ShaderLab name is illegal");
         }
 
-        internal static ShaderlabCategory ParseShaderlabCategory(string source)
+        internal static ShaderLabCategory ParseShaderLabCategory(string source)
         {
             string categoryPattern = @"(?<=\b(Category)\b)\s*{(?:[^{}]+|(?<open>{)|(?<-open>})|(?:(?<close-open>)[^{}]*)+)*(?(open)(?!))}";
             MatchCollection categoryMatches = Regex.Matches(source, categoryPattern, RegexOptions.Singleline);
 
-            ShaderlabCategory shaderlabCategory = new ShaderlabCategory(2);
+            ShaderLabCategory ShaderLabCategory = new ShaderLabCategory(2);
 
             foreach (Match categoryMatche in categoryMatches)
             {
@@ -60,7 +60,7 @@ namespace Infinity.Shaderlib
                     {
                         string key = match.Groups[1].Value;
                         string value = match.Groups[2].Value;
-                        shaderlabCategory.Tags.Add(key, value);
+                        ShaderLabCategory.Tags.Add(key, value);
                     }
                 }
 
@@ -69,7 +69,7 @@ namespace Infinity.Shaderlib
                 foreach (Match passMatche in passMatches)
                 {
                     string passBlock = passMatche.Value;
-                    ShaderlabPass shaderlabPass = new ShaderlabPass(2);
+                    ShaderLabPass ShaderLabPass = new ShaderLabPass(2);
 
                     string passTagsPattern = @"(?<=Tags\s*{\s*)(?:(?!Pass\s*{)[^}])*(?=})";
                     MatchCollection passTagsMatches = Regex.Matches(passBlock, passTagsPattern, RegexOptions.Singleline);
@@ -86,7 +86,7 @@ namespace Infinity.Shaderlib
                         {
                             string key = match.Groups[1].Value;
                             string value = match.Groups[2].Value;
-                            shaderlabPass.Tags.Add(key, value);
+                            ShaderLabPass.Tags.Add(key, value);
                         }
                     }
 
@@ -95,20 +95,20 @@ namespace Infinity.Shaderlib
                     foreach (Match programMatche in programMatches)
                     {
                         string programBlock = programMatche.Value;
-                        shaderlabPass.Program = new ShaderlabProgram
+                        ShaderLabPass.Program = new ShaderLabProgram
                         {
                             Source = programBlock,
                         };
                         
                     }
-                    shaderlabCategory.Passes.Add(shaderlabPass);
+                    ShaderLabCategory.Passes.Add(ShaderLabPass);
                 }
             }
 
-            return shaderlabCategory;
+            return ShaderLabCategory;
         }
 
-        internal static List<ShaderlabProperty> ParseShaderlabProperties(string source)
+        internal static List<ShaderLabProperty> ParseShaderLabProperties(string source)
         {
             string propertiesBlock;
             string pattern = @"(?<=\b(Properties)\b)\s*{(?:[^{}]+|(?<open>{)|(?<-open>})|(?:(?<close-open>)[^{}]*)+)*(?(open)(?!))}";

@@ -3,15 +3,15 @@ using System.Diagnostics;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using System.Text.RegularExpressions;
-using static Infinity.Shaderlib.ShaderConductorWrapper;
+using static SharpShader.ShaderConductor.ShaderConductorWrapper;
 
-namespace Infinity.Shaderlib
+namespace SharpShader.ShaderConductor
 {
-    internal unsafe class ShaderConductorDebugger
+    internal unsafe class ShaderConductorBlobDebugger
     {
         ShaderConductorBlob m_Target;
 
-        public ShaderConductorDebugger(ShaderConductorBlob target)
+        public ShaderConductorBlobDebugger(ShaderConductorBlob target)
         {
             m_Target = target;
         }
@@ -40,7 +40,7 @@ namespace Infinity.Shaderlib
         }
     }
 
-    [DebuggerTypeProxy(typeof(ShaderConductorDebugger))]
+    [DebuggerTypeProxy(typeof(ShaderConductorBlobDebugger))]
     public unsafe struct ShaderConductorBlob : IDisposable
     {
         public uint Size => m_Size;
@@ -89,7 +89,7 @@ namespace Infinity.Shaderlib
         public void Dispose()
         {
             //MemoryUtility.Free(m_Data.ToPointer());
-            if(m_Result.HasValue)
+            if (m_Result.HasValue)
             {
                 DestroyShaderConductorBlob(m_Result.Value.target);
                 DestroyShaderConductorBlob(m_Result.Value.errorWarningMsg);
@@ -97,13 +97,13 @@ namespace Infinity.Shaderlib
         }
     }
 
-    public class ShaderCompilerLibraryLoader : IDisposable
+    public class ShaderConductorInitializer : IDisposable
     {
         string m_ShaderCode;
         Vortice.Dxc.IDxcBlob m_CodeBlob;
         Vortice.Dxc.IDxcResult m_DxcResult;
 
-        public ShaderCompilerLibraryLoader()
+        public ShaderConductorInitializer()
         {
             m_ShaderCode = new string(@"
             [[vk::binding(0, 0)]]
@@ -131,7 +131,7 @@ namespace Infinity.Shaderlib
         }
     }
 
-    public static class ShaderCompiler
+    public static class ShaderConductorUtil
     {
         public static int G_OpenGLVersion = 310;
         public static int G_OptimizationLevel = 3;
@@ -143,7 +143,8 @@ namespace Infinity.Shaderlib
             ResultDesc desc2;
             IntPtr destination = Marshal.AllocHGlobal(bytecode.Length);
             Marshal.Copy(bytecode, 0, destination, bytecode.Length);
-            DisassembleDesc source = new DisassembleDesc {
+            DisassembleDesc source = new DisassembleDesc
+            {
                 language = EShadingLanguage.SpirV,
                 binary = destination,
                 binarySize = bytecode.Length
@@ -179,7 +180,8 @@ namespace Infinity.Shaderlib
 
             string str2;
             ResultDesc desc4;
-            SourceDesc source = new SourceDesc {
+            SourceDesc source = new SourceDesc
+            {
                 stage = stage,
                 source = hlslSource,
                 entryPoint = entryPoint
@@ -197,7 +199,8 @@ namespace Infinity.Shaderlib
                 options.shiftAllSamplersBindings = 40;
                 options.shiftAllTexturesBindings = 60;
             }
-            TargetDesc target = new TargetDesc {
+            TargetDesc target = new TargetDesc
+            {
                 version = G_OpenGLVersion.ToString(),
                 language = language
             };
@@ -215,7 +218,8 @@ namespace Infinity.Shaderlib
             else
             {
                 ResultDesc desc8;
-                DisassembleDesc desc9 = new DisassembleDesc {
+                DisassembleDesc desc9 = new DisassembleDesc
+                {
                     language = language,
                     binary = GetShaderConductorBlobData(desc4.target),
                     binarySize = GetShaderConductorBlobSize(desc4.target)
@@ -311,7 +315,8 @@ namespace Infinity.Shaderlib
         public static byte[] HLSLToMangedSpirV(string hlslSource, string entryPoint, in EFunctionStage stage, in bool keepDebugInfo = false, in bool disableOptimization = false)
         {
             ResultDesc desc4;
-            SourceDesc source = new SourceDesc {
+            SourceDesc source = new SourceDesc
+            {
                 stage = stage,
                 source = hlslSource,
                 entryPoint = entryPoint
@@ -326,7 +331,8 @@ namespace Infinity.Shaderlib
             options.shiftAllUABuffersBindings = 20;
             options.shiftAllSamplersBindings = 40;
             options.shiftAllTexturesBindings = 60;
-            TargetDesc target = new TargetDesc {
+            TargetDesc target = new TargetDesc
+            {
                 version = G_OpenGLVersion.ToString(),
                 language = EShadingLanguage.SpirV
             };
@@ -441,8 +447,8 @@ namespace Infinity.Shaderlib
                     }
                 }
                 input = Regex.Replace(input, @"(findLSB\(.*\))", "uint($1)");
-            } 
-            else if(language == EShadingLanguage.Hlsl)
+            }
+            else if (language == EShadingLanguage.Hlsl)
             {
                 input = input.Replace("_Globals_", "");
             }

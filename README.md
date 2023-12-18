@@ -1,5 +1,5 @@
 # SharpShader
-A Shaderlab like shader framework.
+A ShaderLab like shader framework.
 
 # Example Shader
 Here is an example to use:
@@ -349,7 +349,7 @@ public class MinExample
 {
     static void Main(string[] args)
     {
-        Shaderlab shaderLab = ShaderlabUtility.ParseShaderlabFromFile("D:\\Test\\UnlitShader.shader");
+        ShaderLab ShaderLab = ShaderLabUtility.ParseShaderLabFromFile("D:\\Test\\UnlitShader.shader");
         Console.ReadKey();
     }
 }
