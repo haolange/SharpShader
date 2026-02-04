@@ -59,7 +59,6 @@
 	</ItemGroup>
 
 	<ItemGroup>
-	  <PackageReference Include="System.Text.RegularExpressions" Version="4.3.1" />
 	  <PackageReference Include="Vortice.Dxc" Version="3.6.2" />
 	</ItemGroup>
 
