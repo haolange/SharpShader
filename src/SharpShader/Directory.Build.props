@@ -4,4 +4,9 @@
     <BaseIntermediateOutputPath>$(ProjectDir)../../../Intermediate/Graphics/SharpShader/</BaseIntermediateOutputPath>
     <MSBuildProjectExtensionsPath>$(ProjectDir)../../../Intermediate/Graphics/SharpShader/</MSBuildProjectExtensionsPath>
   </PropertyGroup>
+  <ItemGroup>
+    <Compile Remove="**/._*.cs" />
+    <None Remove="**/._*" />
+    <Content Remove="**/._*" />
+  </ItemGroup>
 </Project>
