@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
 	<PropertyGroup>
 		<TargetFramework>net10.0</TargetFramework>
@@ -6,7 +6,7 @@
 		<AssemblyName>SharpShader</AssemblyName>
 		<RootNamespace>SharpShader</RootNamespace>
 		<AllowUnsafeBlocks>True</AllowUnsafeBlocks>
-		<IntermediateOutputPath>../../../Intermediate/Graphics/SharpShader/</IntermediateOutputPath>
+		<IntermediateOutputPath>../../../Intermediate/Graphics/SharpShader/$(Platform)/$(Configuration)/</IntermediateOutputPath>
 		<BaseOutputPath>$(ProjectDir)../../../Binaries/Graphics/SharpShader/</BaseOutputPath>
 		<Nullable>enable</Nullable>
 	</PropertyGroup>
