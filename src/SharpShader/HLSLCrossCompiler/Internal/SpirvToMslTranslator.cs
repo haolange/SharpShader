@@ -3,7 +3,7 @@ using System.Runtime.InteropServices;
 using Silk.NET.SPIRV.Cross;
 using CrossResult = Silk.NET.SPIRV.Cross.Result;
 
-namespace SharpShader.SilkCompiler.Internal;
+namespace SharpShader.HLSLCrossCompiler.Internal;
 
 internal static unsafe class SpirvToMslTranslator
 {

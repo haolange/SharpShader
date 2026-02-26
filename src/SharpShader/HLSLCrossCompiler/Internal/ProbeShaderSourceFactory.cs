@@ -1,6 +1,6 @@
 using System;
 
-namespace SharpShader.SilkCompiler.Internal;
+namespace SharpShader.HLSLCrossCompiler.Internal;
 
 internal static class ProbeShaderSourceFactory
 {

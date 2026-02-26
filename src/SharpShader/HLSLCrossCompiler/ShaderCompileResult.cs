@@ -1,6 +1,6 @@
 using System;
 
-namespace SharpShader.SilkCompiler;
+namespace SharpShader.HLSLCrossCompiler;
 
 public sealed record ShaderCompileResult
 {

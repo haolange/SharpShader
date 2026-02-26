@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 
-namespace SharpShader.SilkCompiler;
+namespace SharpShader.HLSLCrossCompiler;
 
 public sealed record ShaderCompileRequest
 {

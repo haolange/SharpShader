@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 
-namespace SharpShader.SilkCompiler;
+namespace SharpShader.HLSLCrossCompiler;
 
 public static class ShaderCompilerCompat
 {
@@ -33,7 +33,7 @@ public static class ShaderCompilerCompat
             MslOptions = mslOptions ?? MslCompileOptions.Default,
         };
 
-        return SilkShaderCompiler.Compile(request);
+        return HLSLCrossCompiler.Compile(request);
     }
 
     public static byte[] CompileDxil(

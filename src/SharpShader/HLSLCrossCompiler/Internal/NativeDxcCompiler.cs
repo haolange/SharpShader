@@ -10,7 +10,7 @@ using System.Text;
 using Silk.NET.Core.Native;
 using Silk.NET.Direct3D.Compilers;
 
-namespace SharpShader.SilkCompiler.Internal;
+namespace SharpShader.HLSLCrossCompiler.Internal;
 
 internal static unsafe class NativeDxcCompiler
 {

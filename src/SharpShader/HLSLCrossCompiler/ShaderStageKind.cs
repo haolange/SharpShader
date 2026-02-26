@@ -1,4 +1,4 @@
-namespace SharpShader.SilkCompiler;
+namespace SharpShader.HLSLCrossCompiler;
 
 public enum ShaderStageKind
 {

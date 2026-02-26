@@ -1,7 +1,7 @@
 using System;
 using System.Text.Json.Serialization;
 
-namespace SharpShader.SilkCompiler;
+namespace SharpShader.HLSLCrossCompiler;
 
 public readonly struct ShaderModelVersion : IEquatable<ShaderModelVersion>
 {

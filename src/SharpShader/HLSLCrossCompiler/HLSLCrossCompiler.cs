@@ -1,10 +1,10 @@
 using System;
 using System.Collections.Generic;
-using SharpShader.SilkCompiler.Internal;
+using SharpShader.HLSLCrossCompiler.Internal;
 
-namespace SharpShader.SilkCompiler;
+namespace SharpShader.HLSLCrossCompiler;
 
-public static class SilkShaderCompiler
+public static class HLSLCrossCompiler
 {
     public static ShaderCompileResult Compile(ShaderCompileRequest request)
     {

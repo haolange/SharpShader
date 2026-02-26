@@ -4,7 +4,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Reflection;
 
-namespace SharpShader.SilkCompiler.Internal;
+namespace SharpShader.HLSLCrossCompiler.Internal;
 
 internal static class MacNativePayloadSanitizer
 {

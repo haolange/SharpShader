@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using System.Text;
 
-namespace SharpShader.SilkCompiler.Internal;
+namespace SharpShader.HLSLCrossCompiler.Internal;
 
 internal sealed class NativeWideStringMarshaller : IDisposable
 {

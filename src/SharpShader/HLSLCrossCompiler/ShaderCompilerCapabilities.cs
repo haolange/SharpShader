@@ -1,8 +1,8 @@
 using System;
 using System.Collections.Generic;
-using SharpShader.SilkCompiler.Internal;
+using SharpShader.HLSLCrossCompiler.Internal;
 
-namespace SharpShader.SilkCompiler;
+namespace SharpShader.HLSLCrossCompiler;
 
 public sealed class ShaderCompilerCapabilities
 {
@@ -21,6 +21,6 @@ public sealed class ShaderCompilerCapabilities
 
     public static ShaderCompilerCapabilities Probe()
     {
-        return SilkShaderCompiler.ProbeCapabilities();
+        return HLSLCrossCompiler.ProbeCapabilities();
     }
 }

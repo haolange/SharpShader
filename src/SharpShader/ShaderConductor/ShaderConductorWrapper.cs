@@ -1,6 +1,6 @@
 ﻿using System;
 using System.Runtime.InteropServices;
-using SharpShader.SilkCompiler.Internal;
+using SharpShader.HLSLCrossCompiler.Internal;
 
 namespace SharpShader.ShaderConductor
 {

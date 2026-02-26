@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using Silk.NET.Direct3D.Compilers;
 
-namespace SharpShader.SilkCompiler.Internal;
+namespace SharpShader.HLSLCrossCompiler.Internal;
 
 internal static class DxcArgumentBuilder
 {
