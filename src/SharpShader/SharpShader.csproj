@@ -74,4 +74,8 @@
 	  <PackageReference Include="Vortice.SPIRV.Reflect" Version="1.0.6" />
 	</ItemGroup>
 
+	<Target Name="ClearMacNativePayloadQuarantine" AfterTargets="Build" Condition="$([MSBuild]::IsOSPlatform('OSX'))">
+		<Exec Command="/usr/bin/xattr -dr com.apple.quarantine &quot;$(TargetDir)runtimes&quot;" Condition="Exists('$(TargetDir)runtimes')" IgnoreExitCode="true" />
+	</Target>
+
 </Project>

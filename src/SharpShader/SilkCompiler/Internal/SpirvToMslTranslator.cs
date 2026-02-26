@@ -93,12 +93,6 @@ internal static unsafe class SpirvToMslTranslator
                     cross,
                     context,
                     "Failed to set MSL argument buffers tier option.");
-
-                ThrowIfFailed(
-                    cross.CompilerOptionsSetBool(options, CompilerOption.MslDecorateArgumentBufferIndex, requestedOptions.EnableDecorateArgumentBufferIndex ? (byte)1 : (byte)0),
-                    cross,
-                    context,
-                    "Failed to set MSL decorate argument buffer index option.");
             }
 
             ThrowIfFailed(

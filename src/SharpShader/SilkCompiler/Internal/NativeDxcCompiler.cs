@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Runtime.CompilerServices;
@@ -55,6 +56,8 @@ internal static unsafe class NativeDxcCompiler
 
     static NativeDxcCompiler()
     {
+        MacNativePayloadSanitizer.EnsureKnownPayloadsAreSanitized(typeof(NativeDxcCompiler).Assembly);
+
         try
         {
             NativeLibrary.SetDllImportResolver(typeof(NativeDxcCompiler).Assembly, ResolveDxcLibraryImport);
@@ -67,32 +70,9 @@ internal static unsafe class NativeDxcCompiler
 
     public static bool IsAvailable()
     {
-        bool cliAvailable = DxcCliCompiler.IsAvailable();
-
-        try
-        {
-            using ComPtr<IDxcLibrary> library = CreateInstanceOrDefault<IDxcLibrary>(ClsidDxcLibraryCandidates, IidDxcLibrary);
-            using ComPtr<IDxcCompiler> compiler = CreateInstanceOrDefault<IDxcCompiler>(ClsidDxcCompilerCandidates, IidDxcCompiler);
-
-            if (library.Handle == null || compiler.Handle == null)
-            {
-                return cliAvailable && ProbeCompilePath();
-            }
-
-            // A successful COM activation is insufficient on macOS; some DXC dylibs
-            // can initialize but still fail every compile due ABI/string-marshalling mismatch.
-            return ProbeCompilePath();
-        }
-        catch (Exception ex) when (
-            ex is FileNotFoundException or
-            DllNotFoundException or
-            BadImageFormatException or
-            EntryPointNotFoundException or
-            TypeInitializationException or
-            InvalidCastException)
-        {
-            return cliAvailable && ProbeCompilePath();
-        }
+        // Availability should reflect an end-to-end probe compile result rather than
+        // partial activation checks, which can be false negatives on macOS.
+        return ProbeCompilePath();
     }
 
     private static bool ProbeCompilePath()
@@ -234,12 +214,6 @@ internal static unsafe class NativeDxcCompiler
                 objectBlob.Dispose();
             }
         }
-        catch (ShaderCompilerException ex) when (
-            ex.ErrorCode == ShaderCompilerErrorCode.BackendUnavailable &&
-            DxcCliCompiler.IsAvailable())
-        {
-            return DxcCliCompiler.Compile(request);
-        }
         catch (ShaderCompilerException)
         {
             throw;
@@ -252,11 +226,6 @@ internal static unsafe class NativeDxcCompiler
             TypeInitializationException or
             InvalidCastException)
         {
-            if (DxcCliCompiler.IsAvailable())
-            {
-                return DxcCliCompiler.Compile(request);
-            }
-
             throw new ShaderCompilerException(
                 ShaderCompilerErrorCode.BackendUnavailable,
                 "DXC native backend is unavailable in current process.",
@@ -365,86 +334,6 @@ internal static unsafe class NativeDxcCompiler
             $"DXC backend initialization failed for {interfaceName}. CLSID candidates={string.Join(", ", clsidCandidates)} IID={iid}.{details}{legacyDetails}");
     }
 
-    private static ComPtr<T> CreateInstanceOrDefault<T>(Guid[] clsidCandidates, Guid iid)
-        where T : unmanaged, IComVtbl<T>
-    {
-        bool hasSymbolPointer = TryGetInterfaceIdSymbolPointer(typeof(T).Name, out nint symbolPointer);
-        nint[] legacyIidPointerCandidates = EnumerateLegacyIidPointerCandidates(typeof(T).Name).ToArray();
-
-        foreach (Guid clsid in clsidCandidates)
-        {
-            Guid clsidLocal = clsid;
-            Guid iidCopy = iid;
-
-            try
-            {
-                int hr = TryCreateInstanceNative(ref clsidLocal, (nint)Unsafe.AsPointer(ref iidCopy), out nint instancePtr);
-                if (hr >= 0 && instancePtr != 0)
-                {
-                    return new ComPtr<T>((T*)instancePtr);
-                }
-            }
-            catch (Exception ex) when (
-                ex is FileNotFoundException or
-                DllNotFoundException or
-                BadImageFormatException or
-                EntryPointNotFoundException or
-                TypeInitializationException or
-                InvalidCastException)
-            {
-                // ignore and continue probing next candidate
-            }
-
-            if (hasSymbolPointer)
-            {
-                clsidLocal = clsid;
-                try
-                {
-                    int hr = TryCreateInstanceNative(ref clsidLocal, symbolPointer, out nint instancePtr);
-                    if (hr >= 0 && instancePtr != 0)
-                    {
-                        return new ComPtr<T>((T*)instancePtr);
-                    }
-                }
-                catch (Exception ex) when (
-                    ex is FileNotFoundException or
-                    DllNotFoundException or
-                    BadImageFormatException or
-                    EntryPointNotFoundException or
-                    TypeInitializationException or
-                    InvalidCastException)
-                {
-                    // ignore and continue probing next candidate
-                }
-            }
-
-            foreach (nint legacyIidPointer in legacyIidPointerCandidates)
-            {
-                clsidLocal = clsid;
-                try
-                {
-                    int hr = TryCreateInstanceNative(ref clsidLocal, legacyIidPointer, out nint instancePtr);
-                    if (hr >= 0 && instancePtr != 0)
-                    {
-                        return new ComPtr<T>((T*)instancePtr);
-                    }
-                }
-                catch (Exception ex) when (
-                    ex is FileNotFoundException or
-                    DllNotFoundException or
-                    BadImageFormatException or
-                    EntryPointNotFoundException or
-                    TypeInitializationException or
-                    InvalidCastException)
-                {
-                    // ignore and continue probing next candidate
-                }
-            }
-        }
-
-        return default;
-    }
-
     private static int TryCreateInstanceNative(ref Guid clsid, nint iidPointer, out nint instancePtr)
     {
         int hr = NativeDxcCreateInstance(ref clsid, iidPointer, out instancePtr);
@@ -485,15 +374,54 @@ internal static unsafe class NativeDxcCompiler
 
     private static nint LoadDxcNativeHandle()
     {
-        foreach (string candidate in EnumerateDxcNativeCandidates(typeof(NativeDxcCompiler).Assembly))
+        Assembly assembly = typeof(NativeDxcCompiler).Assembly;
+        List<string> candidates = EnumerateDxcNativeCandidates(assembly)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        foreach (string candidate in candidates)
         {
+            MacNativePayloadSanitizer.EnsureFileIsSanitized(candidate);
             if (File.Exists(candidate) && NativeLibrary.TryLoad(candidate, out nint handle))
             {
                 return handle;
             }
         }
 
+        if (OperatingSystem.IsMacOS())
+        {
+            FailFastMissingNativeDxc(candidates);
+        }
+
         return 0;
+    }
+
+    private static void FailFastMissingNativeDxc(IReadOnlyList<string> candidates)
+    {
+        List<string> existingCandidates = new List<string>();
+        foreach (string candidate in candidates)
+        {
+            if (File.Exists(candidate))
+            {
+                existingCandidates.Add(candidate);
+            }
+        }
+
+        string configuredPath = Environment.GetEnvironmentVariable("INFINITY_SHARPSHADER_DXCOMPILER_PATH") ?? "(unset)";
+        string existingSummary = existingCandidates.Count == 0 ? "(none)" : string.Join(", ", existingCandidates);
+        string candidateSummary = candidates.Count == 0 ? "(none)" : string.Join(", ", candidates);
+        string message =
+            "Native DXC is mandatory and no process-matched libdxcompiler could be loaded on this host. " +
+            $"INFINITY_SHARPSHADER_DXCOMPILER_PATH={configuredPath}. " +
+            $"Existing candidates={existingSummary}. " +
+            $"Probe candidates={candidateSummary}.";
+
+#if DEBUG
+        Debug.Fail(message);
+        throw new InvalidOperationException(message);
+#else
+        Environment.FailFast(message);
+#endif
     }
 
     private static nint ResolveDxcImageBase()
@@ -587,6 +515,7 @@ internal static unsafe class NativeDxcCompiler
 
         foreach (string candidate in EnumerateDxcNativeCandidates(assembly))
         {
+            MacNativePayloadSanitizer.EnsureFileIsSanitized(candidate);
             if (File.Exists(candidate) && NativeLibrary.TryLoad(candidate, out nint handle))
             {
                 return handle;
@@ -659,7 +588,7 @@ internal static unsafe class NativeDxcCompiler
         {
             throw new ShaderCompilerException(
                 ShaderCompilerErrorCode.BackendUnavailable,
-                $"DXC native backend returned HRESULT=0x{compileStatus:X8} for profile {profile}. The loaded libdxcompiler.dylib is not usable in current runtime.",
+                $"DXC native backend returned HRESULT=0x{compileStatus:X8} for profile {profile}. Native DXC is unavailable in current runtime.",
                 diagnostics,
                 profile);
         }

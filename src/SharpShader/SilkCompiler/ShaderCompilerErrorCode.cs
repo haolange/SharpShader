@@ -8,5 +8,4 @@ public enum ShaderCompilerErrorCode
     BackendUnavailable,
     CompileFailed,
     MslTranslateFailed,
-    RosettaHelperUnavailable,
 }
