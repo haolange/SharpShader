@@ -16,6 +16,9 @@ internal static unsafe class NativeDxcCompiler
 {
     private const string DxcLibraryName = "dxcompiler";
     private const int DxcStringEncodingUnavailableHResult = unchecked((int)0x80AA000C);
+    private const uint Utf8CodePage = 65001;
+    private const uint Utf16CodePage = 1200;
+    private const uint Utf32CodePage = 12000;
 
     // Candidate CLSIDs observed across different DXC drops.
     private static readonly Guid[] ClsidDxcLibraryCandidates =
@@ -133,13 +136,19 @@ internal static unsafe class NativeDxcCompiler
                     ? null
                     : request.EntryPoint;
 
-                int hrCompile = compiler.Get().Compile(
-                    (IDxcBlob*)sourceBlob.Handle,
+                using NativeWideStringMarshaller nativeArguments = NativeWideStringMarshaller.Create(
                     request.SourceName,
                     entryPoint,
                     profile,
-                    compileArguments,
-                    (uint)compileArguments.Length,
+                    compileArguments);
+
+                int hrCompile = compiler.Get().Compile(
+                    (IDxcBlob*)sourceBlob.Handle,
+                    (char*)nativeArguments.SourceName,
+                    (char*)nativeArguments.EntryPoint,
+                    (char*)nativeArguments.Profile,
+                    (char**)nativeArguments.Arguments,
+                    nativeArguments.ArgumentCount,
                     (Define*)null,
                     0,
                     includeHandler.Handle,
@@ -572,8 +581,31 @@ internal static unsafe class NativeDxcCompiler
             }
 
             byte[] bytes = new byte[(int)blobSize];
-            Marshal.Copy((IntPtr)errorBlob.Get().GetBufferPointer(), bytes, 0, bytes.Length);
-            return Encoding.UTF8.GetString(bytes).Trim('\0', '\r', '\n', ' ');
+            IntPtr blobPointer = (IntPtr)errorBlob.Get().GetBufferPointer();
+            if (blobPointer == IntPtr.Zero)
+            {
+                return string.Empty;
+            }
+
+            Marshal.Copy(blobPointer, bytes, 0, bytes.Length);
+
+            int known = 0;
+            uint codePage = 0;
+            int hrEncoding = errorBlob.Get().GetEncoding(&known, &codePage);
+            if (hrEncoding >= 0)
+            {
+                if (codePage == 0 && known != 0)
+                {
+                    codePage = OperatingSystem.IsWindows() ? Utf16CodePage : Utf32CodePage;
+                }
+            }
+            else
+            {
+                codePage = 0;
+            }
+
+            string diagnostics = DecodeDiagnostics(bytes, codePage);
+            return diagnostics.Trim('\0', '\r', '\n', ' ');
         }
         finally
         {
@@ -611,6 +643,76 @@ internal static unsafe class NativeDxcCompiler
                || diagnostics.Contains("profile is not supported", StringComparison.OrdinalIgnoreCase)
                || diagnostics.Contains("unrecognized target profile", StringComparison.OrdinalIgnoreCase)
                || diagnostics.Contains("shader model 6.8 is only available", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string DecodeDiagnostics(byte[] bytes, uint codePage)
+    {
+        if (bytes.Length == 0)
+        {
+            return string.Empty;
+        }
+
+        if (TryDecodeByCodePage(bytes, codePage, out string decoded))
+        {
+            return decoded;
+        }
+
+        return Encoding.UTF8.GetString(bytes);
+    }
+
+    private static bool TryDecodeByCodePage(byte[] bytes, uint codePage, out string decoded)
+    {
+        decoded = string.Empty;
+        if (bytes.Length == 0)
+        {
+            return true;
+        }
+
+        try
+        {
+            switch (codePage)
+            {
+                case Utf8CodePage:
+                    decoded = Encoding.UTF8.GetString(bytes);
+                    return true;
+                case Utf16CodePage:
+                    decoded = DecodeUtf16(bytes);
+                    return true;
+                case Utf32CodePage:
+                    decoded = DecodeUtf32(bytes);
+                    return true;
+                default:
+                    return false;
+            }
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static string DecodeUtf16(byte[] bytes)
+    {
+        int usableLength = bytes.Length - (bytes.Length % sizeof(char));
+        if (usableLength <= 0)
+        {
+            return string.Empty;
+        }
+
+        return Encoding.Unicode.GetString(bytes, 0, usableLength);
+    }
+
+    private static string DecodeUtf32(byte[] bytes)
+    {
+        const int Utf32BytesPerCodePoint = 4;
+        int usableLength = bytes.Length - (bytes.Length % Utf32BytesPerCodePoint);
+        if (usableLength <= 0)
+        {
+            return string.Empty;
+        }
+
+        return new UTF32Encoding(bigEndian: false, byteOrderMark: false, throwOnInvalidCharacters: false)
+            .GetString(bytes, 0, usableLength);
     }
 
     private static byte[] CopyBlobToManaged(ComPtr<IDxcBlob> blob)
