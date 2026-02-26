@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Numerics;
 
 namespace SharpShader.ShaderLab
@@ -199,6 +200,20 @@ namespace SharpShader.ShaderLab
         AccelerationStructure,
     }
 
+    public enum StandaloneShaderProgramKind
+    {
+        Compute = 0,
+        RayTrace,
+    }
+
+    public enum StandaloneShaderStage
+    {
+        Compute = 0,
+        RayGeneration,
+        Miss,
+        Unknown,
+    }
+
     public sealed class ShaderLab : IDisposable
     {
         public string Name { get; set; } = string.Empty;
@@ -207,6 +222,135 @@ namespace SharpShader.ShaderLab
 
         public void Dispose()
         {
+        }
+    }
+
+    public sealed class ShaderKeywordGroup
+    {
+        public List<string> Keywords { get; set; } = new List<string>();
+    }
+
+    public readonly struct ShaderVariantKey : IEquatable<ShaderVariantKey>
+    {
+        public IReadOnlyList<string> Keywords { get; }
+
+        public ShaderVariantKey(IEnumerable<string> keywords)
+        {
+            List<string> ordered = keywords
+                .Where(static keyword => !string.IsNullOrWhiteSpace(keyword))
+                .Distinct(StringComparer.Ordinal)
+                .OrderBy(static keyword => keyword, StringComparer.Ordinal)
+                .ToList();
+            Keywords = ordered;
+        }
+
+        public bool Equals(ShaderVariantKey other)
+        {
+            if (Keywords.Count != other.Keywords.Count)
+            {
+                return false;
+            }
+
+            for (int i = 0; i < Keywords.Count; ++i)
+            {
+                if (!string.Equals(Keywords[i], other.Keywords[i], StringComparison.Ordinal))
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        public override bool Equals(object? obj)
+        {
+            return obj is ShaderVariantKey other && Equals(other);
+        }
+
+        public override int GetHashCode()
+        {
+            HashCode hash = new HashCode();
+            for (int i = 0; i < Keywords.Count; ++i)
+            {
+                hash.Add(Keywords[i], StringComparer.Ordinal);
+            }
+            return hash.ToHashCode();
+        }
+
+        public override string ToString()
+        {
+            return Keywords.Count == 0
+                ? "<default>"
+                : string.Join(';', Keywords);
+        }
+    }
+
+    public sealed class StandaloneShaderEntry
+    {
+        public StandaloneShaderStage Stage { get; set; } = StandaloneShaderStage.Unknown;
+        public string EntryName { get; set; } = string.Empty;
+    }
+
+    public sealed class StandaloneShaderProgram
+    {
+        public StandaloneShaderProgramKind Kind { get; set; }
+        public string SourcePath { get; set; } = string.Empty;
+        public string Source { get; set; } = string.Empty;
+        public List<StandaloneShaderEntry> Entries { get; set; } = new List<StandaloneShaderEntry>();
+        public List<ShaderKeywordGroup> KeywordGroups { get; set; } = new List<ShaderKeywordGroup>();
+        public List<ShaderLabResourceBinding> Bindings { get; set; } = new List<ShaderLabResourceBinding>();
+        public List<ShaderLabConstantBuffer> ConstantBuffers { get; set; } = new List<ShaderLabConstantBuffer>();
+
+        public List<ShaderVariantKey> EnumerateVariantKeys()
+        {
+            List<ShaderVariantKey> result = new List<ShaderVariantKey>();
+            if (KeywordGroups.Count == 0)
+            {
+                result.Add(new ShaderVariantKey(Array.Empty<string>()));
+                return result;
+            }
+
+            List<string> selected = new List<string>();
+            EnumerateRecursive(0, selected, result);
+            if (result.Count == 0)
+            {
+                result.Add(new ShaderVariantKey(Array.Empty<string>()));
+            }
+
+            return result;
+        }
+
+        private void EnumerateRecursive(int groupIndex, List<string> selectedKeywords, List<ShaderVariantKey> destination)
+        {
+            if (groupIndex >= KeywordGroups.Count)
+            {
+                destination.Add(new ShaderVariantKey(selectedKeywords));
+                return;
+            }
+
+            ShaderKeywordGroup group = KeywordGroups[groupIndex];
+            if (group.Keywords.Count == 0)
+            {
+                EnumerateRecursive(groupIndex + 1, selectedKeywords, destination);
+                return;
+            }
+
+            for (int i = 0; i < group.Keywords.Count; ++i)
+            {
+                string keyword = group.Keywords[i];
+                bool enableKeyword = !string.Equals(keyword, "_", StringComparison.Ordinal);
+                if (enableKeyword)
+                {
+                    selectedKeywords.Add(keyword);
+                }
+
+                EnumerateRecursive(groupIndex + 1, selectedKeywords, destination);
+
+                if (enableKeyword)
+                {
+                    selectedKeywords.RemoveAt(selectedKeywords.Count - 1);
+                }
+            }
         }
     }
 

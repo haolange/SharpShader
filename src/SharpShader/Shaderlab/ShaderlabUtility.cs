@@ -11,6 +11,7 @@ namespace SharpShader.ShaderLab
     {
         private static readonly Regex s_TagPairRegex = new Regex("\\\"(.*?)\\\"\\s*=\\s*\\\"(.*?)\\\"", RegexOptions.Compiled | RegexOptions.Singleline);
         private static readonly Regex s_PragmaRegex = new Regex(@"^\s*#pragma\s+(?<stage>\w+)\s+(?<entry>[A-Za-z_]\w*)", RegexOptions.Compiled | RegexOptions.Multiline);
+        private static readonly Regex s_StandalonePragmaRegex = new Regex(@"^\s*#pragma\s+(?<directive>\w+)(?<args>.*)$", RegexOptions.Compiled | RegexOptions.Multiline);
         private static readonly Regex s_CBufferRegex = new Regex(
             @"cbuffer\s+(?<name>[A-Za-z_]\w*)(?:\s*:\s*register\s*\(\s*b(?<slot>\d+)\s*,\s*space(?<space>\d+)\s*\))?\s*;?\s*\{(?<body>.*?)\};",
             RegexOptions.Compiled | RegexOptions.Singleline | RegexOptions.IgnoreCase);
@@ -37,6 +38,28 @@ namespace SharpShader.ShaderLab
                 Category = ParseShaderLabCategory(normalizedSource),
             };
             return shaderLab;
+        }
+
+        public static StandaloneShaderProgram ParseComputeProgramFromFile(string filePath)
+        {
+            string source = File.ReadAllText(filePath);
+            return ParseComputeProgramFromSource(source, filePath);
+        }
+
+        public static StandaloneShaderProgram ParseComputeProgramFromSource(string source, string sourcePath = "<memory>")
+        {
+            return ParseStandaloneProgram(source, sourcePath, StandaloneShaderProgramKind.Compute);
+        }
+
+        public static StandaloneShaderProgram ParseRayTraceProgramFromFile(string filePath)
+        {
+            string source = File.ReadAllText(filePath);
+            return ParseRayTraceProgramFromSource(source, filePath);
+        }
+
+        public static StandaloneShaderProgram ParseRayTraceProgramFromSource(string source, string sourcePath = "<memory>")
+        {
+            return ParseStandaloneProgram(source, sourcePath, StandaloneShaderProgramKind.RayTrace);
         }
 
         internal static string ParseShaderLabName(string source)
@@ -189,6 +212,144 @@ namespace SharpShader.ShaderLab
             }
 
             return entries;
+        }
+
+        private static StandaloneShaderProgram ParseStandaloneProgram(string source, string sourcePath, StandaloneShaderProgramKind kind)
+        {
+            string normalizedSource = NormalizeSource(source);
+            StandaloneShaderProgram program = new StandaloneShaderProgram
+            {
+                Kind = kind,
+                SourcePath = sourcePath,
+                Source = normalizedSource.Trim(),
+            };
+
+            program.Entries = ParseStandaloneEntries(normalizedSource, kind);
+            program.KeywordGroups = ParseKeywordGroups(normalizedSource);
+
+            List<ShaderLabProgramEntry> legacyEntries = new List<ShaderLabProgramEntry>(program.Entries.Count);
+            for (int i = 0; i < program.Entries.Count; ++i)
+            {
+                EShaderLabShaderStage legacyStage = ToLegacyStage(program.Entries[i].Stage);
+                if (legacyStage == EShaderLabShaderStage.Undefined)
+                {
+                    continue;
+                }
+
+                legacyEntries.Add(new ShaderLabProgramEntry
+                {
+                    Stage = legacyStage,
+                    EntryName = program.Entries[i].EntryName,
+                });
+            }
+
+            EShaderLabStageMask stageMask = ResolveStageMask(legacyEntries);
+            List<ShaderLabConstantBuffer> constantBuffers = ParseConstantBuffers(normalizedSource);
+            program.ConstantBuffers = constantBuffers;
+            program.Bindings = ParseProgramBindings(normalizedSource, constantBuffers, stageMask);
+            return program;
+        }
+
+        private static List<StandaloneShaderEntry> ParseStandaloneEntries(string source, StandaloneShaderProgramKind kind)
+        {
+            List<StandaloneShaderEntry> entries = new List<StandaloneShaderEntry>();
+            foreach (Match match in s_StandalonePragmaRegex.Matches(source))
+            {
+                string directive = match.Groups["directive"].Value.Trim().ToLowerInvariant();
+                string args = match.Groups["args"].Value.Trim();
+                if (string.IsNullOrWhiteSpace(args))
+                {
+                    continue;
+                }
+
+                string[] tokens = args.Split(new[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+                if (tokens.Length == 0)
+                {
+                    continue;
+                }
+
+                if (kind == StandaloneShaderProgramKind.Compute)
+                {
+                    if (!directive.Equals("kernel", StringComparison.Ordinal) && !directive.Equals("compute", StringComparison.Ordinal))
+                    {
+                        continue;
+                    }
+
+                    entries.Add(new StandaloneShaderEntry
+                    {
+                        Stage = StandaloneShaderStage.Compute,
+                        EntryName = tokens[0],
+                    });
+                    continue;
+                }
+
+                if (kind == StandaloneShaderProgramKind.RayTrace)
+                {
+                    if (directive.Equals("raygeneration", StringComparison.Ordinal))
+                    {
+                        entries.Add(new StandaloneShaderEntry
+                        {
+                            Stage = StandaloneShaderStage.RayGeneration,
+                            EntryName = tokens[0],
+                        });
+                    }
+                    else if (directive.Equals("miss", StringComparison.Ordinal))
+                    {
+                        entries.Add(new StandaloneShaderEntry
+                        {
+                            Stage = StandaloneShaderStage.Miss,
+                            EntryName = tokens[0],
+                        });
+                    }
+                }
+            }
+
+            return entries;
+        }
+
+        private static List<ShaderKeywordGroup> ParseKeywordGroups(string source)
+        {
+            List<ShaderKeywordGroup> groups = new List<ShaderKeywordGroup>();
+            foreach (Match match in s_StandalonePragmaRegex.Matches(source))
+            {
+                string directive = match.Groups["directive"].Value.Trim().ToLowerInvariant();
+                if (!directive.Equals("multi_compile", StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                string args = match.Groups["args"].Value.Trim();
+                if (string.IsNullOrWhiteSpace(args))
+                {
+                    continue;
+                }
+
+                string[] tokens = args.Split(new[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+                if (tokens.Length == 0)
+                {
+                    continue;
+                }
+
+                ShaderKeywordGroup group = new ShaderKeywordGroup();
+                for (int i = 0; i < tokens.Length; ++i)
+                {
+                    group.Keywords.Add(tokens[i]);
+                }
+                groups.Add(group);
+            }
+
+            return groups;
+        }
+
+        private static EShaderLabShaderStage ToLegacyStage(StandaloneShaderStage stage)
+        {
+            return stage switch
+            {
+                StandaloneShaderStage.Compute => EShaderLabShaderStage.ProgramCompute,
+                StandaloneShaderStage.RayGeneration => EShaderLabShaderStage.ProgramRayGen,
+                StandaloneShaderStage.Miss => EShaderLabShaderStage.ProgramRayMiss,
+                _ => EShaderLabShaderStage.Undefined,
+            };
         }
 
         private static List<ShaderLabConstantBuffer> ParseConstantBuffers(string programSource)
