@@ -18,12 +18,12 @@ internal static class MacNativePayloadSanitizer
             return;
         }
 
-        foreach (string root in EnumerateKnownPayloadRoots(assembly))
+        foreach (string root in SharpShaderNativeLibraryLayout.EnumerateKnownPayloadDirectories(assembly))
         {
             EnsureDirectoryIsSanitized(root);
         }
 
-        string? configuredDxcPath = Environment.GetEnvironmentVariable("INFINITY_SHARPSHADER_DXCOMPILER_PATH");
+        string? configuredDxcPath = Environment.GetEnvironmentVariable(SharpShaderNativeLibraryLayout.DxcEnvironmentVariableName);
         EnsureFileOrDirectoryIsSanitized(configuredDxcPath);
     }
 
@@ -79,86 +79,6 @@ internal static class MacNativePayloadSanitizer
         if (Directory.Exists(normalized))
         {
             EnsureDirectoryIsSanitized(normalized);
-        }
-    }
-
-    private static IEnumerable<string> EnumerateKnownPayloadRoots(Assembly assembly)
-    {
-        string baseDir = AppContext.BaseDirectory;
-        string assemblyDir = Path.GetDirectoryName(assembly.Location) ?? baseDir;
-
-        HashSet<string> emitted = new(StringComparer.OrdinalIgnoreCase);
-
-        foreach (string candidate in EnumerateRuntimeCandidates(baseDir))
-        {
-            if (emitted.Add(candidate))
-            {
-                yield return candidate;
-            }
-        }
-
-        foreach (string candidate in EnumerateRuntimeCandidates(assemblyDir))
-        {
-            if (emitted.Add(candidate))
-            {
-                yield return candidate;
-            }
-        }
-
-        foreach (string root in EnumerateSearchRoots(baseDir, assemblyDir))
-        {
-            string runtimeRoot = Path.Combine(root, "Source", "Graphics", "SharpShader", "runtimes");
-            foreach (string candidate in EnumerateRuntimeCandidates(runtimeRoot))
-            {
-                if (emitted.Add(candidate))
-                {
-                    yield return candidate;
-                }
-            }
-        }
-    }
-
-    private static IEnumerable<string> EnumerateRuntimeCandidates(string root)
-    {
-        if (string.IsNullOrWhiteSpace(root))
-        {
-            yield break;
-        }
-
-        yield return Path.Combine(root, "runtimes", "osx-arm64", "native");
-        yield return Path.Combine(root, "runtimes", "osx-x64", "native");
-        yield return Path.Combine(root, "osx-arm64", "native");
-        yield return Path.Combine(root, "osx-x64", "native");
-    }
-
-    private static IEnumerable<string> EnumerateSearchRoots(params string[] startPoints)
-    {
-        HashSet<string> visited = new(StringComparer.OrdinalIgnoreCase);
-        foreach (string start in startPoints)
-        {
-            if (string.IsNullOrWhiteSpace(start))
-            {
-                continue;
-            }
-
-            DirectoryInfo? current = new DirectoryInfo(start);
-            int depth = 0;
-            while (current != null && depth < 16)
-            {
-                if (visited.Add(current.FullName))
-                {
-                    yield return current.FullName;
-                }
-
-                current = current.Parent;
-                depth++;
-            }
-        }
-
-        string cwd = Directory.GetCurrentDirectory();
-        if (visited.Add(cwd))
-        {
-            yield return cwd;
         }
     }
 

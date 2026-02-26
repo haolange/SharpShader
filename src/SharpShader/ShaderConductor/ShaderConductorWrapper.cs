@@ -1,11 +1,18 @@
 ﻿using System;
 using System.Runtime.InteropServices;
+using SharpShader.SilkCompiler.Internal;
 
 namespace SharpShader.ShaderConductor
 {
     public class ShaderConductorWrapper
     {
         private const string NativeLib = "ShaderConductorWrapper";
+
+        static ShaderConductorWrapper()
+        {
+            MacNativePayloadSanitizer.EnsureKnownPayloadsAreSanitized(typeof(ShaderConductorWrapper).Assembly);
+            SharpShaderNativeLibraryResolver.EnsureResolverRegistered(typeof(ShaderConductorWrapper).Assembly);
+        }
 
         [DllImport(NativeLib, CharSet = CharSet.Ansi, CallingConvention = CallingConvention.Cdecl)]
         public static extern void Compile([In] ref SourceDesc source, [In] ref OptionsDesc options, [In] ref TargetDesc target, out ResultDesc result);

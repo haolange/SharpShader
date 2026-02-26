@@ -57,15 +57,7 @@ internal static unsafe class NativeDxcCompiler
     static NativeDxcCompiler()
     {
         MacNativePayloadSanitizer.EnsureKnownPayloadsAreSanitized(typeof(NativeDxcCompiler).Assembly);
-
-        try
-        {
-            NativeLibrary.SetDllImportResolver(typeof(NativeDxcCompiler).Assembly, ResolveDxcLibraryImport);
-        }
-        catch (InvalidOperationException)
-        {
-            // Resolver was already set by another initialization path.
-        }
+        SharpShaderNativeLibraryResolver.EnsureResolverRegistered(typeof(NativeDxcCompiler).Assembly);
     }
 
     public static bool IsAvailable()
@@ -407,12 +399,12 @@ internal static unsafe class NativeDxcCompiler
             }
         }
 
-        string configuredPath = Environment.GetEnvironmentVariable("INFINITY_SHARPSHADER_DXCOMPILER_PATH") ?? "(unset)";
+        string configuredPath = Environment.GetEnvironmentVariable(SharpShaderNativeLibraryLayout.DxcEnvironmentVariableName) ?? "(unset)";
         string existingSummary = existingCandidates.Count == 0 ? "(none)" : string.Join(", ", existingCandidates);
         string candidateSummary = candidates.Count == 0 ? "(none)" : string.Join(", ", candidates);
         string message =
             "Native DXC is mandatory and no process-matched libdxcompiler could be loaded on this host. " +
-            $"INFINITY_SHARPSHADER_DXCOMPILER_PATH={configuredPath}. " +
+            $"{SharpShaderNativeLibraryLayout.DxcEnvironmentVariableName}={configuredPath}. " +
             $"Existing candidates={existingSummary}. " +
             $"Probe candidates={candidateSummary}.";
 
@@ -506,61 +498,9 @@ internal static unsafe class NativeDxcCompiler
         return $"handle=0x{handle:X}, export={(hasExport ? $"0x{exportPtr:X}" : "none")}, imageBase=0x{imageBase:X}, slot[0xC1F020]=0x{probe0:X}, slot[0xC1F028]=0x{probe1:X}";
     }
 
-    private static nint ResolveDxcLibraryImport(string libraryName, Assembly assembly, DllImportSearchPath? searchPath)
-    {
-        if (!libraryName.Equals(DxcLibraryName, StringComparison.OrdinalIgnoreCase))
-        {
-            return 0;
-        }
-
-        foreach (string candidate in EnumerateDxcNativeCandidates(assembly))
-        {
-            MacNativePayloadSanitizer.EnsureFileIsSanitized(candidate);
-            if (File.Exists(candidate) && NativeLibrary.TryLoad(candidate, out nint handle))
-            {
-                return handle;
-            }
-        }
-
-        return 0;
-    }
-
     private static IEnumerable<string> EnumerateDxcNativeCandidates(Assembly assembly)
     {
-        string baseDir = AppContext.BaseDirectory;
-        string assemblyDir = Path.GetDirectoryName(assembly.Location) ?? baseDir;
-
-        string? configuredPath = Environment.GetEnvironmentVariable("INFINITY_SHARPSHADER_DXCOMPILER_PATH");
-        if (!string.IsNullOrWhiteSpace(configuredPath))
-        {
-            yield return configuredPath!;
-            yield return Path.Combine(configuredPath!, "libdxcompiler.dylib");
-        }
-
-        string? matchedRid = ResolveArchitectureMatchedOsxRid();
-        if (!string.IsNullOrWhiteSpace(matchedRid))
-        {
-            yield return Path.Combine(baseDir, "runtimes", matchedRid, "native", "libdxcompiler.dylib");
-            yield return Path.Combine(assemblyDir, "runtimes", matchedRid, "native", "libdxcompiler.dylib");
-        }
-
-        yield return Path.Combine(baseDir, "libdxcompiler.dylib");
-        yield return Path.Combine(assemblyDir, "libdxcompiler.dylib");
-    }
-
-    private static string? ResolveArchitectureMatchedOsxRid()
-    {
-        if (!OperatingSystem.IsMacOS())
-        {
-            return null;
-        }
-
-        return RuntimeInformation.ProcessArchitecture switch
-        {
-            Architecture.X64 => "osx-x64",
-            Architecture.Arm64 => "osx-arm64",
-            _ => null,
-        };
+        return SharpShaderNativeLibraryResolver.EnumerateCandidates(DxcLibraryName, assembly);
     }
 
     private static string[] BuildLegacyCompilerArguments(List<string> arguments)
