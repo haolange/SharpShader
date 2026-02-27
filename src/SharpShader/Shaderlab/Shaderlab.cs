@@ -217,7 +217,8 @@ namespace SharpShader.ShaderLab
     public sealed class ShaderLab : IDisposable
     {
         public string Name { get; set; } = string.Empty;
-        public ShaderLabCategory Category { get; set; } = new ShaderLabCategory();
+        public List<ShaderLabPass> Passes { get; set; } = new List<ShaderLabPass>();
+        public Dictionary<string, string> Tags { get; set; } = new Dictionary<string, string>(StringComparer.Ordinal);
         public List<ShaderLabProperty> Properties { get; set; } = new List<ShaderLabProperty>();
 
         public void Dispose()
@@ -413,22 +414,6 @@ namespace SharpShader.ShaderLab
         public int Slot { get; set; } = -1;
         public int Space { get; set; } = -1;
         public List<ShaderLabConstantMember> Members { get; set; } = new List<ShaderLabConstantMember>();
-    }
-
-    public sealed class ShaderLabCategory : IDisposable
-    {
-        public List<ShaderLabPass> Passes { get; set; }
-        public Dictionary<string, string> Tags { get; set; }
-
-        public ShaderLabCategory(int capacity = 3)
-        {
-            Passes = new List<ShaderLabPass>(capacity);
-            Tags = new Dictionary<string, string>(capacity, StringComparer.Ordinal);
-        }
-
-        public void Dispose()
-        {
-        }
     }
 
     public sealed class ShaderLabStencilOp

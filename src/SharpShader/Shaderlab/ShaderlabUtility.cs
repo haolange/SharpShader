@@ -4,6 +4,7 @@ using System.Globalization;
 using System.IO;
 using System.Text;
 using System.Text.RegularExpressions;
+using SharpShader.ShaderLab.Frontend;
 
 namespace SharpShader.ShaderLab
 {
@@ -31,12 +32,42 @@ namespace SharpShader.ShaderLab
         public static ShaderLab ParseShaderLabFromSource(string source)
         {
             string normalizedSource = NormalizeSource(source);
+            ShaderLabPreprocessedSource preprocessed = ShaderLabProgramBlockExtractor.Extract(normalizedSource);
+            ShaderLabDslParseResult parsed = ShaderLabDslParser.Parse(preprocessed.SanitizedSource);
+
             ShaderLab shaderLab = new ShaderLab
             {
-                Name = ParseShaderLabName(normalizedSource),
-                Properties = ParseShaderLabProperties(normalizedSource),
-                Category = ParseShaderLabCategory(normalizedSource),
+                Name = parsed.Name,
+                Properties = ParseShaderLabPropertiesBlock(parsed.PropertiesBlockContent),
             };
+
+            foreach (ShaderLabParsedTag tag in parsed.ShaderTags)
+            {
+                shaderLab.Tags[tag.Key] = tag.Value;
+            }
+
+            foreach (ShaderLabParsedPass parsedPass in parsed.Passes)
+            {
+                ShaderLabPass pass = new ShaderLabPass();
+                foreach (ShaderLabParsedTag tag in parsedPass.Tags)
+                {
+                    pass.Tags[tag.Key] = tag.Value;
+                }
+
+                if (!string.IsNullOrWhiteSpace(parsedPass.HlslPlaceholder))
+                {
+                    if (!preprocessed.TryGetHlslBlock(parsedPass.HlslPlaceholder, out string? programSource))
+                    {
+                        throw new FormatException($"ShaderLab placeholder '{parsedPass.HlslPlaceholder}' has no extracted HLSL block.");
+                    }
+
+                    pass.Program = ParseProgram(programSource ?? string.Empty);
+                }
+
+                pass.State = ParseRenderState(parsedPass.StateSource, parsedPass.StencilBlockContent);
+                shaderLab.Passes.Add(pass);
+            }
+
             return shaderLab;
         }
 
@@ -62,70 +93,16 @@ namespace SharpShader.ShaderLab
             return ParseStandaloneProgram(source, sourcePath, StandaloneShaderProgramKind.RayTrace);
         }
 
-        internal static string ParseShaderLabName(string source)
-        {
-            int shaderKeywordIndex = FindKeyword(source, "Shader", 0);
-            if (shaderKeywordIndex < 0)
-            {
-                throw new FormatException("ShaderLab source missing 'Shader' declaration.");
-            }
-
-            int quoteStart = source.IndexOf('"', shaderKeywordIndex);
-            if (quoteStart < 0)
-            {
-                throw new FormatException("Shader name is missing opening quote.");
-            }
-
-            int quoteEnd = source.IndexOf('"', quoteStart + 1);
-            if (quoteEnd <= quoteStart)
-            {
-                throw new FormatException("Shader name is missing closing quote.");
-            }
-
-            return source.Substring(quoteStart + 1, quoteEnd - quoteStart - 1);
-        }
-
-        internal static ShaderLabCategory ParseShaderLabCategory(string source)
-        {
-            // TODO(SUBSHADER_COMPAT): Add SubShader-first parsing compatibility with Unity full syntax.
-            if (!TryExtractNamedBlock(source, "Category", 0, out TextBlock categoryBlock))
-            {
-                return new ShaderLabCategory();
-            }
-
-            ShaderLabCategory category = new ShaderLabCategory();
-
-            int firstPassKeyword = FindKeyword(categoryBlock.Content, "Pass", 0);
-            if (TryExtractNamedBlock(categoryBlock.Content, "Tags", 0, out TextBlock categoryTagsBlock)
-                && (firstPassKeyword < 0 || categoryTagsBlock.KeywordIndex < firstPassKeyword))
-            {
-                foreach (KeyValuePair<string, string> pair in ParseTags(categoryTagsBlock.Content))
-                {
-                    category.Tags[pair.Key] = pair.Value;
-                }
-            }
-
-            int cursor = 0;
-            while (TryExtractNamedBlock(categoryBlock.Content, "Pass", cursor, out TextBlock passBlock))
-            {
-                ShaderLabPass pass = ParsePass(passBlock.Content);
-                category.Passes.Add(pass);
-                cursor = passBlock.EndIndex + 1;
-            }
-
-            return category;
-        }
-
-        internal static List<ShaderLabProperty> ParseShaderLabProperties(string source)
+        internal static List<ShaderLabProperty> ParseShaderLabPropertiesBlock(string propertiesContent)
         {
             List<ShaderLabProperty> properties = new List<ShaderLabProperty>();
-            if (!TryExtractNamedBlock(source, "Properties", 0, out TextBlock propertiesBlock))
+            if (string.IsNullOrWhiteSpace(propertiesContent))
             {
                 return properties;
             }
 
             List<string> pendingAttributes = new List<string>();
-            string[] lines = propertiesBlock.Content.Split('\n');
+            string[] lines = propertiesContent.Split('\n');
             foreach (string rawLine in lines)
             {
                 string line = RemoveInlineComment(rawLine).Trim();
@@ -152,30 +129,6 @@ namespace SharpShader.ShaderLab
             return properties;
         }
 
-        private static ShaderLabPass ParsePass(string passSource)
-        {
-            ShaderLabPass pass = new ShaderLabPass();
-
-            if (TryExtractNamedBlock(passSource, "Tags", 0, out TextBlock passTags))
-            {
-                foreach (KeyValuePair<string, string> pair in ParseTags(passTags.Content))
-                {
-                    pass.Tags[pair.Key] = pair.Value;
-                }
-            }
-
-            string sourceWithoutProgram = passSource;
-            if (TryExtractProgram(passSource, out string programSource, out int programStartIndex, out int programEndIndex))
-            {
-                ShaderLabProgram program = ParseProgram(programSource);
-                pass.Program = program;
-                sourceWithoutProgram = passSource.Remove(programStartIndex, programEndIndex - programStartIndex);
-            }
-
-            pass.State = ParseRenderState(sourceWithoutProgram);
-            return pass;
-        }
-
         private static ShaderLabProgram ParseProgram(string programSource)
         {
             ShaderLabProgram program = new ShaderLabProgram
@@ -194,7 +147,8 @@ namespace SharpShader.ShaderLab
         private static List<ShaderLabProgramEntry> ParseProgramEntries(string programSource)
         {
             List<ShaderLabProgramEntry> entries = new List<ShaderLabProgramEntry>();
-            foreach (Match match in s_PragmaRegex.Matches(programSource))
+            string pragmaSource = StripCommentsPreserveNewlines(programSource);
+            foreach (Match match in s_PragmaRegex.Matches(pragmaSource))
             {
                 string stageKeyword = match.Groups["stage"].Value;
                 string entryName = match.Groups["entry"].Value;
@@ -253,7 +207,8 @@ namespace SharpShader.ShaderLab
         private static List<StandaloneShaderEntry> ParseStandaloneEntries(string source, StandaloneShaderProgramKind kind)
         {
             List<StandaloneShaderEntry> entries = new List<StandaloneShaderEntry>();
-            foreach (Match match in s_StandalonePragmaRegex.Matches(source))
+            string pragmaSource = StripCommentsPreserveNewlines(source);
+            foreach (Match match in s_StandalonePragmaRegex.Matches(pragmaSource))
             {
                 string directive = match.Groups["directive"].Value.Trim().ToLowerInvariant();
                 string args = match.Groups["args"].Value.Trim();
@@ -310,7 +265,8 @@ namespace SharpShader.ShaderLab
         private static List<ShaderKeywordGroup> ParseKeywordGroups(string source)
         {
             List<ShaderKeywordGroup> groups = new List<ShaderKeywordGroup>();
-            foreach (Match match in s_StandalonePragmaRegex.Matches(source))
+            string pragmaSource = StripCommentsPreserveNewlines(source);
+            foreach (Match match in s_StandalonePragmaRegex.Matches(pragmaSource))
             {
                 string directive = match.Groups["directive"].Value.Trim().ToLowerInvariant();
                 if (!directive.Equals("multi_compile", StringComparison.Ordinal))
@@ -437,47 +393,47 @@ namespace SharpShader.ShaderLab
             return bindings;
         }
 
-        private static ShaderLabRenderState? ParseRenderState(string passSource)
+        private static ShaderLabRenderState? ParseRenderState(string stateSource, string stencilSource)
         {
             ShaderLabRenderState state = new ShaderLabRenderState();
             bool hasState = false;
 
-            Match cullMatch = Regex.Match(passSource, @"\bCull\s+(Off|FrontAndBack|Front|Back)\b", RegexOptions.IgnoreCase);
+            Match cullMatch = Regex.Match(stateSource, @"\bCull\s+(Off|FrontAndBack|Front|Back)\b", RegexOptions.IgnoreCase);
             if (cullMatch.Success)
             {
                 state.Cull = (int)ParseCullMode(cullMatch.Groups[1].Value);
                 hasState = true;
             }
 
-            Match zWriteMatch = Regex.Match(passSource, @"\bZWrite\s+(On|Off)\b", RegexOptions.IgnoreCase);
+            Match zWriteMatch = Regex.Match(stateSource, @"\bZWrite\s+(On|Off)\b", RegexOptions.IgnoreCase);
             if (zWriteMatch.Success)
             {
                 state.ZWrite = zWriteMatch.Groups[1].Value.Equals("On", StringComparison.OrdinalIgnoreCase) ? 1 : 0;
                 hasState = true;
             }
 
-            Match zTestMatch = Regex.Match(passSource, @"\bZTest\s+(Disabled|Never|Less|Equal|LEqual|Greater|NotEqual|GEqual|Always)\b", RegexOptions.IgnoreCase);
+            Match zTestMatch = Regex.Match(stateSource, @"\bZTest\s+(Disabled|Never|Less|Equal|LEqual|Greater|NotEqual|GEqual|Always)\b", RegexOptions.IgnoreCase);
             if (zTestMatch.Success)
             {
                 state.ZTest = (int)ParseCompareFunction(zTestMatch.Groups[1].Value);
                 hasState = true;
             }
 
-            Match colorMaskMatch = Regex.Match(passSource, @"\bColorMask\s+([A-Za-z0-9]+)\b", RegexOptions.IgnoreCase);
+            Match colorMaskMatch = Regex.Match(stateSource, @"\bColorMask\s+([A-Za-z0-9]+)\b", RegexOptions.IgnoreCase);
             if (colorMaskMatch.Success)
             {
                 state.ColorMask = new ShaderLabFloatProperty(ParseColorMask(colorMaskMatch.Groups[1].Value), "ColorMask");
                 hasState = true;
             }
 
-            Match alphaToMaskMatch = Regex.Match(passSource, @"\bAlphaToMask\s+(On|Off)\b", RegexOptions.IgnoreCase);
+            Match alphaToMaskMatch = Regex.Match(stateSource, @"\bAlphaToMask\s+(On|Off)\b", RegexOptions.IgnoreCase);
             if (alphaToMaskMatch.Success)
             {
                 state.AlphaToMask = new ShaderLabFloatProperty(alphaToMaskMatch.Groups[1].Value.Equals("On", StringComparison.OrdinalIgnoreCase) ? 1f : 0f, "AlphaToMask");
                 hasState = true;
             }
 
-            Match offsetMatch = Regex.Match(passSource, @"\bOffset\s+([-+]?\d*\.?\d+)\s*,?\s*([-+]?\d*\.?\d+)", RegexOptions.IgnoreCase);
+            Match offsetMatch = Regex.Match(stateSource, @"\bOffset\s+([-+]?\d*\.?\d+)\s*,?\s*([-+]?\d*\.?\d+)", RegexOptions.IgnoreCase);
             if (offsetMatch.Success)
             {
                 state.OffsetFactor = new ShaderLabFloatProperty(ParseFloat(offsetMatch.Groups[1].Value), "OffsetFactor");
@@ -485,7 +441,7 @@ namespace SharpShader.ShaderLab
                 hasState = true;
             }
 
-            Match blendOpMatch = Regex.Match(passSource, @"\bBlendOp\s+([A-Za-z]+)(?:\s*,\s*([A-Za-z]+))?", RegexOptions.IgnoreCase);
+            Match blendOpMatch = Regex.Match(stateSource, @"\bBlendOp\s+([A-Za-z]+)(?:\s*,\s*([A-Za-z]+))?", RegexOptions.IgnoreCase);
             if (blendOpMatch.Success)
             {
                 state.BlendOp = new ShaderLabFloatProperty((int)ParseBlendOp(blendOpMatch.Groups[1].Value), "BlendOp");
@@ -497,7 +453,7 @@ namespace SharpShader.ShaderLab
                 hasState = true;
             }
 
-            Match blendMatch = Regex.Match(passSource, @"\bBlend\s+([A-Za-z]+)\s+([A-Za-z]+)(?:\s*,\s*([A-Za-z]+)\s+([A-Za-z]+))?", RegexOptions.IgnoreCase);
+            Match blendMatch = Regex.Match(stateSource, @"\bBlend\s+([A-Za-z]+)\s+([A-Za-z]+)(?:\s*,\s*([A-Za-z]+)\s+([A-Za-z]+))?", RegexOptions.IgnoreCase);
             if (blendMatch.Success)
             {
                 state.SrcBlend = new ShaderLabFloatProperty((int)ParseBlendMode(blendMatch.Groups[1].Value), "SrcBlend");
@@ -516,9 +472,9 @@ namespace SharpShader.ShaderLab
                 hasState = true;
             }
 
-            if (TryExtractNamedBlock(passSource, "Stencil", 0, out TextBlock stencilBlock))
+            if (!string.IsNullOrWhiteSpace(stencilSource))
             {
-                ParseStencilState(stencilBlock.Content, state);
+                ParseStencilState(stencilSource, state);
                 hasState = true;
             }
 
@@ -1209,101 +1165,6 @@ namespace SharpShader.ShaderLab
             return (min, max);
         }
 
-        private static bool TryExtractProgram(string passSource, out string programSource, out int programStartIndex, out int programEndIndex)
-        {
-            // TODO(CGPROGRAM_SUPPORT): Parse CGPROGRAM/CGINCLUDE blocks when legacy compatibility is needed.
-            programSource = string.Empty;
-            programStartIndex = -1;
-            programEndIndex = -1;
-
-            int hlslProgramIndex = FindKeyword(passSource, "HLSLPROGRAM", 0);
-            if (hlslProgramIndex < 0)
-            {
-                return false;
-            }
-
-            int programBodyStart = hlslProgramIndex + "HLSLPROGRAM".Length;
-            int endHlslIndex = FindKeyword(passSource, "ENDHLSL", programBodyStart);
-            if (endHlslIndex < 0)
-            {
-                return false;
-            }
-
-            programSource = passSource.Substring(programBodyStart, endHlslIndex - programBodyStart);
-            programStartIndex = hlslProgramIndex;
-            programEndIndex = endHlslIndex + "ENDHLSL".Length;
-            return true;
-        }
-
-        private static bool TryExtractNamedBlock(string source, string keyword, int startIndex, out TextBlock block)
-        {
-            block = default;
-            int keywordIndex = FindKeyword(source, keyword, startIndex);
-            if (keywordIndex < 0)
-            {
-                return false;
-            }
-
-            int openBrace = FindNextNonWhitespace(source, keywordIndex + keyword.Length);
-            if (openBrace < 0 || source[openBrace] != '{')
-            {
-                return false;
-            }
-
-            int closeBrace = FindMatchingBracket(source, openBrace, '{', '}');
-            if (closeBrace < 0)
-            {
-                return false;
-            }
-
-            block = new TextBlock
-            {
-                KeywordIndex = keywordIndex,
-                StartIndex = openBrace,
-                EndIndex = closeBrace,
-                Content = source.Substring(openBrace + 1, closeBrace - openBrace - 1),
-            };
-            return true;
-        }
-
-        private static int FindKeyword(string source, string keyword, int startIndex)
-        {
-            int cursor = Math.Max(startIndex, 0);
-            while (cursor < source.Length)
-            {
-                int found = source.IndexOf(keyword, cursor, StringComparison.OrdinalIgnoreCase);
-                if (found < 0)
-                {
-                    return -1;
-                }
-
-                bool leftBoundary = found == 0 || !IsIdentifierChar(source[found - 1]);
-                int after = found + keyword.Length;
-                bool rightBoundary = after >= source.Length || !IsIdentifierChar(source[after]);
-                if (leftBoundary && rightBoundary)
-                {
-                    return found;
-                }
-
-                cursor = found + keyword.Length;
-            }
-
-            return -1;
-        }
-
-        private static int FindNextNonWhitespace(string source, int startIndex)
-        {
-            for (int i = startIndex; i < source.Length; i++)
-            {
-                if (!char.IsWhiteSpace(source[i]))
-                {
-                    return i;
-                }
-            }
-
-            return -1;
-        }
-
         private static int FindMatchingBracket(string source, int openIndex, char openChar, char closeChar)
         {
             if (openIndex < 0 || openIndex >= source.Length || source[openIndex] != openChar)
@@ -1381,11 +1242,6 @@ namespace SharpShader.ShaderLab
             return -1;
         }
 
-        private static bool IsIdentifierChar(char c)
-        {
-            return char.IsLetterOrDigit(c) || c == '_';
-        }
-
         private static int TryParseInt(string text, int fallback)
         {
             return int.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out int value) ? value : fallback;
@@ -1410,6 +1266,79 @@ namespace SharpShader.ShaderLab
             return line;
         }
 
+        private static string StripCommentsPreserveNewlines(string source)
+        {
+            if (string.IsNullOrEmpty(source))
+            {
+                return string.Empty;
+            }
+
+            StringBuilder builder = new StringBuilder(source.Length);
+            bool inLineComment = false;
+            bool inBlockComment = false;
+            bool inString = false;
+
+            for (int i = 0; i < source.Length; i++)
+            {
+                char current = source[i];
+                char next = i + 1 < source.Length ? source[i + 1] : '\0';
+
+                if (inLineComment)
+                {
+                    if (current == '\n')
+                    {
+                        inLineComment = false;
+                        builder.Append('\n');
+                    }
+                    else
+                    {
+                        builder.Append(' ');
+                    }
+
+                    continue;
+                }
+
+                if (inBlockComment)
+                {
+                    if (current == '*' && next == '/')
+                    {
+                        inBlockComment = false;
+                        builder.Append("  ");
+                        i++;
+                        continue;
+                    }
+
+                    builder.Append(current == '\n' ? '\n' : ' ');
+                    continue;
+                }
+
+                if (!inString && current == '/' && next == '/')
+                {
+                    inLineComment = true;
+                    builder.Append("  ");
+                    i++;
+                    continue;
+                }
+
+                if (!inString && current == '/' && next == '*')
+                {
+                    inBlockComment = true;
+                    builder.Append("  ");
+                    i++;
+                    continue;
+                }
+
+                if (current == '"' && (i == 0 || source[i - 1] != '\\'))
+                {
+                    inString = !inString;
+                }
+
+                builder.Append(current);
+            }
+
+            return builder.ToString();
+        }
+
         private static string NormalizeSource(string source)
         {
             if (string.IsNullOrEmpty(source))
@@ -1432,12 +1361,5 @@ namespace SharpShader.ShaderLab
             return builder.ToString();
         }
 
-        private struct TextBlock
-        {
-            public int KeywordIndex;
-            public int StartIndex;
-            public int EndIndex;
-            public string Content;
-        }
     }
 }

@@ -49,6 +49,10 @@
 	</PropertyGroup>
 
 	<ItemGroup>
+	  <ProjectReference Include="..\..\ThirdParty\Antlr4\Antlr4.csproj" />
+	</ItemGroup>
+
+	<ItemGroup>
 	  <InternalsVisibleTo Include="Infinity.Rendering.Tests" />
 	</ItemGroup>
 
