@@ -211,6 +211,7 @@ namespace SharpShader.ShaderLab
         Compute = 0,
         RayGeneration,
         Miss,
+        Callable,
         Unknown,
     }
 

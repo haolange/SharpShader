@@ -256,6 +256,14 @@ namespace SharpShader.ShaderLab
                             EntryName = tokens[0],
                         });
                     }
+                    else if (directive.Equals("callable", StringComparison.Ordinal))
+                    {
+                        entries.Add(new StandaloneShaderEntry
+                        {
+                            Stage = StandaloneShaderStage.Callable,
+                            EntryName = tokens[0],
+                        });
+                    }
                 }
             }
 
@@ -304,6 +312,7 @@ namespace SharpShader.ShaderLab
                 StandaloneShaderStage.Compute => EShaderLabShaderStage.ProgramCompute,
                 StandaloneShaderStage.RayGeneration => EShaderLabShaderStage.ProgramRayGen,
                 StandaloneShaderStage.Miss => EShaderLabShaderStage.ProgramRayMiss,
+                StandaloneShaderStage.Callable => EShaderLabShaderStage.ProgramRayRcall,
                 _ => EShaderLabShaderStage.Undefined,
             };
         }
