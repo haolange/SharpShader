@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <!-- Native payloads are no longer copied via NuGet runtimes. -->
-  <!-- Runtime loading now resolves from Binaries/ThirdParty/SharpShader/<OS>/<Arch>/native. -->
+  <!-- Runtime loading now resolves from Binaries/ThirdParty/SharpShader/<OS>/<Arch>/. -->
 </Project>

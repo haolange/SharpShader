@@ -62,8 +62,6 @@ internal static class SharpShaderNativeLibraryLayout
     private enum NativeLibraryKey
     {
         Dxc,
-        ShaderConductor,
-        ShaderConductorWrapper,
     }
 
     public static IEnumerable<string> EnumerateKnownPayloadDirectories(Assembly assembly)
@@ -75,16 +73,29 @@ internal static class SharpShaderNativeLibraryLayout
 
         foreach (string root in EnumerateSearchRoots(baseDir, assemblyDir))
         {
-            string thirdPartyArm64 = Path.Combine(root, "Binaries", "ThirdParty", ThirdPartyRootName, "macOS", "ARM64", "native");
+            string thirdPartyArm64 = Path.Combine(root, "Binaries", "ThirdParty", ThirdPartyRootName, "macOS", "ARM64");
             if (emitted.Add(thirdPartyArm64))
             {
                 yield return thirdPartyArm64;
             }
 
-            string thirdPartyAmd64 = Path.Combine(root, "Binaries", "ThirdParty", ThirdPartyRootName, "macOS", "AMD64", "native");
+            string thirdPartyAmd64 = Path.Combine(root, "Binaries", "ThirdParty", ThirdPartyRootName, "macOS", "AMD64");
             if (emitted.Add(thirdPartyAmd64))
             {
                 yield return thirdPartyAmd64;
+            }
+
+            // Back-compat (pre-ADR-0014): payloads stored under an extra "native/" segment.
+            string legacyThirdPartyArm64 = Path.Combine(root, "Binaries", "ThirdParty", ThirdPartyRootName, "macOS", "ARM64", "native");
+            if (emitted.Add(legacyThirdPartyArm64))
+            {
+                yield return legacyThirdPartyArm64;
+            }
+
+            string legacyThirdPartyAmd64 = Path.Combine(root, "Binaries", "ThirdParty", ThirdPartyRootName, "macOS", "AMD64", "native");
+            if (emitted.Add(legacyThirdPartyAmd64))
+            {
+                yield return legacyThirdPartyAmd64;
             }
 
             string sourceRuntimeArm64 = Path.Combine(root, "Source", "Graphics", "SharpShader", "runtimes", "osx-arm64", "native");
@@ -184,12 +195,27 @@ internal static class SharpShaderNativeLibraryLayout
                     ThirdPartyRootName,
                     osFolder,
                     archFolder,
-                    "native",
                     nativeFileName);
 
                 if (emitted.Add(thirdPartyCandidate))
                 {
                     yield return thirdPartyCandidate;
+                }
+
+                // Back-compat (pre-ADR-0014): payloads stored under an extra "native/" segment.
+                string legacyThirdPartyCandidate = Path.Combine(
+                    root,
+                    "Binaries",
+                    "ThirdParty",
+                    ThirdPartyRootName,
+                    osFolder,
+                    archFolder,
+                    "native",
+                    nativeFileName);
+
+                if (emitted.Add(legacyThirdPartyCandidate))
+                {
+                    yield return legacyThirdPartyCandidate;
                 }
             }
         }
@@ -340,18 +366,6 @@ internal static class SharpShaderNativeLibraryLayout
             return true;
         }
 
-        if (normalized.Equals("shaderconductor", StringComparison.OrdinalIgnoreCase))
-        {
-            key = NativeLibraryKey.ShaderConductor;
-            return true;
-        }
-
-        if (normalized.Equals("shaderconductorwrapper", StringComparison.OrdinalIgnoreCase))
-        {
-            key = NativeLibraryKey.ShaderConductorWrapper;
-            return true;
-        }
-
         key = default;
         return false;
     }
@@ -379,8 +393,6 @@ internal static class SharpShaderNativeLibraryLayout
             return key switch
             {
                 NativeLibraryKey.Dxc => "dxcompiler.dll",
-                NativeLibraryKey.ShaderConductor => "ShaderConductor.dll",
-                NativeLibraryKey.ShaderConductorWrapper => "ShaderConductorWrapper.dll",
                 _ => null,
             };
         }
@@ -390,8 +402,6 @@ internal static class SharpShaderNativeLibraryLayout
             return key switch
             {
                 NativeLibraryKey.Dxc => "libdxcompiler.so",
-                NativeLibraryKey.ShaderConductor => "libShaderConductor.so",
-                NativeLibraryKey.ShaderConductorWrapper => "libShaderConductorWrapper.so",
                 _ => null,
             };
         }
@@ -401,8 +411,6 @@ internal static class SharpShaderNativeLibraryLayout
             return key switch
             {
                 NativeLibraryKey.Dxc => "libdxcompiler.dylib",
-                NativeLibraryKey.ShaderConductor => "libShaderConductor.dylib",
-                NativeLibraryKey.ShaderConductorWrapper => "libShaderConductorWrapper.dylib",
                 _ => null,
             };
         }
