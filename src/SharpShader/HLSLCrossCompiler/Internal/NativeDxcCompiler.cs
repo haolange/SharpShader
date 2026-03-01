@@ -385,6 +385,12 @@ internal static unsafe class NativeDxcCompiler
             MacNativePayloadSanitizer.EnsureFileIsSanitized(candidate);
             if (File.Exists(candidate) && NativeLibrary.TryLoad(candidate, out nint handle))
             {
+                string? dxcDirectory = Path.GetDirectoryName(candidate);
+                if (!string.IsNullOrWhiteSpace(dxcDirectory))
+                {
+                    EnsureDirectoryInProcessPath(dxcDirectory);
+                }
+                TryLoadCompanionDxilLibraries(candidate, candidates);
                 return handle;
             }
         }
@@ -395,6 +401,75 @@ internal static unsafe class NativeDxcCompiler
         }
 
         return 0;
+    }
+
+    private static void TryLoadCompanionDxilLibraries(string loadedDxcPath, IReadOnlyList<string> dxcCandidates)
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        HashSet<string> attemptedPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        TryLoadDxilSibling(loadedDxcPath, attemptedPaths);
+
+        for (int i = 0; i < dxcCandidates.Count; ++i)
+        {
+            TryLoadDxilSibling(dxcCandidates[i], attemptedPaths);
+        }
+    }
+
+    private static void TryLoadDxilSibling(string dxcPath, HashSet<string> attemptedPaths)
+    {
+        if (string.IsNullOrWhiteSpace(dxcPath))
+        {
+            return;
+        }
+
+        string? directory = Path.GetDirectoryName(dxcPath);
+        if (string.IsNullOrWhiteSpace(directory))
+        {
+            return;
+        }
+
+        EnsureDirectoryInProcessPath(directory);
+
+        string dxilPath = Path.Combine(directory, "dxil.dll");
+        string fullPath = Path.GetFullPath(dxilPath);
+        if (!attemptedPaths.Add(fullPath) || !File.Exists(fullPath))
+        {
+            return;
+        }
+
+        NativeLibrary.TryLoad(fullPath, out _);
+    }
+
+    private static void EnsureDirectoryInProcessPath(string directory)
+    {
+        if (!OperatingSystem.IsWindows() || string.IsNullOrWhiteSpace(directory))
+        {
+            return;
+        }
+
+        string fullDirectory = Path.GetFullPath(directory);
+        string existingPath = Environment.GetEnvironmentVariable("PATH") ?? string.Empty;
+        if (existingPath.Length > 0)
+        {
+            string[] segments = existingPath.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            for (int i = 0; i < segments.Length; ++i)
+            {
+                string segment = segments[i];
+                if (string.Equals(Path.GetFullPath(segment), fullDirectory, StringComparison.OrdinalIgnoreCase))
+                {
+                    return;
+                }
+            }
+        }
+
+        string updatedPath = string.IsNullOrWhiteSpace(existingPath)
+            ? fullDirectory
+            : $"{fullDirectory};{existingPath}";
+        Environment.SetEnvironmentVariable("PATH", updatedPath);
     }
 
     private static void FailFastMissingNativeDxc(IReadOnlyList<string> candidates)

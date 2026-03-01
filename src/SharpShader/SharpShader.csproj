@@ -60,7 +60,6 @@
 	  <PackageReference Include="Silk.NET.Direct3D.Compilers" Version="2.23.0" />
 	  <PackageReference Include="Silk.NET.SPIRV.Cross" Version="2.23.0" />
 	  <PackageReference Include="Silk.NET.SPIRV.Cross.Native" Version="2.23.0" />
-	  <PackageReference Include="Vortice.D3D12MA.Native" Version="1.0.0" />
 	  <PackageReference Include="Vortice.D3DCompiler" Version="3.8.2" />
 	  <PackageReference Include="Vortice.Dxc" Version="3.8.2" />
 	  <PackageReference Include="Vortice.Dxc.Native" Version="1.0.4" />

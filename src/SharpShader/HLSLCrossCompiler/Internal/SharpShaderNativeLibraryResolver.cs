@@ -142,6 +142,8 @@ internal static class SharpShaderNativeLibraryLayout
         string assemblyDir = Path.GetDirectoryName(assembly.Location) ?? baseDir;
         string? osFolder = ResolveBuildOsFolder();
         string? archFolder = ResolveBuildArchFolder();
+        string? legacyRid = ResolveRuntimeRid();
+        bool preferRuntimeRidFirst = key == NativeLibraryKey.Dxc && OperatingSystem.IsWindows();
 
         HashSet<string> emitted = new(StringComparer.OrdinalIgnoreCase);
 
@@ -153,6 +155,21 @@ internal static class SharpShaderNativeLibraryLayout
                 {
                     yield return configured;
                 }
+            }
+        }
+
+        if (preferRuntimeRidFirst && !string.IsNullOrWhiteSpace(legacyRid))
+        {
+            string legacyBaseCandidate = Path.Combine(baseDir, "runtimes", legacyRid, "native", nativeFileName);
+            if (emitted.Add(legacyBaseCandidate))
+            {
+                yield return legacyBaseCandidate;
+            }
+
+            string legacyAssemblyCandidate = Path.Combine(assemblyDir, "runtimes", legacyRid, "native", nativeFileName);
+            if (emitted.Add(legacyAssemblyCandidate))
+            {
+                yield return legacyAssemblyCandidate;
             }
         }
 
@@ -177,8 +194,7 @@ internal static class SharpShaderNativeLibraryLayout
             }
         }
 
-        string? legacyRid = ResolveRuntimeRid();
-        if (!string.IsNullOrWhiteSpace(legacyRid))
+        if (!preferRuntimeRidFirst && !string.IsNullOrWhiteSpace(legacyRid))
         {
             string legacyBaseCandidate = Path.Combine(baseDir, "runtimes", legacyRid, "native", nativeFileName);
             if (emitted.Add(legacyBaseCandidate))
