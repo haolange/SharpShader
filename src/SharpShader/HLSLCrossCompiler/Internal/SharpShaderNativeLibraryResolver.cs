@@ -57,7 +57,7 @@ internal static class SharpShaderNativeLibraryLayout
 {
     public const string DxcEnvironmentVariableName = "INFINITY_SHARPSHADER_DXCOMPILER_PATH";
 
-    private const string ThirdPartyRootName = "SharpShader";
+    private const string ThirdPartyRootName = "DXC";
 
     private enum NativeLibraryKey
     {
