@@ -57,6 +57,7 @@ internal static class SharpShaderNativeLibraryLayout
 {
     public const string DxcEnvironmentVariableName = "INFINITY_SHARPSHADER_DXCOMPILER_PATH";
 
+    private const string ThirdPartyVendorRootName = "Microsoft";
     private const string ThirdPartyRootName = "DXC";
 
     private enum NativeLibraryKey
@@ -73,6 +74,18 @@ internal static class SharpShaderNativeLibraryLayout
 
         foreach (string root in EnumerateSearchRoots(baseDir, assemblyDir))
         {
+            string thirdPartyMicrosoftArm64 = Path.Combine(root, "Binaries", "ThirdParty", ThirdPartyVendorRootName, ThirdPartyRootName, "macOS", "ARM64");
+            if (emitted.Add(thirdPartyMicrosoftArm64))
+            {
+                yield return thirdPartyMicrosoftArm64;
+            }
+
+            string thirdPartyMicrosoftAmd64 = Path.Combine(root, "Binaries", "ThirdParty", ThirdPartyVendorRootName, ThirdPartyRootName, "macOS", "AMD64");
+            if (emitted.Add(thirdPartyMicrosoftAmd64))
+            {
+                yield return thirdPartyMicrosoftAmd64;
+            }
+
             string thirdPartyArm64 = Path.Combine(root, "Binaries", "ThirdParty", ThirdPartyRootName, "macOS", "ARM64");
             if (emitted.Add(thirdPartyArm64))
             {
@@ -192,6 +205,7 @@ internal static class SharpShaderNativeLibraryLayout
                     root,
                     "Binaries",
                     "ThirdParty",
+                    ThirdPartyVendorRootName,
                     ThirdPartyRootName,
                     osFolder,
                     archFolder,
@@ -202,7 +216,7 @@ internal static class SharpShaderNativeLibraryLayout
                     yield return thirdPartyCandidate;
                 }
 
-                // Back-compat (pre-ADR-0014): payloads stored under an extra "native/" segment.
+                // Back-compat: pre-vendor layout (ADR-0014/ADR-0016 migration period).
                 string legacyThirdPartyCandidate = Path.Combine(
                     root,
                     "Binaries",
