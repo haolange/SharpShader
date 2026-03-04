@@ -86,66 +86,6 @@ internal static class SharpShaderNativeLibraryLayout
                 yield return thirdPartyMicrosoftAmd64;
             }
 
-            string thirdPartyArm64 = Path.Combine(root, "Binaries", "ThirdParty", ThirdPartyRootName, "macOS", "ARM64");
-            if (emitted.Add(thirdPartyArm64))
-            {
-                yield return thirdPartyArm64;
-            }
-
-            string thirdPartyAmd64 = Path.Combine(root, "Binaries", "ThirdParty", ThirdPartyRootName, "macOS", "AMD64");
-            if (emitted.Add(thirdPartyAmd64))
-            {
-                yield return thirdPartyAmd64;
-            }
-
-            // Back-compat (pre-ADR-0014): payloads stored under an extra "native/" segment.
-            string legacyThirdPartyArm64 = Path.Combine(root, "Binaries", "ThirdParty", ThirdPartyRootName, "macOS", "ARM64", "native");
-            if (emitted.Add(legacyThirdPartyArm64))
-            {
-                yield return legacyThirdPartyArm64;
-            }
-
-            string legacyThirdPartyAmd64 = Path.Combine(root, "Binaries", "ThirdParty", ThirdPartyRootName, "macOS", "AMD64", "native");
-            if (emitted.Add(legacyThirdPartyAmd64))
-            {
-                yield return legacyThirdPartyAmd64;
-            }
-
-            string sourceRuntimeArm64 = Path.Combine(root, "Source", "Graphics", "SharpShader", "runtimes", "osx-arm64", "native");
-            if (emitted.Add(sourceRuntimeArm64))
-            {
-                yield return sourceRuntimeArm64;
-            }
-
-            string sourceRuntimeX64 = Path.Combine(root, "Source", "Graphics", "SharpShader", "runtimes", "osx-x64", "native");
-            if (emitted.Add(sourceRuntimeX64))
-            {
-                yield return sourceRuntimeX64;
-            }
-
-            string runtimeArm64 = Path.Combine(root, "runtimes", "osx-arm64", "native");
-            if (emitted.Add(runtimeArm64))
-            {
-                yield return runtimeArm64;
-            }
-
-            string runtimeX64 = Path.Combine(root, "runtimes", "osx-x64", "native");
-            if (emitted.Add(runtimeX64))
-            {
-                yield return runtimeX64;
-            }
-
-            string looseArm64 = Path.Combine(root, "osx-arm64", "native");
-            if (emitted.Add(looseArm64))
-            {
-                yield return looseArm64;
-            }
-
-            string looseX64 = Path.Combine(root, "osx-x64", "native");
-            if (emitted.Add(looseX64))
-            {
-                yield return looseX64;
-            }
         }
     }
 
@@ -166,8 +106,6 @@ internal static class SharpShaderNativeLibraryLayout
         string assemblyDir = Path.GetDirectoryName(assembly.Location) ?? baseDir;
         string? osFolder = ResolveBuildOsFolder();
         string? archFolder = ResolveBuildArchFolder();
-        string? legacyRid = ResolveRuntimeRid();
-        bool preferRuntimeRidFirst = key == NativeLibraryKey.Dxc && OperatingSystem.IsWindows();
 
         HashSet<string> emitted = new(StringComparer.OrdinalIgnoreCase);
 
@@ -179,21 +117,6 @@ internal static class SharpShaderNativeLibraryLayout
                 {
                     yield return configured;
                 }
-            }
-        }
-
-        if (preferRuntimeRidFirst && !string.IsNullOrWhiteSpace(legacyRid))
-        {
-            string legacyBaseCandidate = Path.Combine(baseDir, "runtimes", legacyRid, "native", nativeFileName);
-            if (emitted.Add(legacyBaseCandidate))
-            {
-                yield return legacyBaseCandidate;
-            }
-
-            string legacyAssemblyCandidate = Path.Combine(assemblyDir, "runtimes", legacyRid, "native", nativeFileName);
-            if (emitted.Add(legacyAssemblyCandidate))
-            {
-                yield return legacyAssemblyCandidate;
             }
         }
 
@@ -215,50 +138,7 @@ internal static class SharpShaderNativeLibraryLayout
                 {
                     yield return thirdPartyCandidate;
                 }
-
-                // Back-compat: pre-vendor layout (ADR-0014/ADR-0016 migration period).
-                string legacyThirdPartyCandidate = Path.Combine(
-                    root,
-                    "Binaries",
-                    "ThirdParty",
-                    ThirdPartyRootName,
-                    osFolder,
-                    archFolder,
-                    "native",
-                    nativeFileName);
-
-                if (emitted.Add(legacyThirdPartyCandidate))
-                {
-                    yield return legacyThirdPartyCandidate;
-                }
             }
-        }
-
-        if (!preferRuntimeRidFirst && !string.IsNullOrWhiteSpace(legacyRid))
-        {
-            string legacyBaseCandidate = Path.Combine(baseDir, "runtimes", legacyRid, "native", nativeFileName);
-            if (emitted.Add(legacyBaseCandidate))
-            {
-                yield return legacyBaseCandidate;
-            }
-
-            string legacyAssemblyCandidate = Path.Combine(assemblyDir, "runtimes", legacyRid, "native", nativeFileName);
-            if (emitted.Add(legacyAssemblyCandidate))
-            {
-                yield return legacyAssemblyCandidate;
-            }
-        }
-
-        string flatBaseCandidate = Path.Combine(baseDir, nativeFileName);
-        if (emitted.Add(flatBaseCandidate))
-        {
-            yield return flatBaseCandidate;
-        }
-
-        string flatAssemblyCandidate = Path.Combine(assemblyDir, nativeFileName);
-        if (emitted.Add(flatAssemblyCandidate))
-        {
-            yield return flatAssemblyCandidate;
         }
     }
 
@@ -334,41 +214,6 @@ internal static class SharpShaderNativeLibraryLayout
             Architecture.Arm64 => "ARM64",
             _ => null,
         };
-    }
-
-    private static string? ResolveRuntimeRid()
-    {
-        if (OperatingSystem.IsWindows())
-        {
-            return RuntimeInformation.ProcessArchitecture switch
-            {
-                Architecture.X64 => "win-x64",
-                Architecture.Arm64 => "win-arm64",
-                _ => null,
-            };
-        }
-
-        if (OperatingSystem.IsLinux())
-        {
-            return RuntimeInformation.ProcessArchitecture switch
-            {
-                Architecture.X64 => "linux-x64",
-                Architecture.Arm64 => "linux-arm64",
-                _ => null,
-            };
-        }
-
-        if (OperatingSystem.IsMacOS())
-        {
-            return RuntimeInformation.ProcessArchitecture switch
-            {
-                Architecture.X64 => "osx-x64",
-                Architecture.Arm64 => "osx-arm64",
-                _ => null,
-            };
-        }
-
-        return null;
     }
 
     private static bool TryResolveLibraryKey(string libraryName, out NativeLibraryKey key)

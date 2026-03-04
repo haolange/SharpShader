@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <!-- Native payloads are no longer copied via NuGet runtimes. -->
-  <!-- Runtime loading now resolves from Binaries/ThirdParty/Microsoft/DXC/<OS>/<Arch>/ (with DXC legacy fallback). -->
+  <!-- Runtime loading now resolves from Binaries/ThirdParty/Microsoft/DXC/<OS>/<Arch>/ only. -->
 </Project>
