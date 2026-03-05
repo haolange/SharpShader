@@ -28,6 +28,7 @@ internal static unsafe class SpirvToMslTranslator
         uint[] spirvWords = new uint[spirvResult.Bytecode.Length / sizeof(uint)];
         Buffer.BlockCopy(spirvResult.Bytecode, 0, spirvWords, 0, spirvResult.Bytecode.Length);
 
+        SpirvCrossNativeLibraryBootstrap.EnsureLoaded();
         Cross cross = Cross.GetApi();
         Context* context = null;
 
