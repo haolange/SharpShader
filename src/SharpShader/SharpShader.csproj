@@ -5,9 +5,7 @@
 		<Platforms>x64;ARM64</Platforms>
 		<AssemblyName>SharpShader</AssemblyName>
 		<RootNamespace>SharpShader</RootNamespace>
-		<AllowUnsafeBlocks>True</AllowUnsafeBlocks>
-		<IntermediateOutputPath>../../../Intermediate/Graphics/SharpShader/$(Platform)/$(Configuration)/</IntermediateOutputPath>
-		<Nullable>enable</Nullable>
+		<AllowUnsafeBlocks>True</AllowUnsafeBlocks>		<Nullable>enable</Nullable>
 	</PropertyGroup>
 
 	<PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
@@ -49,7 +47,7 @@
 	</PropertyGroup>
 
 	<ItemGroup>
-	  <ProjectReference Include="..\..\ThirdParty\Antlr4\Antlr4.csproj" />
+	  <ProjectReference Include="..\..\..\ThirdParty\Antlr4\Antlr4.csproj" />
 	</ItemGroup>
 
 	<ItemGroup>
