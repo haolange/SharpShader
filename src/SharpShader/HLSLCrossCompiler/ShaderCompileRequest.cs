@@ -29,6 +29,8 @@ public sealed record ShaderCompileRequest
 
     public SpirvCompileOptions SpirvOptions { get; init; } = SpirvCompileOptions.Default;
 
+    public AppleMetalCompileStrategy AppleMetalStrategy { get; init; } = AppleMetalCompileStrategy.LegacySpirvCrossMsl;
+
     public bool Enable16BitTypes { get; init; } = true;
 
     public bool EnableDebugInfo { get; init; }

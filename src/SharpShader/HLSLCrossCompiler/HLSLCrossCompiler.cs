@@ -26,6 +26,11 @@ public static class HLSLCrossCompiler
         return CompileCore(request with { Target = ShaderTargetKind.Msl }, null);
     }
 
+    public static ShaderCompileResult CompileMetalLibrary(ShaderCompileRequest request)
+    {
+        return CompileCore(request with { Target = ShaderTargetKind.MetalLibrary }, null);
+    }
+
     public static ShaderCompilerCapabilities ProbeCapabilities()
     {
         return ProbeCapabilitiesCore(null);
@@ -50,6 +55,11 @@ public static class HLSLCrossCompiler
             ShaderCompileRequest spirvRequest = request with { Target = ShaderTargetKind.SpirV };
             ShaderCompileResult spirvResult = CompileViaDxc(spirvRequest, context);
             return SpirvToMslTranslator.Translate(request, spirvResult);
+        }
+
+        if (request.Target == ShaderTargetKind.MetalLibrary)
+        {
+            return MetalShaderConverterCompiler.CompileToMetalLibrary(request, context);
         }
 
         return CompileViaDxc(request, context);
