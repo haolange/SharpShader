@@ -1,11 +1,12 @@
-namespace SharpShader.HLSLCrossCompiler;
-
-public enum ShaderCompilerErrorCode
+namespace SharpShader.HLSLCrossCompiler
 {
-    Unknown = 0,
-    InvalidRequest,
-    ProfileUnsupported,
-    BackendUnavailable,
-    CompileFailed,
-    MslTranslateFailed,
+    public enum ShaderCompilerErrorCode
+    {
+        Unknown = 0,
+        InvalidRequest,
+        ProfileUnsupported,
+        BackendUnavailable,
+        CompileFailed,
+        MslTranslateFailed,
+    }
 }

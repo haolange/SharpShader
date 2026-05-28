@@ -1,10 +1,10 @@
 using System;
-using System.Collections.Generic;
-using System.Globalization;
 using System.IO;
 using System.Text;
-using System.Text.RegularExpressions;
+using System.Globalization;
+using System.Collections.Generic;
 using SharpShader.ShaderLab.Frontend;
+using System.Text.RegularExpressions;
 
 namespace SharpShader.ShaderLab
 {

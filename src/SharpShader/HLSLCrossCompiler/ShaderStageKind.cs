@@ -1,14 +1,15 @@
-namespace SharpShader.HLSLCrossCompiler;
-
-public enum ShaderStageKind
+namespace SharpShader.HLSLCrossCompiler
 {
-    Vertex,
-    Hull,
-    Domain,
-    Geometry,
-    Pixel,
-    Compute,
-    Amplification,
-    Mesh,
-    Library,
+    public enum ShaderStageKind
+    {
+        Vertex,
+        Hull,
+        Domain,
+        Geometry,
+        Pixel,
+        Compute,
+        Amplification,
+        Mesh,
+        Library,
+    }
 }

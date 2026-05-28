@@ -1,9 +1,10 @@
-namespace SharpShader.HLSLCrossCompiler;
-
-public enum ShaderTargetKind
+namespace SharpShader.HLSLCrossCompiler
 {
-    Dxil,
-    SpirV,
-    Msl,
-    MetalLibrary,
+    public enum ShaderTargetKind
+    {
+        Dxil,
+        SpirV,
+        Msl,
+        MetalLibrary,
+    }
 }

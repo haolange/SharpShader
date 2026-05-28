@@ -1,7 +1,8 @@
-namespace SharpShader.HLSLCrossCompiler;
-
-public enum AppleMetalCompileStrategy
+namespace SharpShader.HLSLCrossCompiler
 {
-    LegacySpirvCrossMsl = 0,
-    MetalShaderConverter = 1,
+    public enum AppleMetalCompileStrategy
+    {
+        LegacySpirvCrossMsl = 0,
+        MetalShaderConverter = 1,
+    }
 }

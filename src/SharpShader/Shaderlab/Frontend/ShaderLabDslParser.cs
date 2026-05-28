@@ -1,6 +1,6 @@
 using System;
-using System.Collections.Generic;
 using Antlr4.Runtime;
+using System.Collections.Generic;
 using SharpShader.ShaderLab.Frontend.Generated;
 
 namespace SharpShader.ShaderLab.Frontend
