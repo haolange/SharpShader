@@ -137,6 +137,8 @@ namespace SharpShader.ShaderLab
                 Entries = ParseProgramEntries(programSource),
             };
 
+            program.KeywordGroups = ParseKeywordGroups(programSource);
+
             EShaderLabStageMask stageMask = ResolveStageMask(program.Entries);
             List<ShaderLabConstantBuffer> constantBuffers = ParseConstantBuffers(programSource);
             program.ConstantBuffers = constantBuffers;
@@ -181,23 +183,7 @@ namespace SharpShader.ShaderLab
             program.Entries = ParseStandaloneEntries(normalizedSource, kind);
             program.KeywordGroups = ParseKeywordGroups(normalizedSource);
 
-            List<ShaderLabProgramEntry> legacyEntries = new List<ShaderLabProgramEntry>(program.Entries.Count);
-            for (int i = 0; i < program.Entries.Count; ++i)
-            {
-                EShaderLabShaderStage legacyStage = ToLegacyStage(program.Entries[i].Stage);
-                if (legacyStage == EShaderLabShaderStage.Undefined)
-                {
-                    continue;
-                }
-
-                legacyEntries.Add(new ShaderLabProgramEntry
-                {
-                    Stage = legacyStage,
-                    EntryName = program.Entries[i].EntryName,
-                });
-            }
-
-            EShaderLabStageMask stageMask = ResolveStageMask(legacyEntries);
+            EShaderLabStageMask stageMask = ResolveStandaloneStageMask(program.Entries);
             List<ShaderLabConstantBuffer> constantBuffers = ParseConstantBuffers(normalizedSource);
             program.ConstantBuffers = constantBuffers;
             program.Bindings = ParseProgramBindings(normalizedSource, constantBuffers, stageMask);
@@ -303,18 +289,6 @@ namespace SharpShader.ShaderLab
             }
 
             return groups;
-        }
-
-        private static EShaderLabShaderStage ToLegacyStage(StandaloneShaderStage stage)
-        {
-            return stage switch
-            {
-                StandaloneShaderStage.Compute => EShaderLabShaderStage.ProgramCompute,
-                StandaloneShaderStage.RayGeneration => EShaderLabShaderStage.ProgramRayGen,
-                StandaloneShaderStage.Miss => EShaderLabShaderStage.ProgramRayMiss,
-                StandaloneShaderStage.Callable => EShaderLabShaderStage.ProgramRayRcall,
-                _ => EShaderLabShaderStage.Undefined,
-            };
         }
 
         private static List<ShaderLabConstantBuffer> ParseConstantBuffers(string programSource)
@@ -880,6 +854,24 @@ namespace SharpShader.ShaderLab
                     EShaderLabShaderStage.ProgramRayCHit => EShaderLabStageMask.RayClosestHit,
                     EShaderLabShaderStage.ProgramRayMiss => EShaderLabStageMask.RayMiss,
                     EShaderLabShaderStage.ProgramRayRcall => EShaderLabStageMask.RayCallable,
+                    _ => EShaderLabStageMask.None,
+                };
+            }
+
+            return mask;
+        }
+
+        private static EShaderLabStageMask ResolveStandaloneStageMask(List<StandaloneShaderEntry> entries)
+        {
+            EShaderLabStageMask mask = EShaderLabStageMask.None;
+            foreach (StandaloneShaderEntry entry in entries)
+            {
+                mask |= entry.Stage switch
+                {
+                    StandaloneShaderStage.Compute => EShaderLabStageMask.Compute,
+                    StandaloneShaderStage.RayGeneration => EShaderLabStageMask.RayGen,
+                    StandaloneShaderStage.Miss => EShaderLabStageMask.RayMiss,
+                    StandaloneShaderStage.Callable => EShaderLabStageMask.RayCallable,
                     _ => EShaderLabStageMask.None,
                 };
             }

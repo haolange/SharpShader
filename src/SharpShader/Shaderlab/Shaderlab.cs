@@ -380,6 +380,7 @@ namespace SharpShader.ShaderLab
     {
         public string Source { get; set; } = string.Empty;
         public List<ShaderLabProgramEntry> Entries { get; set; } = new List<ShaderLabProgramEntry>();
+        public List<ShaderKeywordGroup> KeywordGroups { get; set; } = new List<ShaderKeywordGroup>();
         public List<ShaderLabResourceBinding> Bindings { get; set; } = new List<ShaderLabResourceBinding>();
         public List<ShaderLabConstantBuffer> ConstantBuffers { get; set; } = new List<ShaderLabConstantBuffer>();
     }
