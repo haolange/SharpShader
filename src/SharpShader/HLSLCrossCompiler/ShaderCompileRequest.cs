@@ -1,4 +1,5 @@
 using System;
+using System.Threading;
 using System.Collections.Generic;
 
 namespace SharpShader.HLSLCrossCompiler
@@ -29,7 +30,11 @@ namespace SharpShader.HLSLCrossCompiler
 
         public SpirvCompileOptions SpirvOptions { get; init; } = SpirvCompileOptions.Default;
 
-        public AppleMetalCompileStrategy AppleMetalStrategy { get; init; } = AppleMetalCompileStrategy.LegacySpirvCrossMsl;
+        public string? MetalShaderConverterPath { get; init; }
+
+        public TimeSpan MetalShaderConverterTimeout { get; init; } = TimeSpan.FromMinutes(2);
+
+        public CancellationToken CancellationToken { get; init; }
 
         public bool Enable16BitTypes { get; init; } = true;
 
@@ -58,6 +63,14 @@ namespace SharpShader.HLSLCrossCompiler
             if (OptimizationLevel is < 0 or > 3)
             {
                 throw new ShaderCompilerException(ShaderCompilerErrorCode.InvalidRequest, "OptimizationLevel must be in range 0-3.");
+            }
+
+            double converterTimeoutMilliseconds = MetalShaderConverterTimeout.TotalMilliseconds;
+            if (converterTimeoutMilliseconds <= 0 || converterTimeoutMilliseconds > uint.MaxValue - 1)
+            {
+                throw new ShaderCompilerException(
+                    ShaderCompilerErrorCode.InvalidRequest,
+                    $"MetalShaderConverterTimeout must be greater than zero and no more than {uint.MaxValue - 1} milliseconds.");
             }
 
             if (Stage != ShaderStageKind.Library && string.IsNullOrWhiteSpace(EntryPoint))

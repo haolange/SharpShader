@@ -1,4 +1,7 @@
 using System;
+using System.Collections.Generic;
+using SharpShader.Compilation;
+using Silk.NET.SPIRV;
 using Silk.NET.SPIRV.Cross;
 using System.Runtime.InteropServices;
 using CrossResult = Silk.NET.SPIRV.Cross.Result;
@@ -9,6 +12,39 @@ namespace SharpShader.HLSLCrossCompiler.Internal
     {
         public static ShaderCompileResult Translate(ShaderCompileRequest request, ShaderCompileResult spirvResult)
         {
+            return TranslateCore(
+                request,
+                spirvResult,
+                bindingPlan: null);
+        }
+
+        internal static ShaderCompileResult Translate(
+            ShaderCompileRequest request,
+            ShaderCompileResult spirvResult,
+            string entryPoint,
+            ShaderExecutionStage stage,
+            IReadOnlyList<VulkanShaderBindingMapping> vulkanBindings,
+            MetalShaderBackendLayout metalLayout)
+        {
+            MslTranslationBindingPlan bindingPlan =
+                MslTranslationBindingPlan.Create(
+                    entryPoint,
+                    stage,
+                    vulkanBindings,
+                    metalLayout);
+            return TranslateCore(
+                request,
+                spirvResult,
+                bindingPlan);
+        }
+
+        private static ShaderCompileResult TranslateCore(
+            ShaderCompileRequest request,
+            ShaderCompileResult spirvResult,
+            MslTranslationBindingPlan? bindingPlan)
+        {
+            ArgumentNullException.ThrowIfNull(request);
+            ArgumentNullException.ThrowIfNull(spirvResult);
             if (spirvResult.Bytecode.Length == 0)
             {
                 throw new ShaderCompilerException(
@@ -28,13 +64,13 @@ namespace SharpShader.HLSLCrossCompiler.Internal
             uint[] spirvWords = new uint[spirvResult.Bytecode.Length / sizeof(uint)];
             Buffer.BlockCopy(spirvResult.Bytecode, 0, spirvWords, 0, spirvResult.Bytecode.Length);
 
-            SpirvCrossNativeLibraryBootstrap.EnsureLoaded();
-            Cross cross = Cross.GetApi();
+            using Cross cross = SpirvCrossNativeLibraryBootstrap.CreateApi();
             Context* context = null;
 
-            ThrowIfFailed(cross.ContextCreate(&context), cross, context, "Failed to create SPIRV-Cross context.");
             try
             {
+                ThrowIfFailed(cross.ContextCreate(&context), cross, context, "Failed to create SPIRV-Cross context.");
+
                 ParsedIr* ir = null;
                 fixed (uint* spirvPtr = spirvWords)
                 {
@@ -51,6 +87,14 @@ namespace SharpShader.HLSLCrossCompiler.Internal
                     cross,
                     context,
                     "Failed to create MSL compiler.");
+
+                ExecutionModel? selectedExecutionModel = bindingPlan is null
+                    ? null
+                    : SpirvToMslBindingApplier.SelectEntryPoint(
+                        cross,
+                        context,
+                        compiler,
+                        bindingPlan);
 
                 CompilerOptions* options = null;
                 ThrowIfFailed(cross.CompilerCreateCompilerOptions(compiler, &options), cross, context, "Failed to create MSL compiler options.");
@@ -81,20 +125,35 @@ namespace SharpShader.HLSLCrossCompiler.Internal
                     context,
                     "Failed to set MSL target platform.");
 
+                bool enableArgumentBuffers = bindingPlan is null
+                    ? requestedOptions.EnableArgumentBuffers
+                    : bindingPlan.Mode == MslTranslationBindingMode.ReferenceBuffer;
                 ThrowIfFailed(
-                    cross.CompilerOptionsSetBool(options, CompilerOption.MslArgumentBuffers, requestedOptions.EnableArgumentBuffers ? (byte)1 : (byte)0),
+                    cross.CompilerOptionsSetBool(options, CompilerOption.MslArgumentBuffers, enableArgumentBuffers ? (byte)1 : (byte)0),
                     cross,
                     context,
                     "Failed to set MSL argument buffer option.");
 
-                if (requestedOptions.EnableArgumentBuffers)
+                if (enableArgumentBuffers)
                 {
+                    uint argumentBuffersTier = bindingPlan is null
+                        ? requestedOptions.ArgumentBuffersTier
+                        : 1u;
                     ThrowIfFailed(
-                        cross.CompilerOptionsSetUint(options, CompilerOption.MslArgumentBuffersTier, requestedOptions.ArgumentBuffersTier),
+                        cross.CompilerOptionsSetUint(options, CompilerOption.MslArgumentBuffersTier, argumentBuffersTier),
                         cross,
                         context,
                         "Failed to set MSL argument buffers tier option.");
                 }
+
+                bool enableDecorationBinding =
+                    requestedOptions.EnableDecorateArgumentBufferIndex
+                    || bindingPlan?.Mode == MslTranslationBindingMode.ReferenceBuffer;
+                ThrowIfFailed(
+                    cross.CompilerOptionsSetBool(options, CompilerOption.MslEnableDecorationBinding, enableDecorationBinding ? (byte)1 : (byte)0),
+                    cross,
+                    context,
+                    "Failed to set MSL argument-buffer id decoration option.");
 
                 ThrowIfFailed(
                     cross.CompilerOptionsSetBool(options, CompilerOption.MslForceNativeArrays, requestedOptions.ForceNativeArrays ? (byte)1 : (byte)0),
@@ -122,8 +181,34 @@ namespace SharpShader.HLSLCrossCompiler.Internal
 
                 ThrowIfFailed(cross.CompilerInstallCompilerOptions(compiler, options), cross, context, "Failed to install MSL compiler options.");
 
+                if (bindingPlan is not null)
+                {
+                    if (!selectedExecutionModel.HasValue)
+                    {
+                        throw new ShaderCompilerException(
+                            ShaderCompilerErrorCode.MslTranslateFailed,
+                            "Planned MSL translation did not select a SPIR-V execution model.");
+                    }
+
+                    SpirvToMslBindingApplier.Apply(
+                        cross,
+                        context,
+                        compiler,
+                        selectedExecutionModel.Value,
+                        bindingPlan);
+                }
+
                 byte* mslPtr = null;
                 ThrowIfFailed(cross.CompilerCompile(compiler, &mslPtr), cross, context, "SPIRV-Cross failed to compile MSL text.");
+
+                if (bindingPlan is not null)
+                {
+                    SpirvToMslBindingApplier.ValidateAdopted(
+                        cross,
+                        compiler,
+                        selectedExecutionModel!.Value,
+                        bindingPlan);
+                }
 
                 string mslText = Marshal.PtrToStringUTF8((IntPtr)mslPtr) ?? string.Empty;
                 if (string.IsNullOrWhiteSpace(mslText))

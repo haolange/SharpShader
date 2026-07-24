@@ -7,6 +7,8 @@ namespace SharpShader.HLSLCrossCompiler
         ProfileUnsupported,
         BackendUnavailable,
         CompileFailed,
+        ToolLaunchFailed,
+        ToolTimedOut,
         MslTranslateFailed,
     }
 }

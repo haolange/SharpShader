@@ -157,10 +157,7 @@ namespace SharpShader.HLSLCrossCompiler.Internal
                 args.Add("-fvk-invert-y");
             }
 
-            AppendShiftOption(args, "-fvk-t-shift", options.TextureBindingShift, options.TextureBindingSpace);
-            AppendShiftOption(args, "-fvk-s-shift", options.SamplerBindingShift, options.SamplerBindingSpace);
-            AppendShiftOption(args, "-fvk-u-shift", options.UavBindingShift, options.UavBindingSpace);
-            AppendShiftOption(args, "-fvk-b-shift", options.CBufferBindingShift, options.CBufferBindingSpace);
+            AppendBindingShifts(args, options.BindingShifts);
 
             if (!string.IsNullOrWhiteSpace(options.TargetEnvironment))
             {
@@ -176,16 +173,73 @@ namespace SharpShader.HLSLCrossCompiler.Internal
             }
         }
 
-        private static void AppendShiftOption(List<string> args, string optionName, int? shift, uint registerSpace)
+        private static void AppendBindingShifts(
+            List<string> args,
+            IReadOnlyList<SpirvBindingShift> bindingShifts)
         {
-            if (!shift.HasValue)
+            if (bindingShifts is null)
             {
-                return;
+                throw new ShaderCompilerException(
+                    ShaderCompilerErrorCode.InvalidRequest,
+                    "SPIR-V binding shifts must not be null.");
             }
 
-            args.Add(optionName);
-            args.Add(shift.Value.ToString(CultureInfo.InvariantCulture));
-            args.Add(registerSpace.ToString(CultureInfo.InvariantCulture));
+            SpirvBindingShift[] ordered = new List<SpirvBindingShift>(bindingShifts).ToArray();
+            Array.Sort(ordered, CompareBindingShifts);
+            HashSet<(SpirvBindingShiftKind Kind, uint RegisterSpace)> identities = new();
+            foreach (SpirvBindingShift bindingShift in ordered)
+            {
+                if (!Enum.IsDefined(bindingShift.Kind))
+                {
+                    throw new ShaderCompilerException(
+                        ShaderCompilerErrorCode.InvalidRequest,
+                        $"SPIR-V binding shift kind {bindingShift.Kind} is not defined.");
+                }
+
+                if (bindingShift.Shift < 0)
+                {
+                    throw new ShaderCompilerException(
+                        ShaderCompilerErrorCode.InvalidRequest,
+                        $"SPIR-V {bindingShift.Kind} binding shift for register space "
+                        + $"{bindingShift.RegisterSpace} must not be negative.");
+                }
+
+                if (!identities.Add((bindingShift.Kind, bindingShift.RegisterSpace)))
+                {
+                    throw new ShaderCompilerException(
+                        ShaderCompilerErrorCode.InvalidRequest,
+                        $"SPIR-V binding shifts contain duplicate {bindingShift.Kind} mapping "
+                        + $"for register space {bindingShift.RegisterSpace}.");
+                }
+
+                args.Add(GetBindingShiftOption(bindingShift.Kind));
+                args.Add(bindingShift.Shift.ToString(CultureInfo.InvariantCulture));
+                args.Add(bindingShift.RegisterSpace.ToString(CultureInfo.InvariantCulture));
+            }
+        }
+
+        private static int CompareBindingShifts(
+            SpirvBindingShift left,
+            SpirvBindingShift right)
+        {
+            int kind = left.Kind.CompareTo(right.Kind);
+            return kind != 0
+                ? kind
+                : left.RegisterSpace.CompareTo(right.RegisterSpace);
+        }
+
+        private static string GetBindingShiftOption(SpirvBindingShiftKind kind)
+        {
+            return kind switch
+            {
+                SpirvBindingShiftKind.ShaderResource => "-fvk-t-shift",
+                SpirvBindingShiftKind.Sampler => "-fvk-s-shift",
+                SpirvBindingShiftKind.ConstantBuffer => "-fvk-b-shift",
+                SpirvBindingShiftKind.UnorderedAccess => "-fvk-u-shift",
+                _ => throw new ShaderCompilerException(
+                    ShaderCompilerErrorCode.InvalidRequest,
+                    $"SPIR-V binding shift kind {kind} is not defined."),
+            };
         }
     }
 }

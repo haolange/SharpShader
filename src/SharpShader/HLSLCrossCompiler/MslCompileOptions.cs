@@ -36,8 +36,5 @@ namespace SharpShader.HLSLCrossCompiler
         /// allowing discrete resource updates without re-encoding the entire argument buffer.
         /// </summary>
         public bool EnableDecorateArgumentBufferIndex { get; init; }
-
-        // Placeholder for future Metal IR backends (MetalShaderConverter / MDT).
-        public string? MetalIrBackendHint { get; init; }
     }
 }

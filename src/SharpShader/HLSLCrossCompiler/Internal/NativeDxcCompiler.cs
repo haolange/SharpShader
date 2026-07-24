@@ -2,13 +2,10 @@ using System;
 using System.IO;
 using System.Linq;
 using System.Text;
-using System.Reflection;
-using System.Diagnostics;
 using Silk.NET.Core.Native;
 using System.Collections.Generic;
 using Silk.NET.Direct3D.Compilers;
 using System.Runtime.InteropServices;
-using System.Runtime.CompilerServices;
 
 namespace SharpShader.HLSLCrossCompiler.Internal
 {
@@ -16,61 +13,19 @@ namespace SharpShader.HLSLCrossCompiler.Internal
     {
         private const string DxcLibraryName = "dxcompiler";
         private const int DxcStringEncodingUnavailableHResult = unchecked((int)0x80AA000C);
-        private const uint Utf8CodePage = 65001;
-        private const uint Utf16CodePage = 1200;
-        private const uint Utf32CodePage = 12000;
 
-        // Candidate CLSIDs observed across different DXC drops.
-        private static readonly Guid[] ClsidDxcLibraryCandidates =
-        {
-            new("6245D6AF-66E0-48FD-80B4-4D271796748C"),
-            IDxcLibrary.Guid,
-        };
-
-        private static readonly Guid[] ClsidDxcCompilerCandidates =
-        {
-            new("73E22D93-E6CE-47F3-B5BF-F0664F39C1B0"),
-            IDxcCompiler.Guid,
-            IDxcCompiler3.Guid,
-        };
-
-        private static readonly Guid IidDxcLibrary = IDxcLibrary.Guid;
-        private static readonly Guid IidDxcCompiler = IDxcCompiler.Guid;
-        private static readonly Lazy<nint> DxcNativeHandle = new(LoadDxcNativeHandle);
-        private static readonly Lazy<nint> DxcImageBase = new(ResolveDxcImageBase);
+        private static readonly Guid s_ClsidDxcUtils = new("6245D6AF-66E0-48FD-80B4-4D271796748C");
+        private static readonly Guid s_ClsidDxcCompiler = new("73E22D93-E6CE-47F3-B5BF-F0664F39C1B0");
 
         [DllImport(DxcLibraryName, EntryPoint = "DxcCreateInstance", CallingConvention = CallingConvention.Winapi, ExactSpelling = true)]
-        private static extern int NativeDxcCreateInstance(ref Guid clsid, nint iid, out nint instance);
-
-        [DllImport(DxcLibraryName, EntryPoint = "DxcCreateInstance2", CallingConvention = CallingConvention.Winapi, ExactSpelling = true)]
-        private static extern int NativeDxcCreateInstance2(nint malloc, ref Guid clsid, nint iid, out nint instance);
-
-        [StructLayout(LayoutKind.Sequential)]
-        private struct DlInfo
-        {
-            public nint FileName;
-            public nint FileBase;
-            public nint SymbolName;
-            public nint SymbolAddress;
-        }
-
-        [DllImport("/usr/lib/libSystem.B.dylib", EntryPoint = "dladdr", ExactSpelling = true)]
-        private static extern int DlAddr(nint address, out DlInfo info);
+        private static extern int NativeDxcCreateInstance(ref Guid clsid, ref Guid iid, out nint instance);
 
         static NativeDxcCompiler()
         {
-            MacNativePayloadSanitizer.EnsureKnownPayloadsAreSanitized(typeof(NativeDxcCompiler).Assembly);
             SharpShaderNativeLibraryResolver.EnsureResolverRegistered(typeof(NativeDxcCompiler).Assembly);
         }
 
         public static bool IsAvailable()
-        {
-            // Availability should reflect an end-to-end probe compile result rather than
-            // partial activation checks, which can be false negatives on macOS.
-            return ProbeCompilePath();
-        }
-
-        private static bool ProbeCompilePath()
         {
             ShaderCompileRequest request = ProbeShaderSourceFactory.CreateProbeRequest(
                 ShaderStageKind.Vertex,
@@ -78,8 +33,7 @@ namespace SharpShader.HLSLCrossCompiler.Internal
 
             try
             {
-                ShaderCompileResult result = Compile(request);
-                return result.Bytecode.Length > 0;
+                return Compile(request).Bytecode.Length > 0;
             }
             catch (ShaderCompilerException ex) when (
                 ex.ErrorCode == ShaderCompilerErrorCode.BackendUnavailable ||
@@ -90,130 +44,183 @@ namespace SharpShader.HLSLCrossCompiler.Internal
             }
         }
 
-        public static ShaderCompileResult Compile(ShaderCompileRequest request)
+        internal static DxcPreprocessedSource Preprocess(
+            ShaderCompileRequest request,
+            DxcDependencyCaptureLimits limits)
         {
             request.Validate();
 
-            string profile = DxcArgumentBuilder.BuildProfile(request.Stage, request.ShaderModel);
-            List<string> arguments = DxcArgumentBuilder.BuildArguments(request, profile);
-            string[] compileArguments = BuildLegacyCompilerArguments(arguments);
-
+            string profile = DxcArgumentBuilder.BuildProfile(
+                request.Stage,
+                request.ShaderModel);
+            List<string> arguments = DxcArgumentBuilder.BuildArguments(
+                request,
+                profile);
+            arguments.Add("-P");
+            string[] additionalArguments = BuildAdditionalCompilerArguments(
+                arguments);
             byte[] sourceUtf8 = Encoding.UTF8.GetBytes(request.Source);
 
             try
             {
-                using ComPtr<IDxcLibrary> library = CreateInstance<IDxcLibrary>(ClsidDxcLibraryCandidates, IidDxcLibrary, "IDxcLibrary");
-                using ComPtr<IDxcCompiler> compiler = CreateInstance<IDxcCompiler>(ClsidDxcCompilerCandidates, IidDxcCompiler, "IDxcCompiler");
-
-                using ComPtr<IDxcIncludeHandler> includeHandler = default;
-                int hrInclude = library.Get().CreateIncludeHandler((IDxcIncludeHandler**)includeHandler.GetAddressOf());
-                if (hrInclude < 0)
-                {
-                    throw new ShaderCompilerException(
-                        ShaderCompilerErrorCode.BackendUnavailable,
-                        $"Failed to create DXC include handler. HRESULT=0x{hrInclude:X8}");
-                }
-
-                using ComPtr<IDxcBlobEncoding> sourceBlob = default;
-                using ComPtr<IDxcOperationResult> operationResult = default;
-
-                fixed (byte* sourcePtr = sourceUtf8)
-                {
-                    int hrSource = library.Get().CreateBlobWithEncodingFromPinned(
-                        sourcePtr,
-                        (uint)sourceUtf8.Length,
-                        DXC.CPUtf8,
-                        (IDxcBlobEncoding**)sourceBlob.GetAddressOf());
-
-                    if (hrSource < 0 || sourceBlob.Handle == null)
-                    {
-                        throw new ShaderCompilerException(
-                            ShaderCompilerErrorCode.BackendUnavailable,
-                            $"Failed to create DXC source blob. HRESULT=0x{hrSource:X8}");
-                    }
-
-                    string? entryPoint = request.Stage == ShaderStageKind.Library && string.IsNullOrWhiteSpace(request.EntryPoint)
-                        ? null
-                        : request.EntryPoint;
-
-                    using NativeWideStringMarshaller nativeArguments = NativeWideStringMarshaller.Create(
-                        request.SourceName,
-                        entryPoint,
+                using ComPtr<IDxcUtils> utils = CreateInstance<IDxcUtils>(
+                    s_ClsidDxcUtils,
+                    IDxcUtils.Guid,
+                    nameof(IDxcUtils));
+                using ComPtr<IDxcCompiler3> compiler = CreateInstance<IDxcCompiler3>(
+                    s_ClsidDxcCompiler,
+                    IDxcCompiler3.Guid,
+                    nameof(IDxcCompiler3));
+                ComPtr<IDxcIncludeHandler> defaultIncludeHandler =
+                    CreateIncludeHandler(utils);
+                using DxcDependencyCaptureIncludeHandler captureHandler =
+                    new(ref defaultIncludeHandler, limits);
+                using ComPtr<IDxcCompilerArgs> compilerArguments =
+                    BuildCompilerArguments(
+                        utils,
+                        request,
                         profile,
-                        compileArguments);
+                        additionalArguments);
+                using ComPtr<IDxcResult> result = CompileSource(
+                    compiler,
+                    captureHandler.Handler,
+                    compilerArguments,
+                    sourceUtf8);
 
-                    int hrCompile = compiler.Get().Compile(
-                        (IDxcBlob*)sourceBlob.Handle,
-                        (char*)nativeArguments.SourceName,
-                        (char*)nativeArguments.EntryPoint,
-                        (char*)nativeArguments.Profile,
-                        (char**)nativeArguments.Arguments,
-                        nativeArguments.ArgumentCount,
-                        (Define*)null,
-                        0,
-                        includeHandler.Handle,
-                        (IDxcOperationResult**)operationResult.GetAddressOf());
-
-                    if (hrCompile < 0 && operationResult.Handle == null)
-                    {
-                        throw new ShaderCompilerException(
-                            ShaderCompilerErrorCode.BackendUnavailable,
-                            $"DXC compile invocation failed. HRESULT=0x{hrCompile:X8}");
-                    }
-                }
-
-                if (operationResult.Handle == null)
+                IReadOnlyList<DxcCapturedInclude> captures =
+                    captureHandler.CompleteCapture();
+                string diagnostics = GetDiagnosticsOutput(result);
+                int compileStatus = 0;
+                int statusResult = result.Get().GetStatus(&compileStatus);
+                if (statusResult < 0)
                 {
                     throw new ShaderCompilerException(
                         ShaderCompilerErrorCode.BackendUnavailable,
-                        "DXC compile returned no operation result object.");
+                        $"Failed to read DXC preprocess status. HRESULT=0x{statusResult:X8}",
+                        diagnostics,
+                        profile);
                 }
 
-                string diagnostics = GetDiagnostics(operationResult);
-                string warnings = ExtractWarnings(diagnostics);
-
-                int compileStatus = 0;
-                operationResult.Get().GetStatus(&compileStatus);
                 if (compileStatus < 0)
                 {
                     ThrowCompileFailure(profile, diagnostics, compileStatus);
                 }
 
-                ComPtr<IDxcBlob> objectBlob = default;
+                byte[] content = GetRequiredBlobOutput(
+                    result,
+                    OutKind.Hlsl,
+                    "preprocessed HLSL",
+                    profile,
+                    diagnostics,
+                    limits.MaximumPreprocessedBytes);
+                string source;
                 try
                 {
-                    int hrObject = operationResult.Get().GetResult((IDxcBlob**)objectBlob.GetAddressOf());
-
-                    if (hrObject < 0 || objectBlob.Handle == null)
-                    {
-                        throw new ShaderCompilerException(
-                            ShaderCompilerErrorCode.CompileFailed,
-                            $"DXC object output is missing for profile {profile}. HRESULT=0x{hrObject:X8}",
-                            diagnostics,
-                            profile);
-                    }
-
-                    byte[] bytecode = CopyBlobToManaged(objectBlob);
-                    if (bytecode.Length == 0)
-                    {
-                        throw new ShaderCompilerException(
-                            ShaderCompilerErrorCode.CompileFailed,
-                            $"DXC produced empty bytecode for profile {profile}.",
-                            diagnostics,
-                            profile);
-                    }
-
-                    return new ShaderCompileResult
-                    {
-                        Bytecode = bytecode,
-                        Diagnostics = diagnostics,
-                        Warnings = warnings,
-                    };
+                    source = new UTF8Encoding(false, true).GetString(content);
                 }
-                finally
+                catch (DecoderFallbackException exception)
                 {
-                    objectBlob.Dispose();
+                    throw new ShaderCompilerException(
+                        ShaderCompilerErrorCode.CompileFailed,
+                        "DXC returned preprocessed HLSL that is not valid UTF-8.",
+                        diagnostics,
+                        profile,
+                        exception);
                 }
+
+                return new DxcPreprocessedSource(
+                    source,
+                    content,
+                    captures);
+            }
+            catch (ShaderCompilerException)
+            {
+                throw;
+            }
+            catch (Exception exception) when (
+                exception is FileNotFoundException
+                or DllNotFoundException
+                or BadImageFormatException
+                or EntryPointNotFoundException
+                or TypeInitializationException
+                or InvalidCastException)
+            {
+                throw new ShaderCompilerException(
+                    ShaderCompilerErrorCode.BackendUnavailable,
+                    "DXC native preprocessor is unavailable in current process.",
+                    exception.Message,
+                    profile,
+                    exception);
+            }
+        }
+
+        public static ShaderCompileResult Compile(ShaderCompileRequest request)
+        {
+            request.Validate();
+
+            string profile = DxcArgumentBuilder.BuildProfile(request.Stage, request.ShaderModel);
+            string[] additionalArguments = BuildAdditionalCompilerArguments(
+                DxcArgumentBuilder.BuildArguments(request, profile));
+            byte[] sourceUtf8 = Encoding.UTF8.GetBytes(request.Source);
+
+            try
+            {
+                using ComPtr<IDxcUtils> utils = CreateInstance<IDxcUtils>(s_ClsidDxcUtils, IDxcUtils.Guid, nameof(IDxcUtils));
+                using ComPtr<IDxcCompiler3> compiler = CreateInstance<IDxcCompiler3>(s_ClsidDxcCompiler, IDxcCompiler3.Guid, nameof(IDxcCompiler3));
+                using ComPtr<IDxcIncludeHandler> includeHandler = CreateIncludeHandler(utils);
+                using ComPtr<IDxcCompilerArgs> compilerArguments = BuildCompilerArguments(
+                    utils,
+                    request,
+                    profile,
+                    additionalArguments);
+                using ComPtr<IDxcResult> result = CompileSource(
+                    compiler,
+                    includeHandler,
+                    compilerArguments,
+                    sourceUtf8);
+
+                string diagnostics = GetDiagnosticsOutput(result);
+                string warnings = ExtractWarnings(diagnostics);
+
+                int compileStatus = 0;
+                int hrStatus = result.Get().GetStatus(&compileStatus);
+                if (hrStatus < 0)
+                {
+                    throw new ShaderCompilerException(
+                        ShaderCompilerErrorCode.BackendUnavailable,
+                        $"Failed to read DXC compile status. HRESULT=0x{hrStatus:X8}",
+                        diagnostics,
+                        profile);
+                }
+
+                if (compileStatus < 0)
+                {
+                    ThrowCompileFailure(profile, diagnostics, compileStatus);
+                }
+
+                byte[] bytecode = GetRequiredBlobOutput(result, OutKind.Object, "object", profile, diagnostics);
+                byte[] reflectionData = GetOptionalBlobOutput(result, OutKind.Reflection, profile, diagnostics, out _);
+                byte[] pdbData = GetOptionalBlobOutput(result, OutKind.Pdb, profile, diagnostics, out string? pdbName);
+                byte[] shaderHash = GetOptionalBlobOutput(result, OutKind.ShaderHash, profile, diagnostics, out _);
+                if (shaderHash.Length != 0 && shaderHash.Length != 20)
+                {
+                    throw new ShaderCompilerException(
+                        ShaderCompilerErrorCode.CompileFailed,
+                        $"DXC shader hash output has invalid size {shaderHash.Length}; expected 20 bytes.",
+                        diagnostics,
+                        profile);
+                }
+
+                return new ShaderCompileResult
+                {
+                    Bytecode = bytecode,
+                    ReflectionData = reflectionData,
+                    PdbData = pdbData,
+                    PdbName = pdbName,
+                    ShaderHash = shaderHash,
+                    Diagnostics = diagnostics,
+                    Warnings = warnings,
+                };
             }
             catch (ShaderCompilerException)
             {
@@ -236,374 +243,316 @@ namespace SharpShader.HLSLCrossCompiler.Internal
             }
         }
 
-        private static ComPtr<T> CreateInstance<T>(Guid[] clsidCandidates, Guid iid, string interfaceName)
+        private static ComPtr<T> CreateInstance<T>(Guid clsid, Guid iid, string interfaceName)
             where T : unmanaged, IComVtbl<T>
         {
-            Exception? lastException = null;
-            bool hasSymbolPointer = TryGetInterfaceIdSymbolPointer(interfaceName, out nint symbolPointer);
-            nint[] legacyIidPointerCandidates = EnumerateLegacyIidPointerCandidates(interfaceName).ToArray();
-            List<string> legacyPointersTried = new List<string>();
-
-            foreach (Guid clsid in clsidCandidates)
+            Guid clsidCopy = clsid;
+            Guid iidCopy = iid;
+            int hr = NativeDxcCreateInstance(ref clsidCopy, ref iidCopy, out nint instance);
+            if (hr < 0 || instance == 0)
             {
-                Guid clsidLocal = clsid;
-                Guid iidCopy = iid;
-
-                try
-                {
-                    int hr = TryCreateInstanceNative(ref clsidLocal, (nint)Unsafe.AsPointer(ref iidCopy), out nint instancePtr);
-                    if (hr >= 0 && instancePtr != 0)
-                    {
-                        return new ComPtr<T>((T*)instancePtr);
-                    }
-
-                    lastException = new InvalidOperationException($"HRESULT=0x{hr:X8}");
-                }
-                catch (Exception ex) when (
-                    ex is FileNotFoundException or
-                    DllNotFoundException or
-                    BadImageFormatException or
-                    EntryPointNotFoundException or
-                    TypeInitializationException or
-                    InvalidCastException)
-                {
-                    lastException = ex;
-                }
-
-                if (hasSymbolPointer)
-                {
-                    clsidLocal = clsid;
-                    try
-                    {
-                        int hr = TryCreateInstanceNative(ref clsidLocal, symbolPointer, out nint instancePtr);
-                        if (hr >= 0 && instancePtr != 0)
-                        {
-                            return new ComPtr<T>((T*)instancePtr);
-                        }
-
-                        lastException = new InvalidOperationException($"HRESULT=0x{hr:X8}");
-                    }
-                    catch (Exception ex) when (
-                        ex is FileNotFoundException or
-                        DllNotFoundException or
-                        BadImageFormatException or
-                        EntryPointNotFoundException or
-                        TypeInitializationException or
-                        InvalidCastException)
-                    {
-                        lastException = ex;
-                    }
-                }
-
-                foreach (nint legacyIidPointer in legacyIidPointerCandidates)
-                {
-                    legacyPointersTried.Add($"0x{legacyIidPointer:X}");
-                    clsidLocal = clsid;
-                    try
-                    {
-                        int hr = TryCreateInstanceNative(ref clsidLocal, legacyIidPointer, out nint instancePtr);
-                        if (hr >= 0 && instancePtr != 0)
-                        {
-                            return new ComPtr<T>((T*)instancePtr);
-                        }
-
-                        lastException = new InvalidOperationException($"HRESULT=0x{hr:X8}");
-                    }
-                    catch (Exception ex) when (
-                        ex is FileNotFoundException or
-                        DllNotFoundException or
-                        BadImageFormatException or
-                        EntryPointNotFoundException or
-                        TypeInitializationException or
-                        InvalidCastException)
-                    {
-                        lastException = ex;
-                    }
-                }
+                throw new ShaderCompilerException(
+                    ShaderCompilerErrorCode.BackendUnavailable,
+                    $"DXC backend initialization failed for {interfaceName}. HRESULT=0x{hr:X8}");
             }
 
-            string details = lastException == null
-                ? string.Empty
-                : $" Last error: {lastException.GetType().Name}: {lastException.Message}";
-
-            string legacyDetails = legacyPointersTried.Count == 0
-                ? $" LegacyIIDPointers=(none, known={legacyIidPointerCandidates.Length}, {BuildLegacyProbeSummary()})"
-                : $" LegacyIIDPointers=[{string.Join(", ", legacyPointersTried.Distinct())}]";
-
-            throw new ShaderCompilerException(
-                ShaderCompilerErrorCode.BackendUnavailable,
-                $"DXC backend initialization failed for {interfaceName}. CLSID candidates={string.Join(", ", clsidCandidates)} IID={iid}.{details}{legacyDetails}");
+            return new ComPtr<T>((T*)instance);
         }
 
-        private static int TryCreateInstanceNative(ref Guid clsid, nint iidPointer, out nint instancePtr)
+        private static ComPtr<IDxcIncludeHandler> CreateIncludeHandler(ComPtr<IDxcUtils> utils)
         {
-            int hr = NativeDxcCreateInstance(ref clsid, iidPointer, out instancePtr);
-            if (hr < 0 || instancePtr == 0)
+            ComPtr<IDxcIncludeHandler> includeHandler = default;
+            int hr = utils.Get().CreateDefaultIncludeHandler((IDxcIncludeHandler**)includeHandler.GetAddressOf());
+            if (hr < 0 || includeHandler.Handle == null)
             {
-                hr = NativeDxcCreateInstance2(0, ref clsid, iidPointer, out instancePtr);
+                includeHandler.Dispose();
+                throw new ShaderCompilerException(
+                    ShaderCompilerErrorCode.BackendUnavailable,
+                    $"Failed to create DXC include handler. HRESULT=0x{hr:X8}");
             }
 
-            return hr;
+            return includeHandler;
         }
 
-        private static bool TryGetInterfaceIdSymbolPointer(string interfaceName, out nint symbolPointer)
+        private static ComPtr<IDxcCompilerArgs> BuildCompilerArguments(
+            ComPtr<IDxcUtils> utils,
+            ShaderCompileRequest request,
+            string profile,
+            IReadOnlyList<string> additionalArguments)
         {
-            symbolPointer = 0;
-            nint handle = DxcNativeHandle.Value;
-            if (handle == 0)
+            string? entryPoint = request.Stage == ShaderStageKind.Library && string.IsNullOrWhiteSpace(request.EntryPoint)
+                ? null
+                : request.EntryPoint;
+
+            using NativeWideStringMarshaller nativeArguments = NativeWideStringMarshaller.Create(
+                request.SourceName,
+                entryPoint,
+                profile,
+                additionalArguments);
+
+            ComPtr<IDxcCompilerArgs> compilerArguments = default;
+            int hr = utils.Get().BuildArguments(
+                (char*)nativeArguments.SourceName,
+                (char*)nativeArguments.EntryPoint,
+                (char*)nativeArguments.Profile,
+                (char**)nativeArguments.Arguments,
+                nativeArguments.ArgumentCount,
+                (Define*)null,
+                0,
+                (IDxcCompilerArgs**)compilerArguments.GetAddressOf());
+
+            if (hr < 0 || compilerArguments.Handle == null)
             {
-                return false;
+                compilerArguments.Dispose();
+                throw new ShaderCompilerException(
+                    ShaderCompilerErrorCode.BackendUnavailable,
+                    $"Failed to build DXC compiler arguments for {request.SourceName}. HRESULT=0x{hr:X8}");
             }
 
-            string[] symbolCandidates = interfaceName switch
-            {
-                "IDxcLibrary" => new[] { "__ZN11IDxcLibrary14IDxcLibrary_IDE" },
-                "IDxcCompiler" => new[] { "__ZN12IDxcCompiler15IDxcCompiler_IDE", "__ZN13IDxcCompiler216IDxcCompiler2_IDE" },
-                _ => Array.Empty<string>(),
-            };
+            return compilerArguments;
+        }
 
-            foreach (string symbol in symbolCandidates)
+        private static ComPtr<IDxcResult> CompileSource(
+            ComPtr<IDxcCompiler3> compiler,
+            ComPtr<IDxcIncludeHandler> includeHandler,
+            ComPtr<IDxcCompilerArgs> compilerArguments,
+            byte[] sourceUtf8)
+        {
+            ComPtr<IDxcResult> result = default;
+            fixed (byte* sourcePointer = sourceUtf8)
             {
-                if (NativeLibrary.TryGetExport(handle, symbol, out symbolPointer))
+                char** arguments = compilerArguments.Get().GetArguments();
+                uint argumentCount = compilerArguments.Get().GetCount();
+                if (arguments == null || argumentCount == 0)
                 {
-                    return true;
+                    throw new ShaderCompilerException(
+                        ShaderCompilerErrorCode.BackendUnavailable,
+                        "DXC returned an empty compiler argument list.");
+                }
+
+                Silk.NET.Direct3D.Compilers.Buffer sourceBuffer = new Silk.NET.Direct3D.Compilers.Buffer
+                {
+                    Ptr = sourcePointer,
+                    Size = (nuint)sourceUtf8.Length,
+                    Encoding = DXC.CPUtf8,
+                };
+
+                Guid resultIid = IDxcResult.Guid;
+                int hr = compiler.Get().Compile(
+                    &sourceBuffer,
+                    arguments,
+                    argumentCount,
+                    includeHandler.Handle,
+                    ref resultIid,
+                    (void**)result.GetAddressOf());
+
+                if (hr < 0 || result.Handle == null)
+                {
+                    result.Dispose();
+                    throw new ShaderCompilerException(
+                        ShaderCompilerErrorCode.BackendUnavailable,
+                        $"DXC compile invocation failed. HRESULT=0x{hr:X8}");
                 }
             }
 
-            return false;
+            return result;
         }
 
-        private static nint LoadDxcNativeHandle()
+        private static byte[] GetRequiredBlobOutput(
+            ComPtr<IDxcResult> result,
+            OutKind outputKind,
+            string outputName,
+            string profile,
+            string diagnostics,
+            long maximumBytes = long.MaxValue)
         {
-            Assembly assembly = typeof(NativeDxcCompiler).Assembly;
-            List<string> candidates = EnumerateDxcNativeCandidates(assembly)
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .ToList();
-
-            foreach (string candidate in candidates)
+            if (!result.Get().HasOutput(outputKind))
             {
-                MacNativePayloadSanitizer.EnsureFileIsSanitized(candidate);
-                if (File.Exists(candidate) && NativeLibrary.TryLoad(candidate, out nint handle))
-                {
-                    string? dxcDirectory = Path.GetDirectoryName(candidate);
-                    if (!string.IsNullOrWhiteSpace(dxcDirectory))
-                    {
-                        EnsureDirectoryInProcessPath(dxcDirectory);
-                    }
-                    TryLoadCompanionDxilLibraries(candidate, candidates);
-                    return handle;
-                }
+                throw new ShaderCompilerException(
+                    ShaderCompilerErrorCode.CompileFailed,
+                    $"DXC {outputName} output is missing for profile {profile}.",
+                    diagnostics,
+                    profile);
             }
 
-            if (OperatingSystem.IsMacOS())
+            byte[] output = GetBlobOutput(
+                result,
+                outputKind,
+                profile,
+                diagnostics,
+                out _,
+                maximumBytes);
+            if (output.Length == 0)
             {
-                FailFastMissingNativeDxc(candidates);
+                throw new ShaderCompilerException(
+                    ShaderCompilerErrorCode.CompileFailed,
+                    $"DXC produced empty {outputName} output for profile {profile}.",
+                    diagnostics,
+                    profile);
             }
 
-            return 0;
+            return output;
         }
 
-        private static void TryLoadCompanionDxilLibraries(string loadedDxcPath, IReadOnlyList<string> dxcCandidates)
+        private static byte[] GetOptionalBlobOutput(
+            ComPtr<IDxcResult> result,
+            OutKind outputKind,
+            string profile,
+            string diagnostics,
+            out string? outputName)
         {
-            if (!OperatingSystem.IsWindows())
-            {
-                return;
-            }
-
-            HashSet<string> attemptedPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            TryLoadDxilSibling(loadedDxcPath, attemptedPaths);
-
-            for (int i = 0; i < dxcCandidates.Count; ++i)
-            {
-                TryLoadDxilSibling(dxcCandidates[i], attemptedPaths);
-            }
+            outputName = null;
+            return result.Get().HasOutput(outputKind)
+                ? GetBlobOutput(result, outputKind, profile, diagnostics, out outputName)
+                : Array.Empty<byte>();
         }
 
-        private static void TryLoadDxilSibling(string dxcPath, HashSet<string> attemptedPaths)
+        private static byte[] GetBlobOutput(
+            ComPtr<IDxcResult> result,
+            OutKind outputKind,
+            string profile,
+            string diagnostics,
+            out string? outputName,
+            long maximumBytes = long.MaxValue)
         {
-            if (string.IsNullOrWhiteSpace(dxcPath))
-            {
-                return;
-            }
-
-            string? directory = Path.GetDirectoryName(dxcPath);
-            if (string.IsNullOrWhiteSpace(directory))
-            {
-                return;
-            }
-
-            EnsureDirectoryInProcessPath(directory);
-
-            string dxilPath = Path.Combine(directory, "dxil.dll");
-            string fullPath = Path.GetFullPath(dxilPath);
-            if (!attemptedPaths.Add(fullPath) || !File.Exists(fullPath))
-            {
-                return;
-            }
-
-            NativeLibrary.TryLoad(fullPath, out _);
-        }
-
-        private static void EnsureDirectoryInProcessPath(string directory)
-        {
-            if (!OperatingSystem.IsWindows() || string.IsNullOrWhiteSpace(directory))
-            {
-                return;
-            }
-
-            string fullDirectory = Path.GetFullPath(directory);
-            string existingPath = Environment.GetEnvironmentVariable("PATH") ?? string.Empty;
-            if (existingPath.Length > 0)
-            {
-                string[] segments = existingPath.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-                for (int i = 0; i < segments.Length; ++i)
-                {
-                    string segment = segments[i];
-                    if (string.Equals(Path.GetFullPath(segment), fullDirectory, StringComparison.OrdinalIgnoreCase))
-                    {
-                        return;
-                    }
-                }
-            }
-
-            string updatedPath = string.IsNullOrWhiteSpace(existingPath)
-                ? fullDirectory
-                : $"{fullDirectory};{existingPath}";
-            Environment.SetEnvironmentVariable("PATH", updatedPath);
-        }
-
-        private static void FailFastMissingNativeDxc(IReadOnlyList<string> candidates)
-        {
-            List<string> existingCandidates = new List<string>();
-            foreach (string candidate in candidates)
-            {
-                if (File.Exists(candidate))
-                {
-                    existingCandidates.Add(candidate);
-                }
-            }
-
-            string configuredPath = Environment.GetEnvironmentVariable(SharpShaderNativeLibraryLayout.DxcEnvironmentVariableName) ?? "(unset)";
-            string existingSummary = existingCandidates.Count == 0 ? "(none)" : string.Join(", ", existingCandidates);
-            string candidateSummary = candidates.Count == 0 ? "(none)" : string.Join(", ", candidates);
-            string message =
-                "Native DXC is mandatory and no process-matched libdxcompiler could be loaded on this host. " +
-                $"{SharpShaderNativeLibraryLayout.DxcEnvironmentVariableName}={configuredPath}. " +
-                $"Existing candidates={existingSummary}. " +
-                $"Probe candidates={candidateSummary}.";
-
-    #if DEBUG
-            Debug.Fail(message);
-            throw new InvalidOperationException(message);
-    #else
-            Environment.FailFast(message);
-    #endif
-        }
-
-        private static nint ResolveDxcImageBase()
-        {
-            if (!OperatingSystem.IsMacOS())
-            {
-                return 0;
-            }
-
-            nint handle = DxcNativeHandle.Value;
-            if (handle == 0)
-            {
-                return 0;
-            }
-
-            if (!NativeLibrary.TryGetExport(handle, "DxcCreateInstance", out nint createInstancePtr))
-            {
-                return 0;
-            }
-
-            return DlAddr(createInstancePtr, out DlInfo info) == 0 ? 0 : info.FileBase;
-        }
-
-        private static IEnumerable<nint> EnumerateLegacyIidPointerCandidates(string interfaceName)
-        {
-            if (!OperatingSystem.IsMacOS())
-            {
-                yield break;
-            }
-
-            nint imageBase = DxcImageBase.Value;
-            if (imageBase == 0)
-            {
-                yield break;
-            }
-
-            int[] gotOffsets = interfaceName switch
-            {
-                "IDxcLibrary" => new[] { 0xC1F028 },
-                "IDxcCompiler" => new[] { 0xC1F030 },
-                _ => Array.Empty<int>(),
-            };
-
-            HashSet<nint> visited = new HashSet<nint>();
-            foreach (int gotOffset in gotOffsets)
-            {
-                nint slotAddress = imageBase + gotOffset;
-                nint iidPointer = Marshal.ReadIntPtr(slotAddress);
-                if (iidPointer != 0 && visited.Add(iidPointer))
-                {
-                    yield return iidPointer;
-                }
-            }
-        }
-
-        private static string BuildLegacyProbeSummary()
-        {
-            if (!OperatingSystem.IsMacOS())
-            {
-                return "macOS=false";
-            }
-
-            nint handle = DxcNativeHandle.Value;
-            nint exportPtr = 0;
-            bool hasExport = handle != 0 && NativeLibrary.TryGetExport(handle, "DxcCreateInstance", out exportPtr);
-            nint imageBase = DxcImageBase.Value;
-            nint probe0 = 0;
-            nint probe1 = 0;
+            ComPtr<IDxcBlob> blob = default;
+            ComPtr<IDxcBlobWide> nameBlob = default;
+            outputName = null;
             try
             {
-                if (imageBase != 0)
+                Guid blobIid = IDxcBlob.Guid;
+                int hr = result.Get().GetOutput(
+                    outputKind,
+                    ref blobIid,
+                    (void**)blob.GetAddressOf(),
+                    (IDxcBlobWide**)nameBlob.GetAddressOf());
+
+                if (hr < 0 || blob.Handle == null)
                 {
-                    probe0 = Marshal.ReadIntPtr(imageBase + 0xC1F020);
-                    probe1 = Marshal.ReadIntPtr(imageBase + 0xC1F028);
+                    throw new ShaderCompilerException(
+                        ShaderCompilerErrorCode.CompileFailed,
+                        $"Failed to read DXC {outputKind} output for profile {profile}. HRESULT=0x{hr:X8}",
+                        diagnostics,
+                        profile);
                 }
-            }
-            catch
-            {
-                // ignore probe failures in diagnostics
-            }
 
-            return $"handle=0x{handle:X}, export={(hasExport ? $"0x{exportPtr:X}" : "none")}, imageBase=0x{imageBase:X}, slot[0xC1F020]=0x{probe0:X}, slot[0xC1F028]=0x{probe1:X}";
-        }
-
-        private static IEnumerable<string> EnumerateDxcNativeCandidates(Assembly assembly)
-        {
-            return SharpShaderNativeLibraryResolver.EnumerateCandidates(DxcLibraryName, assembly);
-        }
-
-        private static string[] BuildLegacyCompilerArguments(List<string> arguments)
-        {
-            List<string> filtered = new List<string>(arguments.Count);
-            for (int i = 0; i < arguments.Count; i++)
-            {
-                string argument = arguments[i];
-                if (argument.Equals("-T", StringComparison.OrdinalIgnoreCase) ||
-                    argument.Equals("-E", StringComparison.OrdinalIgnoreCase))
+                if (nameBlob.Handle != null)
                 {
-                    i++;
+                    outputName = CopyWideStringToManaged(nameBlob);
+                }
+
+                return CopyBlobToManaged(blob, maximumBytes, outputKind);
+            }
+            finally
+            {
+                nameBlob.Dispose();
+                blob.Dispose();
+            }
+        }
+
+        private static string CopyWideStringToManaged(ComPtr<IDxcBlobWide> blob)
+        {
+            nuint length = blob.Get().GetStringLength();
+            char* pointer = blob.Get().GetStringPointer();
+            if (length == 0 || pointer == null)
+            {
+                return string.Empty;
+            }
+
+            if (length > int.MaxValue)
+            {
+                throw new ShaderCompilerException(
+                    ShaderCompilerErrorCode.CompileFailed,
+                    "DXC output name exceeds managed string size limits.");
+            }
+
+            if (OperatingSystem.IsWindows())
+            {
+                return new string(pointer, 0, (int)length);
+            }
+
+            StringBuilder builder = new StringBuilder((int)length);
+            int* codePoints = (int*)pointer;
+            for (int index = 0; index < (int)length; index++)
+            {
+                builder.Append(char.ConvertFromUtf32(codePoints[index]));
+            }
+
+            return builder.ToString();
+        }
+
+        private static string GetDiagnosticsOutput(ComPtr<IDxcResult> result)
+        {
+            const OutKind outputKind = OutKind.Errors;
+            if (!result.Get().HasOutput(outputKind))
+            {
+                throw new ShaderCompilerException(
+                    ShaderCompilerErrorCode.BackendUnavailable,
+                    "DXC result did not expose the required diagnostics output.");
+            }
+
+            ComPtr<IDxcBlobUtf8> blob = default;
+            try
+            {
+                Guid blobIid = IDxcBlobUtf8.Guid;
+                int hr = result.Get().GetOutput(
+                    outputKind,
+                    ref blobIid,
+                    (void**)blob.GetAddressOf(),
+                    (IDxcBlobWide**)null);
+
+                if (hr < 0 || blob.Handle == null)
+                {
+                    throw new ShaderCompilerException(
+                        ShaderCompilerErrorCode.BackendUnavailable,
+                        $"Failed to read DXC diagnostics output. HRESULT=0x{hr:X8}");
+                }
+
+                nuint length = blob.Get().GetStringLength();
+                if (length == 0 || blob.Get().GetStringPointer() == null)
+                {
+                    return string.Empty;
+                }
+
+                if (length > int.MaxValue)
+                {
+                    return "DXC diagnostics output exceeds managed string size limits.";
+                }
+
+                return Encoding.UTF8
+                    .GetString(new ReadOnlySpan<byte>(blob.Get().GetStringPointer(), (int)length))
+                    .Trim('\0', '\r', '\n', ' ');
+            }
+            finally
+            {
+                blob.Dispose();
+            }
+        }
+
+        private static string[] BuildAdditionalCompilerArguments(List<string> arguments)
+        {
+            List<string> additionalArguments = new List<string>(arguments.Count);
+            for (int index = 0; index < arguments.Count; index++)
+            {
+                string argument = arguments[index];
+                if (argument.Equals("-T", StringComparison.OrdinalIgnoreCase)
+                    || argument.Equals("-E", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (index + 1 >= arguments.Count)
+                    {
+                        throw new ShaderCompilerException(
+                            ShaderCompilerErrorCode.InvalidRequest,
+                            $"DXC argument {argument} is missing its value.");
+                    }
+
+                    index++;
                     continue;
                 }
 
-                filtered.Add(argument);
+                additionalArguments.Add(argument);
             }
 
-            return filtered.ToArray();
+            return additionalArguments.ToArray();
         }
 
         private static void ThrowCompileFailure(string profile, string diagnostics, int compileStatus)
@@ -631,61 +580,6 @@ namespace SharpShader.HLSLCrossCompiler.Internal
                 $"DXC compile failed for profile {profile}. HRESULT=0x{compileStatus:X8}",
                 diagnostics,
                 profile);
-        }
-
-        private static string GetDiagnostics(ComPtr<IDxcOperationResult> operationResult)
-        {
-            ComPtr<IDxcBlobEncoding> errorBlob = default;
-            try
-            {
-                int hrErrors = operationResult.Get().GetErrorBuffer((IDxcBlobEncoding**)errorBlob.GetAddressOf());
-                if (hrErrors < 0 || errorBlob.Handle == null)
-                {
-                    return string.Empty;
-                }
-
-                nuint blobSize = errorBlob.Get().GetBufferSize();
-                if (blobSize == 0)
-                {
-                    return string.Empty;
-                }
-
-                if (blobSize > int.MaxValue)
-                {
-                    return "DXC diagnostics output exceeds managed string size limits.";
-                }
-
-                byte[] bytes = new byte[(int)blobSize];
-                IntPtr blobPointer = (IntPtr)errorBlob.Get().GetBufferPointer();
-                if (blobPointer == IntPtr.Zero)
-                {
-                    return string.Empty;
-                }
-
-                Marshal.Copy(blobPointer, bytes, 0, bytes.Length);
-
-                int known = 0;
-                uint codePage = 0;
-                int hrEncoding = errorBlob.Get().GetEncoding(&known, &codePage);
-                if (hrEncoding >= 0)
-                {
-                    if (codePage == 0 && known != 0)
-                    {
-                        codePage = OperatingSystem.IsWindows() ? Utf16CodePage : Utf32CodePage;
-                    }
-                }
-                else
-                {
-                    codePage = 0;
-                }
-
-                string diagnostics = DecodeDiagnostics(bytes, codePage);
-                return diagnostics.Trim('\0', '\r', '\n', ' ');
-            }
-            finally
-            {
-                errorBlob.Dispose();
-            }
         }
 
         private static string ExtractWarnings(string diagnostics)
@@ -720,82 +614,23 @@ namespace SharpShader.HLSLCrossCompiler.Internal
                    || diagnostics.Contains("shader model 6.8 is only available", StringComparison.OrdinalIgnoreCase);
         }
 
-        private static string DecodeDiagnostics(byte[] bytes, uint codePage)
-        {
-            if (bytes.Length == 0)
-            {
-                return string.Empty;
-            }
-
-            if (TryDecodeByCodePage(bytes, codePage, out string decoded))
-            {
-                return decoded;
-            }
-
-            return Encoding.UTF8.GetString(bytes);
-        }
-
-        private static bool TryDecodeByCodePage(byte[] bytes, uint codePage, out string decoded)
-        {
-            decoded = string.Empty;
-            if (bytes.Length == 0)
-            {
-                return true;
-            }
-
-            try
-            {
-                switch (codePage)
-                {
-                    case Utf8CodePage:
-                        decoded = Encoding.UTF8.GetString(bytes);
-                        return true;
-                    case Utf16CodePage:
-                        decoded = DecodeUtf16(bytes);
-                        return true;
-                    case Utf32CodePage:
-                        decoded = DecodeUtf32(bytes);
-                        return true;
-                    default:
-                        return false;
-                }
-            }
-            catch
-            {
-                return false;
-            }
-        }
-
-        private static string DecodeUtf16(byte[] bytes)
-        {
-            int usableLength = bytes.Length - (bytes.Length % sizeof(char));
-            if (usableLength <= 0)
-            {
-                return string.Empty;
-            }
-
-            return Encoding.Unicode.GetString(bytes, 0, usableLength);
-        }
-
-        private static string DecodeUtf32(byte[] bytes)
-        {
-            const int Utf32BytesPerCodePoint = 4;
-            int usableLength = bytes.Length - (bytes.Length % Utf32BytesPerCodePoint);
-            if (usableLength <= 0)
-            {
-                return string.Empty;
-            }
-
-            return new UTF32Encoding(bigEndian: false, byteOrderMark: false, throwOnInvalidCharacters: false)
-                .GetString(bytes, 0, usableLength);
-        }
-
-        private static byte[] CopyBlobToManaged(ComPtr<IDxcBlob> blob)
+        private static byte[] CopyBlobToManaged(
+            ComPtr<IDxcBlob> blob,
+            long maximumBytes,
+            OutKind outputKind)
         {
             nuint size = blob.Get().GetBufferSize();
             if (size == 0)
             {
                 return Array.Empty<byte>();
+            }
+
+            if ((ulong)size > (ulong)maximumBytes)
+            {
+                throw new ShaderCompilerException(
+                    ShaderCompilerErrorCode.InvalidRequest,
+                    $"DXC {outputKind} output exceeds the configured byte limit "
+                    + $"of {maximumBytes}.");
             }
 
             if (size > int.MaxValue)
@@ -805,8 +640,16 @@ namespace SharpShader.HLSLCrossCompiler.Internal
                     "DXC output blob exceeds managed array size limits.");
             }
 
+            void* source = blob.Get().GetBufferPointer();
+            if (source == null)
+            {
+                throw new ShaderCompilerException(
+                    ShaderCompilerErrorCode.CompileFailed,
+                    "DXC returned a non-empty output blob with a null data pointer.");
+            }
+
             byte[] output = new byte[(int)size];
-            Marshal.Copy((IntPtr)blob.Get().GetBufferPointer(), output, 0, output.Length);
+            Marshal.Copy((nint)source, output, 0, output.Length);
             return output;
         }
     }

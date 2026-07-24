@@ -10,23 +10,16 @@ namespace SharpShader.ShaderLab
 {
     public static class ShaderLabUtil
     {
-        private static readonly Regex s_TagPairRegex = new Regex("\\\"(.*?)\\\"\\s*=\\s*\\\"(.*?)\\\"", RegexOptions.Compiled | RegexOptions.Singleline);
         private static readonly Regex s_PragmaRegex = new Regex(@"^\s*#pragma\s+(?<stage>\w+)\s+(?<entry>[A-Za-z_]\w*)", RegexOptions.Compiled | RegexOptions.Multiline);
         private static readonly Regex s_StandalonePragmaRegex = new Regex(@"^\s*#pragma\s+(?<directive>\w+)(?<args>.*)$", RegexOptions.Compiled | RegexOptions.Multiline);
-        private static readonly Regex s_CBufferRegex = new Regex(
-            @"cbuffer\s+(?<name>[A-Za-z_]\w*)(?:\s*:\s*register\s*\(\s*b(?<slot>\d+)\s*,\s*space(?<space>\d+)\s*\))?\s*;?\s*\{(?<body>.*?)\};",
-            RegexOptions.Compiled | RegexOptions.Singleline | RegexOptions.IgnoreCase);
-        private static readonly Regex s_CBufferMemberRegex = new Regex(
-            @"^\s*(?<type>[A-Za-z_]\w*(?:\s*<[^>]+>)?)\s+(?<name>[A-Za-z_]\w*)(?:\s*\[\s*(?<array>\d+)\s*\])?\s*;",
-            RegexOptions.Compiled | RegexOptions.Multiline);
-        private static readonly Regex s_RegisterRegex = new Regex(
-            @"register\s*\(\s*(?<reg>[tsub])(?<slot>\d+)(?:\s*,\s*space(?<space>\d+))?\s*\)",
-            RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
         public static ShaderLab ParseShaderLabFromFile(string filePath)
         {
-            string source = File.ReadAllText(filePath);
-            return ParseShaderLabFromSource(source);
+            string fullPath = Path.GetFullPath(filePath);
+            string source = File.ReadAllText(fullPath);
+            ShaderLab shaderLab = ParseShaderLabFromSource(source);
+            shaderLab.SourcePath = fullPath;
+            return shaderLab;
         }
 
         public static ShaderLab ParseShaderLabFromSource(string source)
@@ -139,10 +132,6 @@ namespace SharpShader.ShaderLab
 
             program.KeywordGroups = ParseKeywordGroups(programSource);
 
-            EShaderLabStageMask stageMask = ResolveStageMask(program.Entries);
-            List<ShaderLabConstantBuffer> constantBuffers = ParseConstantBuffers(programSource);
-            program.ConstantBuffers = constantBuffers;
-            program.Bindings = ParseProgramBindings(programSource, constantBuffers, stageMask);
             return program;
         }
 
@@ -183,10 +172,6 @@ namespace SharpShader.ShaderLab
             program.Entries = ParseStandaloneEntries(normalizedSource, kind);
             program.KeywordGroups = ParseKeywordGroups(normalizedSource);
 
-            EShaderLabStageMask stageMask = ResolveStandaloneStageMask(program.Entries);
-            List<ShaderLabConstantBuffer> constantBuffers = ParseConstantBuffers(normalizedSource);
-            program.ConstantBuffers = constantBuffers;
-            program.Bindings = ParseProgramBindings(normalizedSource, constantBuffers, stageMask);
             return program;
         }
 
@@ -289,91 +274,6 @@ namespace SharpShader.ShaderLab
             }
 
             return groups;
-        }
-
-        private static List<ShaderLabConstantBuffer> ParseConstantBuffers(string programSource)
-        {
-            List<ShaderLabConstantBuffer> constantBuffers = new List<ShaderLabConstantBuffer>();
-            foreach (Match match in s_CBufferRegex.Matches(programSource))
-            {
-                ShaderLabConstantBuffer buffer = new ShaderLabConstantBuffer
-                {
-                    Name = match.Groups["name"].Value,
-                    Slot = TryParseInt(match.Groups["slot"].Value, -1),
-                    Space = TryParseInt(match.Groups["space"].Value, -1),
-                };
-
-                string body = match.Groups["body"].Value;
-                foreach (Match memberMatch in s_CBufferMemberRegex.Matches(body))
-                {
-                    ShaderLabConstantMember member = new ShaderLabConstantMember
-                    {
-                        TypeName = memberMatch.Groups["type"].Value.Trim(),
-                        Name = memberMatch.Groups["name"].Value.Trim(),
-                        ArraySize = TryParseInt(memberMatch.Groups["array"].Value, 0),
-                    };
-                    buffer.Members.Add(member);
-                }
-
-                constantBuffers.Add(buffer);
-            }
-
-            return constantBuffers;
-        }
-
-        private static List<ShaderLabResourceBinding> ParseProgramBindings(
-            string programSource,
-            List<ShaderLabConstantBuffer> constantBuffers,
-            EShaderLabStageMask stageMask)
-        {
-            List<ShaderLabResourceBinding> bindings = new List<ShaderLabResourceBinding>();
-
-            foreach (ShaderLabConstantBuffer buffer in constantBuffers)
-            {
-                ShaderLabResourceBinding bufferBinding = new ShaderLabResourceBinding
-                {
-                    Name = buffer.Name,
-                    BindType = EShaderLabBindType.UniformBuffer,
-                    RegisterType = buffer.Slot >= 0 ? EShaderLabRegisterType.RegisterB : EShaderLabRegisterType.None,
-                    Slot = buffer.Slot,
-                    Space = buffer.Space,
-                    StageMask = stageMask,
-                    SourceKind = EShaderLabResourceSourceKind.ConstantBuffer,
-                    TypeName = "cbuffer",
-                };
-                bindings.Add(bufferBinding);
-            }
-
-            string programWithoutCBuffer = s_CBufferRegex.Replace(programSource, string.Empty);
-            string[] lines = programWithoutCBuffer.Split('\n');
-            foreach (string rawLine in lines)
-            {
-                string line = RemoveInlineComment(rawLine).Trim();
-                if (string.IsNullOrWhiteSpace(line) || !line.EndsWith(";", StringComparison.Ordinal))
-                {
-                    continue;
-                }
-
-                if (!TryParseResourceDeclaration(line, out string typeName, out string resourceName, out EShaderLabRegisterType registerType, out int slot, out int space))
-                {
-                    continue;
-                }
-
-                ShaderLabResourceBinding binding = new ShaderLabResourceBinding
-                {
-                    Name = resourceName,
-                    BindType = ParseBindType(typeName),
-                    RegisterType = registerType,
-                    Slot = slot,
-                    Space = space,
-                    StageMask = stageMask,
-                    SourceKind = ParseSourceKind(typeName),
-                    TypeName = typeName,
-                };
-                bindings.Add(binding);
-            }
-
-            return bindings;
         }
 
         private static ShaderLabRenderState? ParseRenderState(string stateSource, string stencilSource)
@@ -587,80 +487,6 @@ namespace SharpShader.ShaderLab
             return true;
         }
 
-        private static bool TryParseResourceDeclaration(
-            string line,
-            out string typeName,
-            out string resourceName,
-            out EShaderLabRegisterType registerType,
-            out int slot,
-            out int space)
-        {
-            typeName = string.Empty;
-            resourceName = string.Empty;
-            registerType = EShaderLabRegisterType.None;
-            slot = -1;
-            space = -1;
-
-            int firstSpace = line.IndexOf(' ');
-            if (firstSpace <= 0)
-            {
-                return false;
-            }
-
-            typeName = line.Substring(0, firstSpace).Trim();
-            if (!IsResourceTypeToken(typeName))
-            {
-                return false;
-            }
-
-            string remainder = line.Substring(firstSpace + 1).Trim();
-            int nameEnd = remainder.IndexOfAny(new[] { ' ', ':', '[', ';' });
-            if (nameEnd <= 0)
-            {
-                return false;
-            }
-
-            resourceName = remainder.Substring(0, nameEnd).Trim();
-            if (string.IsNullOrWhiteSpace(resourceName))
-            {
-                return false;
-            }
-
-            Match registerMatch = s_RegisterRegex.Match(remainder);
-            if (registerMatch.Success)
-            {
-                registerType = ParseRegisterType(registerMatch.Groups["reg"].Value);
-                slot = TryParseInt(registerMatch.Groups["slot"].Value, -1);
-                space = TryParseInt(registerMatch.Groups["space"].Value, -1);
-            }
-
-            return true;
-        }
-
-        private static bool IsResourceTypeToken(string typeName)
-        {
-            string normalized = typeName.Trim().ToLowerInvariant();
-            return normalized.StartsWith("texture", StringComparison.Ordinal)
-                || normalized.StartsWith("rwtexture", StringComparison.Ordinal)
-                || normalized.StartsWith("sampler", StringComparison.Ordinal)
-                || normalized.StartsWith("structuredbuffer", StringComparison.Ordinal)
-                || normalized.StartsWith("rwstructuredbuffer", StringComparison.Ordinal)
-                || normalized.StartsWith("byteaddressbuffer", StringComparison.Ordinal)
-                || normalized.StartsWith("rwbyteaddressbuffer", StringComparison.Ordinal)
-                || normalized.StartsWith("raytracingaccelerationstructure", StringComparison.Ordinal);
-        }
-
-        private static Dictionary<string, string> ParseTags(string tagsSource)
-        {
-            Dictionary<string, string> tags = new Dictionary<string, string>(StringComparer.Ordinal);
-            foreach (Match match in s_TagPairRegex.Matches(tagsSource))
-            {
-                tags[match.Groups[1].Value] = match.Groups[2].Value;
-            }
-
-            return tags;
-        }
-
         private static bool TryParsePropertyLine(string line, List<string> pendingAttributes, out ShaderLabProperty property)
         {
             property = new ShaderLabProperty();
@@ -833,169 +659,6 @@ namespace SharpShader.ShaderLab
                 "miss" => EShaderLabShaderStage.ProgramRayMiss,
                 "callable" => EShaderLabShaderStage.ProgramRayRcall,
                 _ => EShaderLabShaderStage.Undefined,
-            };
-        }
-
-        private static EShaderLabStageMask ResolveStageMask(List<ShaderLabProgramEntry> entries)
-        {
-            EShaderLabStageMask mask = EShaderLabStageMask.None;
-            foreach (ShaderLabProgramEntry entry in entries)
-            {
-                mask |= entry.Stage switch
-                {
-                    EShaderLabShaderStage.ProgramVertex => EShaderLabStageMask.Vertex,
-                    EShaderLabShaderStage.ProgramFragment => EShaderLabStageMask.Fragment,
-                    EShaderLabShaderStage.ProgramMesh => EShaderLabStageMask.Mesh,
-                    EShaderLabShaderStage.ProgramTask => EShaderLabStageMask.Task,
-                    EShaderLabShaderStage.ProgramCompute => EShaderLabStageMask.Compute,
-                    EShaderLabShaderStage.ProgramRayGen => EShaderLabStageMask.RayGen,
-                    EShaderLabShaderStage.ProgramRayInt => EShaderLabStageMask.RayIntersection,
-                    EShaderLabShaderStage.ProgramRayAHit => EShaderLabStageMask.RayAnyHit,
-                    EShaderLabShaderStage.ProgramRayCHit => EShaderLabStageMask.RayClosestHit,
-                    EShaderLabShaderStage.ProgramRayMiss => EShaderLabStageMask.RayMiss,
-                    EShaderLabShaderStage.ProgramRayRcall => EShaderLabStageMask.RayCallable,
-                    _ => EShaderLabStageMask.None,
-                };
-            }
-
-            return mask;
-        }
-
-        private static EShaderLabStageMask ResolveStandaloneStageMask(List<StandaloneShaderEntry> entries)
-        {
-            EShaderLabStageMask mask = EShaderLabStageMask.None;
-            foreach (StandaloneShaderEntry entry in entries)
-            {
-                mask |= entry.Stage switch
-                {
-                    StandaloneShaderStage.Compute => EShaderLabStageMask.Compute,
-                    StandaloneShaderStage.RayGeneration => EShaderLabStageMask.RayGen,
-                    StandaloneShaderStage.Miss => EShaderLabStageMask.RayMiss,
-                    StandaloneShaderStage.Callable => EShaderLabStageMask.RayCallable,
-                    _ => EShaderLabStageMask.None,
-                };
-            }
-
-            return mask;
-        }
-
-        private static EShaderLabBindType ParseBindType(string typeName)
-        {
-            string normalized = typeName.Replace(" ", string.Empty, StringComparison.Ordinal).ToLowerInvariant();
-            if (normalized.StartsWith("sampler", StringComparison.Ordinal))
-            {
-                return EShaderLabBindType.Sampler;
-            }
-            if (normalized.StartsWith("raytracingaccelerationstructure", StringComparison.Ordinal))
-            {
-                return EShaderLabBindType.AccelStruct;
-            }
-            if (normalized.StartsWith("rwstructuredbuffer", StringComparison.Ordinal) || normalized.StartsWith("rwbyteaddressbuffer", StringComparison.Ordinal))
-            {
-                return EShaderLabBindType.StorageBuffer;
-            }
-            if (normalized.StartsWith("structuredbuffer", StringComparison.Ordinal) || normalized.StartsWith("byteaddressbuffer", StringComparison.Ordinal))
-            {
-                return EShaderLabBindType.Buffer;
-            }
-            if (normalized.StartsWith("rwtexture2darrayms", StringComparison.Ordinal))
-            {
-                return EShaderLabBindType.StorageTexture2DArrayMS;
-            }
-            if (normalized.StartsWith("rwtexture2dms", StringComparison.Ordinal))
-            {
-                return EShaderLabBindType.StorageTexture2DMS;
-            }
-            if (normalized.StartsWith("rwtexture2darray", StringComparison.Ordinal))
-            {
-                return EShaderLabBindType.StorageTexture2DArray;
-            }
-            if (normalized.StartsWith("rwtexture2d", StringComparison.Ordinal))
-            {
-                return EShaderLabBindType.StorageTexture2D;
-            }
-            if (normalized.StartsWith("rwtexturecubearray", StringComparison.Ordinal))
-            {
-                return EShaderLabBindType.StorageTextureCubeArray;
-            }
-            if (normalized.StartsWith("rwtexturecube", StringComparison.Ordinal))
-            {
-                return EShaderLabBindType.StorageTextureCube;
-            }
-            if (normalized.StartsWith("rwtexture3d", StringComparison.Ordinal))
-            {
-                return EShaderLabBindType.StorageTexture3D;
-            }
-            if (normalized.StartsWith("texture2darrayms", StringComparison.Ordinal))
-            {
-                return EShaderLabBindType.Texture2DArrayMS;
-            }
-            if (normalized.StartsWith("texture2dms", StringComparison.Ordinal))
-            {
-                return EShaderLabBindType.Texture2DMS;
-            }
-            if (normalized.StartsWith("texture2darray", StringComparison.Ordinal))
-            {
-                return EShaderLabBindType.Texture2DArray;
-            }
-            if (normalized.StartsWith("texture2d", StringComparison.Ordinal))
-            {
-                return EShaderLabBindType.Texture2D;
-            }
-            if (normalized.StartsWith("texturecubearray", StringComparison.Ordinal))
-            {
-                return EShaderLabBindType.TextureCubeArray;
-            }
-            if (normalized.StartsWith("texturecube", StringComparison.Ordinal))
-            {
-                return EShaderLabBindType.TextureCube;
-            }
-            if (normalized.StartsWith("texture3d", StringComparison.Ordinal))
-            {
-                return EShaderLabBindType.Texture3D;
-            }
-
-            return EShaderLabBindType.Unknown;
-        }
-
-        private static EShaderLabResourceSourceKind ParseSourceKind(string typeName)
-        {
-            string normalized = typeName.Replace(" ", string.Empty, StringComparison.Ordinal).ToLowerInvariant();
-            if (normalized.StartsWith("sampler", StringComparison.Ordinal))
-            {
-                return EShaderLabResourceSourceKind.Sampler;
-            }
-            if (normalized.StartsWith("raytracingaccelerationstructure", StringComparison.Ordinal))
-            {
-                return EShaderLabResourceSourceKind.AccelerationStructure;
-            }
-            if (normalized.Contains("buffer", StringComparison.Ordinal))
-            {
-                return EShaderLabResourceSourceKind.Buffer;
-            }
-            if (normalized.Contains("texture", StringComparison.Ordinal))
-            {
-                return EShaderLabResourceSourceKind.Texture;
-            }
-
-            return EShaderLabResourceSourceKind.Unknown;
-        }
-
-        private static EShaderLabRegisterType ParseRegisterType(string token)
-        {
-            if (string.IsNullOrWhiteSpace(token))
-            {
-                return EShaderLabRegisterType.None;
-            }
-
-            string lower = token.Trim().ToLowerInvariant();
-            return lower switch
-            {
-                "b" => EShaderLabRegisterType.RegisterB,
-                "t" => EShaderLabRegisterType.RegisterT,
-                "s" => EShaderLabRegisterType.RegisterS,
-                "u" => EShaderLabRegisterType.RegisterU,
-                _ => EShaderLabRegisterType.None,
             };
         }
 
@@ -1241,11 +904,6 @@ namespace SharpShader.ShaderLab
             }
 
             return -1;
-        }
-
-        private static int TryParseInt(string text, int fallback)
-        {
-            return int.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out int value) ? value : fallback;
         }
 
         private static string RemoveInlineComment(string line)

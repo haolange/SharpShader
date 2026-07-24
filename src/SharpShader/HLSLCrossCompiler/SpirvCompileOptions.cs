@@ -15,21 +15,7 @@ namespace SharpShader.HLSLCrossCompiler
 
         public bool InvertY { get; init; }
 
-        public int? TextureBindingShift { get; init; }
-
-        public uint TextureBindingSpace { get; init; }
-
-        public int? SamplerBindingShift { get; init; }
-
-        public uint SamplerBindingSpace { get; init; }
-
-        public int? UavBindingShift { get; init; }
-
-        public uint UavBindingSpace { get; init; }
-
-        public int? CBufferBindingShift { get; init; }
-
-        public uint CBufferBindingSpace { get; init; }
+        public IReadOnlyList<SpirvBindingShift> BindingShifts { get; init; } = Array.Empty<SpirvBindingShift>();
 
         public string? TargetEnvironment { get; init; }
 
