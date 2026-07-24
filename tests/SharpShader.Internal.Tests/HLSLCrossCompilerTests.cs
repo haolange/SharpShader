@@ -70,6 +70,112 @@ namespace Infinity.Rendering.Tests
         }
 
         [Fact]
+        public void SpirvCrossCanonicalPath_ShouldUseExactThirdPartyLayout()
+        {
+            string configuredRoot = Path.Combine(
+                Path.GetTempPath(),
+                $"SharpShader-third-party-{Guid.NewGuid():N}");
+
+            string exactPath = SpirvCrossNativeLibraryBootstrap.ResolveCanonicalLibraryPathForTesting(
+                configuredRoot,
+                Path.Combine(configuredRoot, "irrelevant-base"),
+                Path.Combine(configuredRoot, "irrelevant-assembly", "SharpShader.dll"));
+
+            string osFolder = OperatingSystem.IsWindows()
+                ? "Win"
+                : OperatingSystem.IsLinux()
+                    ? "Linux"
+                    : OperatingSystem.IsMacOS()
+                        ? "macOS"
+                        : throw new PlatformNotSupportedException();
+            string archFolder = System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture switch
+            {
+                System.Runtime.InteropServices.Architecture.X64 => "AMD64",
+                System.Runtime.InteropServices.Architecture.Arm64 => "ARM64",
+                _ => throw new PlatformNotSupportedException(),
+            };
+            string nativeFileName = OperatingSystem.IsWindows()
+                ? "spirv-cross.dll"
+                : OperatingSystem.IsLinux()
+                    ? "libspirv-cross.so"
+                    : "libspirv-cross.dylib";
+
+            string expectedPath = Path.GetFullPath(
+                Path.Combine(
+                    configuredRoot,
+                    "Khronos",
+                    "SPIRV-Cross",
+                    osFolder,
+                    archFolder,
+                    nativeFileName));
+
+            Assert.Equal(expectedPath, exactPath);
+        }
+
+        [Fact]
+        public void SpirvCrossCanonicalPath_ShouldNotSearchCurrentDirectory()
+        {
+            string neutralRoot = Path.Combine(
+                Path.GetTempPath(),
+                $"SharpShader-native-root-{Guid.NewGuid():N}");
+
+            ShaderCompilerException exception = Assert.Throws<ShaderCompilerException>(
+                () => SpirvCrossNativeLibraryBootstrap.ResolveCanonicalLibraryPathForTesting(
+                    null,
+                    Path.Combine(neutralRoot, "app"),
+                    Path.Combine(neutralRoot, "assembly", "SharpShader.dll")));
+
+            Assert.Equal(ShaderCompilerErrorCode.BackendUnavailable, exception.ErrorCode);
+            Assert.Contains("INFINITY_THIRDPARTY_NATIVE_ROOT", exception.Message, StringComparison.Ordinal);
+        }
+
+        [Fact]
+        public void SpirvCrossMissingExactLibrary_ShouldFailWithoutFallback()
+        {
+            string missingPath = Path.Combine(
+                Path.GetTempPath(),
+                $"SharpShader-missing-spirv-cross-{Guid.NewGuid():N}",
+                OperatingSystem.IsWindows() ? "spirv-cross.dll" : "libspirv-cross.so");
+
+            ShaderCompilerException exception = Assert.Throws<ShaderCompilerException>(
+                () => SpirvCrossNativeLibraryBootstrap.CreateApiFromExactPath(missingPath));
+
+            Assert.Equal(ShaderCompilerErrorCode.BackendUnavailable, exception.ErrorCode);
+            Assert.Contains(Path.GetFullPath(missingPath), exception.Message, StringComparison.Ordinal);
+        }
+
+        [Fact]
+        public void SpirvCrossCanonicalNativeContext_MslSmoke()
+        {
+            const string source = @"
+RWStructuredBuffer<uint> Output : register(u0);
+
+[numthreads(1, 1, 1)]
+void main(uint3 dispatchThreadId : SV_DispatchThreadID)
+{
+    Output[0] = dispatchThreadId.x + 42;
+}";
+
+            ShaderCompileResult result = HLSLCrossCompiler.Compile(new ShaderCompileRequest
+            {
+                Source = source,
+                SourceName = "spirv-cross-canonical-context-smoke.hlsl",
+                EntryPoint = "main",
+                Stage = ShaderStageKind.Compute,
+                ShaderModel = new ShaderModelVersion(6, 0),
+                Target = ShaderTargetKind.Msl,
+                MslOptions = new MslCompileOptions
+                {
+                    Platform = MslTargetPlatform.MacOS,
+                },
+            });
+
+            Assert.NotEmpty(result.Bytecode);
+            Assert.False(string.IsNullOrWhiteSpace(result.Text));
+            Assert.Contains("kernel", result.Text!, StringComparison.Ordinal);
+        }
+
+        [Fact]
         public void RayTracing_LibraryCompile()
         {
             ShaderCompilerCapabilities capabilities = ShaderCompilerCapabilities.Probe();
@@ -172,10 +278,124 @@ namespace Infinity.Rendering.Tests
 
             Assert.Equal(ShaderCompilerErrorCode.CompileFailed, exception.ErrorCode);
             Assert.False(string.IsNullOrWhiteSpace(exception.Diagnostics));
+            Assert.Contains("inline.hlsl", exception.Diagnostics, StringComparison.OrdinalIgnoreCase);
 
             bool hasLineColumn = Regex.IsMatch(exception.Diagnostics, @"\(\d+,\d+\)")
                                  || Regex.IsMatch(exception.Diagnostics, @":\d+:\d+");
             Assert.True(hasLineColumn, "Diagnostics should include line and column information.");
+        }
+
+        [Fact]
+        public void ModernDxcOutputs_ShouldBeStable()
+        {
+            ShaderCompilerCapabilities capabilities = ShaderCompilerCapabilities.Probe();
+            ShaderModelVersion shaderModel = new ShaderModelVersion(6, 6);
+            if (!capabilities.IsAnyDxcAvailable
+                || !capabilities.IsProfileSupported(ShaderStageKind.Compute, shaderModel))
+            {
+                return;
+            }
+
+            ShaderCompileRequest request = new ShaderCompileRequest
+            {
+                Source = ComputeShaderSource,
+                SourceName = "stable-outputs.hlsl",
+                EntryPoint = "main",
+                Stage = ShaderStageKind.Compute,
+                ShaderModel = shaderModel,
+                Target = ShaderTargetKind.Dxil,
+                EnableDebugInfo = true,
+            };
+
+            ShaderCompileResult first = HLSLCrossCompiler.Compile(request);
+            ShaderCompileResult second = HLSLCrossCompiler.Compile(request);
+
+            Assert.NotEmpty(first.Bytecode);
+            Assert.NotEmpty(first.ReflectionData);
+            Assert.Equal(20, first.ShaderHash.Length);
+            Assert.True(first.ReflectionData.SequenceEqual(second.ReflectionData));
+            Assert.True(first.ShaderHash.SequenceEqual(second.ShaderHash));
+            Assert.True(first.PdbData.SequenceEqual(second.PdbData));
+
+            if (first.PdbData.Length > 0)
+            {
+                Assert.False(string.IsNullOrWhiteSpace(first.PdbName));
+            }
+        }
+
+        [Fact]
+        public void UnicodeSourceNameAndInclude_ShouldCompileAndDiagnose()
+        {
+            ShaderCompilerCapabilities capabilities = ShaderCompilerCapabilities.Probe();
+            ShaderModelVersion shaderModel = new ShaderModelVersion(6, 6);
+            if (!capabilities.IsAnyDxcAvailable
+                || !capabilities.IsProfileSupported(ShaderStageKind.Pixel, shaderModel))
+            {
+                return;
+            }
+
+            string temporaryDirectory = Path.Combine(
+                Path.GetTempPath(),
+                $"SharpShader-包含-{Guid.NewGuid():N}");
+            Directory.CreateDirectory(temporaryDirectory);
+
+            try
+            {
+                string includePath = Path.Combine(temporaryDirectory, "共享头.hlsli");
+                File.WriteAllText(
+                    includePath,
+                    "float4 BuildColor() { return float4(0.25, 0.5, 0.75, 1.0); }");
+
+                string source = "#include \"共享头.hlsli\"\nfloat4 main() : SV_Target { return BuildColor(); }";
+                string sourcePath = Path.Combine(temporaryDirectory, "着色器-测试.hlsl");
+                File.WriteAllText(sourcePath, source);
+
+                ShaderCompileRequest request = new ShaderCompileRequest
+                {
+                    Source = source,
+                    SourceName = sourcePath,
+                    EntryPoint = "main",
+                    Stage = ShaderStageKind.Pixel,
+                    ShaderModel = shaderModel,
+                    Target = ShaderTargetKind.Dxil,
+                    IncludeDirs = new[] { temporaryDirectory },
+                };
+
+                ShaderCompileResult result;
+                try
+                {
+                    result = HLSLCrossCompiler.Compile(request);
+                }
+                catch (ShaderCompilerException compileException)
+                {
+                    throw new InvalidOperationException(
+                        $"Unicode source/include compile failed: {compileException.Diagnostics}",
+                        compileException);
+                }
+
+                Assert.NotEmpty(result.Bytecode);
+                Assert.NotEmpty(result.ReflectionData);
+                Assert.Equal(20, result.ShaderHash.Length);
+
+                const string invalidSource = "float4 main() : SV_Target { return BuildColor(";
+                File.WriteAllText(sourcePath, invalidSource);
+                ShaderCompilerException exception = Assert.Throws<ShaderCompilerException>(
+                    () => HLSLCrossCompiler.Compile(request with
+                    {
+                        Source = invalidSource,
+                    }));
+
+                Assert.Equal(ShaderCompilerErrorCode.CompileFailed, exception.ErrorCode);
+                Assert.Contains("着色器-测试.hlsl", exception.Diagnostics, StringComparison.Ordinal);
+
+                bool hasLineColumn = Regex.IsMatch(exception.Diagnostics, @"\(\d+,\d+\)")
+                                     || Regex.IsMatch(exception.Diagnostics, @":\d+:\d+");
+                Assert.True(hasLineColumn, "Unicode diagnostics should include line and column information.");
+            }
+            finally
+            {
+                Directory.Delete(temporaryDirectory, recursive: true);
+            }
         }
 
         [Fact]
@@ -231,6 +451,9 @@ namespace Infinity.Rendering.Tests
             Assert.NotEmpty(vertexResult.Bytecode);
             Assert.NotEmpty(pixelResult.Bytecode);
             Assert.NotEmpty(computeResult.Bytecode);
+            Assert.NotEmpty(vertexResult.ReflectionData);
+            Assert.NotEmpty(pixelResult.ReflectionData);
+            Assert.NotEmpty(computeResult.ReflectionData);
         }
 
         [Fact]
