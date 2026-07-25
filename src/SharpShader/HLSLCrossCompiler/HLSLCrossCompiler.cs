@@ -48,6 +48,12 @@ namespace SharpShader.HLSLCrossCompiler
 
         private static ShaderCompileResult CompileCore(ShaderCompileRequest request, ShaderCompilerExecutionContext? context)
         {
+#if INFINITY_TARGET_ANDROID || INFINITY_TARGET_IOS
+            request.Validate();
+            throw new PlatformNotSupportedException(
+                "Runtime shader compilation is disabled for mobile targets. "
+                + "Consume a host-produced, target-qualified shader artifact package.");
+#else
             request.Validate();
 
             if (request.Target == ShaderTargetKind.Msl)
@@ -63,6 +69,7 @@ namespace SharpShader.HLSLCrossCompiler
             }
 
             return CompileViaDxc(request, context);
+#endif
         }
 
         private static ShaderCompileResult CompileViaDxc(ShaderCompileRequest request, ShaderCompilerExecutionContext? context)
@@ -72,6 +79,14 @@ namespace SharpShader.HLSLCrossCompiler
 
         private static ShaderCompilerCapabilities ProbeCapabilitiesCore(ShaderCompilerExecutionContext? context)
         {
+#if INFINITY_TARGET_ANDROID || INFINITY_TARGET_IOS
+            return new ShaderCompilerCapabilities
+            {
+                NativeDxcAvailable = false,
+                ProfileSupport = new Dictionary<string, bool>(
+                    StringComparer.OrdinalIgnoreCase),
+            };
+#else
             bool nativeDxcAvailable = context?.IsNativeDxcAvailableOverride?.Invoke() ?? NativeDxcCompiler.IsAvailable();
 
             Dictionary<string, bool> profileSupport = new Dictionary<string, bool>(StringComparer.OrdinalIgnoreCase);
@@ -94,6 +109,7 @@ namespace SharpShader.HLSLCrossCompiler
                 NativeDxcAvailable = nativeDxcAvailable,
                 ProfileSupport = profileSupport,
             };
+#endif
         }
 
         private static bool ProbeProfileSupport(ShaderStageKind stage, ShaderModelVersion shaderModel, ShaderCompilerExecutionContext? context)
