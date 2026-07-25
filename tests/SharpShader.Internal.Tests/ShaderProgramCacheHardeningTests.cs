@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
+using System.Security.Cryptography;
 using System.Threading;
 using System.Threading.Tasks;
 using SharpShader.Compilation;
@@ -93,7 +94,7 @@ namespace Infinity.Rendering.Tests
             ShaderProgramCompilation initial =
                 CreateCompiler(cache.Path).Compile(request);
             string livePath = GetLivePath(cache.Path, initial.CacheKey);
-            File.WriteAllText(livePath, "{\"schemaVersion\":1,\"broken\":true}");
+            File.WriteAllText(livePath, "{\"schemaVersion\":2,\"broken\":true}");
 
             using CountdownEvent readersEntered = new(2);
             using ManualResetEventSlim releaseReaders = new(false);
@@ -125,7 +126,7 @@ namespace Infinity.Rendering.Tests
                 result => Assert.Equal(republished.CacheKey, result.CacheKey));
             Assert.Single(Directory.EnumerateFiles(
                 cache.Path,
-                "*.sharpshader-cache.json",
+                "*.sharpshader-cache-r2.json",
                 SearchOption.TopDirectoryOnly));
             Assert.Single(Directory.EnumerateFiles(
                 cache.Path,
@@ -225,10 +226,10 @@ namespace Infinity.Rendering.Tests
                     SearchOption.TopDirectoryOnly)
                 .Where(path =>
                     path.EndsWith(
-                        ".sharpshader-cache.json",
+                        ".sharpshader-cache-r2.json",
                         StringComparison.Ordinal)
                     || path.Contains(
-                        ".sharpshader-cache.json.corrupt-",
+                        ".sharpshader-cache-r2.json.corrupt-",
                         StringComparison.Ordinal))
                 .Sum(path => new FileInfo(path).Length);
             Assert.InRange(retainedBytes, 1, limits.MaximumPersistentCacheBytes);
@@ -259,7 +260,7 @@ namespace Infinity.Rendering.Tests
             Assert.Contains("512-byte limit", exception.Message);
             Assert.Empty(Directory.EnumerateFiles(
                 cache.Path,
-                "*.sharpshader-cache.json",
+                "*.sharpshader-cache-r2.json",
                 SearchOption.TopDirectoryOnly));
             Assert.Empty(Directory.EnumerateFiles(
                 cache.Path,
@@ -267,11 +268,136 @@ namespace Infinity.Rendering.Tests
                 SearchOption.TopDirectoryOnly));
         }
 
+        [Fact]
+        [Trait("Category", "SharpShaderAttachment")]
+        public void RetiredNamespaceIsNeverReadAndOldCurrentSchemaIsQuarantined()
+        {
+            using TemporaryDirectory cache = new();
+            (ShaderProgramCompilation compilation,
+                ShaderProgramDependencySnapshot dependencies) =
+                CreatePortableCacheFixture();
+            ShaderProgramPersistentCache persistent = new(
+                cache.Path,
+                ShaderProgramCacheLimits.Default);
+            persistent.Store(compilation, dependencies);
+
+            string livePath = GetLivePath(
+                cache.Path,
+                compilation.CacheKey);
+            string canonical = File.ReadAllText(livePath);
+            string oldSchema = canonical.Replace(
+                "\"schemaVersion\":2",
+                "\"schemaVersion\":1",
+                StringComparison.Ordinal);
+            Assert.NotEqual(canonical, oldSchema);
+            File.WriteAllText(livePath, oldSchema);
+
+            string retiredPath = Path.Combine(
+                cache.Path,
+                compilation.CacheKey + ".sharpshader-cache.json");
+            const string retiredSentinel =
+                "retired cache namespace must never be read";
+            File.WriteAllText(retiredPath, retiredSentinel);
+
+            Assert.False(persistent.TryLoadPair(
+                dependencies.ProvisionalKey,
+                out ShaderProgramDependencySnapshot? rejectedDependencies,
+                out ShaderProgramCompilation? rejectedCompilation));
+            Assert.Null(rejectedDependencies);
+            Assert.Null(rejectedCompilation);
+            Assert.Equal(retiredSentinel, File.ReadAllText(retiredPath));
+            Assert.False(File.Exists(livePath));
+            Assert.Single(Directory.EnumerateFiles(
+                cache.Path,
+                "*.sharpshader-cache-r2.json.corrupt-*",
+                SearchOption.TopDirectoryOnly));
+
+            persistent.Store(compilation, dependencies);
+            Assert.True(File.Exists(livePath));
+            Assert.Contains(
+                "\"schemaVersion\":2",
+                File.ReadAllText(livePath),
+                StringComparison.Ordinal);
+            Assert.Empty(Directory.EnumerateFiles(
+                cache.Path,
+                "*.claim-*",
+                SearchOption.TopDirectoryOnly));
+            Assert.Empty(Directory.EnumerateFiles(
+                cache.Path,
+                "*.tmp",
+                SearchOption.TopDirectoryOnly));
+        }
+
+        private static (
+            ShaderProgramCompilation Compilation,
+            ShaderProgramDependencySnapshot Dependencies)
+            CreatePortableCacheFixture()
+        {
+            const string sourceDigest =
+                "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+            const string provisionalKey =
+                "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd";
+            const string finalKey =
+                "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";
+            byte[] content = { 0x44, 0x58, 0x49, 0x4c };
+            ShaderArtifactIdentity identity = new(
+                ShaderArtifactKind.Dxil,
+                Convert.ToHexStringLower(SHA256.HashData(content)),
+                checked((ulong)content.Length),
+                "portable.dxil");
+            ShaderInterfaceLayout layout = new(
+                Array.Empty<ShaderLogicalBinding>());
+            ShaderInterfaceEntry entry = new(
+                "CSMain",
+                ShaderExecutionStage.Compute,
+                layout.Signature,
+                new ShaderAttachmentInterface(
+                    "default",
+                    "CSMain",
+                    ShaderExecutionStage.Compute),
+                new[] { identity });
+            ShaderInterfaceManifest manifest = new(
+                sourceDigest,
+                new[]
+                {
+                    new ShaderToolchainComponent(
+                        "PortableCacheFixture",
+                        "1.0"),
+                },
+                new[] { layout },
+                new[]
+                {
+                    new ShaderInterfaceVariant(
+                        "default",
+                        defines: null,
+                        new[] { entry }),
+                },
+                new[] { ShaderBackendLayoutPlanner.Plan(layout) },
+                ShaderProgramTarget.DirectX12);
+            ShaderProgramArtifact artifact = new(
+                "default",
+                "CSMain",
+                ShaderExecutionStage.Compute,
+                identity,
+                content,
+                text: null);
+            ShaderProgramCompilation compilation = new(
+                finalKey,
+                manifest,
+                new[] { artifact });
+            ShaderProgramDependencySnapshot dependencies = new(
+                provisionalKey,
+                finalKey,
+                isWarmable: true,
+                Array.Empty<ShaderProgramDependencyFile>(),
+                Array.Empty<ShaderProgramDirectoryTopology>());
+            return (compilation, dependencies);
+        }
         private static int CountLiveEntries(string directory)
         {
             return Directory.EnumerateFiles(
                     directory,
-                    "*.sharpshader-cache.json",
+                    "*.sharpshader-cache-r2.json",
                     SearchOption.TopDirectoryOnly)
                 .Count();
         }
@@ -282,7 +408,7 @@ namespace Infinity.Rendering.Tests
         {
             return Path.Combine(
                 directory,
-                cacheKey + ".sharpshader-cache.json");
+                cacheKey + ".sharpshader-cache-r2.json");
         }
 
         private static ShaderProgramCompileRequest CreateRequest(

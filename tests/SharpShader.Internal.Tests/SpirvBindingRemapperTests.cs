@@ -46,7 +46,7 @@ namespace Infinity.Rendering.Tests
             VulkanShaderBackendLayout target = CreateDenseTargetLayout(logical);
             byte[] inputSnapshot = (byte[])temporary.Bytecode.Clone();
 
-            byte[] remapped = SpirvBindingRemapper.Remap(
+            byte[] remapped = RemapForTest(
                 temporary.Bytecode,
                 logical,
                 target);
@@ -103,7 +103,7 @@ namespace Infinity.Rendering.Tests
                 });
             VulkanShaderBackendLayout target = CreateDenseTargetLayout(logical);
 
-            byte[] remapped = SpirvBindingRemapper.Remap(
+            byte[] remapped = RemapForTest(
                 temporary.Bytecode,
                 logical,
                 target);
@@ -142,7 +142,7 @@ namespace Infinity.Rendering.Tests
                 CreateShiftedOptions(includeAutoShift: false));
             VulkanShaderBackendLayout target = CreateDenseTargetLayout(logical);
 
-            byte[] remapped = SpirvBindingRemapper.Remap(
+            byte[] remapped = RemapForTest(
                 temporary.Bytecode,
                 logical,
                 target);
@@ -184,7 +184,7 @@ namespace Infinity.Rendering.Tests
                 "TextureA");
 
             ShaderCompilerException exception = Assert.Throws<ShaderCompilerException>(
-                () => SpirvBindingRemapper.Remap(
+                () => RemapForTest(
                     duplicateNames,
                     logical,
                     CreateDenseTargetLayout(logical)));
@@ -216,21 +216,21 @@ namespace Infinity.Rendering.Tests
             VulkanShaderBackendLayout target = CreateDenseTargetLayout(logical);
 
             ShaderCompilerException missing = Assert.Throws<ShaderCompilerException>(
-                () => SpirvBindingRemapper.Remap(
+                () => RemapForTest(
                     RemoveFirstDecoration(temporary.Bytecode, Decoration.Binding),
                     logical,
                     target));
             Assert.Contains("must have both DescriptorSet and Binding", missing.Message, StringComparison.Ordinal);
 
             ShaderCompilerException duplicate = Assert.Throws<ShaderCompilerException>(
-                () => SpirvBindingRemapper.Remap(
+                () => RemapForTest(
                     DuplicateFirstDecoration(temporary.Bytecode, Decoration.Binding),
                     logical,
                     target));
             Assert.Contains("duplicate Binding decorations", duplicate.Message, StringComparison.Ordinal);
 
             ShaderCompilerException conflict = Assert.Throws<ShaderCompilerException>(
-                () => SpirvBindingRemapper.Remap(
+                () => RemapForTest(
                     CollideFirstTwoBindings(temporary.Bytecode),
                     logical,
                     target));
@@ -262,7 +262,7 @@ namespace Infinity.Rendering.Tests
                 OpDecorateId);
 
             ShaderCompilerException exception = Assert.Throws<ShaderCompilerException>(
-                () => SpirvBindingRemapper.Remap(
+                () => RemapForTest(
                     indirect,
                     logical,
                     CreateDenseTargetLayout(logical)));
@@ -302,11 +302,11 @@ namespace Infinity.Rendering.Tests
                     : mapping));
 
             ShaderCompilerException missingException = Assert.Throws<ShaderCompilerException>(
-                () => SpirvBindingRemapper.Remap(temporary.Bytecode, logical, missing));
+                () => RemapForTest(temporary.Bytecode, logical, missing));
             Assert.Contains("missing logical binding", missingException.Message, StringComparison.Ordinal);
 
             ShaderCompilerException kindException = Assert.Throws<ShaderCompilerException>(
-                () => SpirvBindingRemapper.Remap(temporary.Bytecode, logical, wrongKind));
+                () => RemapForTest(temporary.Bytecode, logical, wrongKind));
             Assert.Contains("logical resource shape requires", kindException.Message, StringComparison.Ordinal);
         }
 
@@ -334,7 +334,7 @@ namespace Infinity.Rendering.Tests
             byte[] badVersion = (byte[])temporary.Bytecode.Clone();
             WriteWord(badVersion, 1, 0x00010700);
             ShaderCompilerException versionException = Assert.Throws<ShaderCompilerException>(
-                () => SpirvBindingRemapper.Remap(badVersion, logical, target));
+                () => RemapForTest(badVersion, logical, target));
             Assert.Contains("version 0x00010700 is not supported", versionException.Message, StringComparison.Ordinal);
 
             byte[] badInstruction = (byte[])temporary.Bytecode.Clone();
@@ -344,7 +344,7 @@ namespace Infinity.Rendering.Tests
                 5,
                 (uint.MaxValue & 0xFFFF0000u) | (firstInstruction & 0xFFFFu));
             ShaderCompilerException instructionException = Assert.Throws<ShaderCompilerException>(
-                () => SpirvBindingRemapper.Remap(badInstruction, logical, target));
+                () => RemapForTest(badInstruction, logical, target));
             Assert.Contains("extends beyond the artifact boundary", instructionException.Message, StringComparison.Ordinal);
         }
 
@@ -620,6 +620,19 @@ namespace Infinity.Rendering.Tests
             }
         }
 
+        private static byte[] RemapForTest(
+            byte[] bytecode,
+            ShaderArtifactReflection reflection,
+            VulkanShaderBackendLayout targetLayout)
+        {
+            return SpirvBindingRemapper.Remap(
+                bytecode,
+                reflection,
+                targetLayout,
+                Array.Empty<ShaderAttachmentInterface>(),
+                SpirvBindingRemapper.GetPrivateAttachmentDescriptorSet(
+                    targetLayout));
+        }
         private static uint ReadWord(byte[] bytecode, int wordOffset)
         {
             return BinaryPrimitives.ReadUInt32LittleEndian(

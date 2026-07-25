@@ -2,6 +2,7 @@ using Xunit;
 using System;
 using System.IO;
 using System.Linq;
+using System.Security.Cryptography;
 using SharpShader.Compilation;
 using SharpShader.Compilation.Internal;
 using SharpShader.HLSLCrossCompiler;
@@ -275,6 +276,421 @@ void RayGen()
                 StringComparison.OrdinalIgnoreCase);
         }
 
+        [Fact]
+        [Trait("Category", "SharpShaderAttachment")]
+        public void AttachmentInterfaceParser_ShouldIgnoreCommentAndStringNoise()
+        {
+            string source = CreateAttachmentShaderLabSource()
+                .Replace(
+                    "            AttachmentInterface",
+                    "            // AttachmentInterface { Unknown 1 }\n"
+                    + "            /* AttachmentInterface { Phase 99 } */\n"
+                    + "            AttachmentInterface",
+                    StringComparison.Ordinal)
+                .Replace(
+                    "            ENDHLSL",
+                    "            // AttachmentInterface in HLSL comment\n"
+                    + "            static const char* kAttachmentNoise = "
+                    + "\"AttachmentInterface { Missing }\";\n"
+                    + "            ENDHLSL",
+                    StringComparison.Ordinal);
+
+            ShaderLab shader = ShaderLabUtil.ParseShaderLabFromSource(source);
+            ShaderAttachmentPhase phase = Assert.IsType<ShaderAttachmentPhase>(
+                Assert.Single(shader.Passes).Program.AttachmentPhase);
+            Assert.Equal(0u, phase.Phase);
+            Assert.Single(phase.Attachments);
+        }
+
+        [Theory]
+        [InlineData("unknown")]
+        [InlineData("duplicate")]
+        [InlineData("missing")]
+        [Trait("Category", "SharpShaderAttachment")]
+        public void AttachmentInterfaceParser_ShouldRejectMalformedFields(
+            string mutation)
+        {
+            string source = CreateAttachmentShaderLabSource();
+            source = mutation switch
+            {
+                "unknown" => source.Replace(
+                    "Phase 0",
+                    "Phase 0\nUnknownField 1",
+                    StringComparison.Ordinal),
+                "duplicate" => source.Replace(
+                    "Phase 0",
+                    "Phase 0\nPhase 0",
+                    StringComparison.Ordinal),
+                "missing" => source.Replace(
+                    "LayerMode SingleLayer",
+                    string.Empty,
+                    StringComparison.Ordinal),
+                _ => throw new ArgumentOutOfRangeException(nameof(mutation)),
+            };
+
+            Assert.ThrowsAny<FormatException>(() =>
+                ShaderLabUtil.ParseShaderLabFromSource(source));
+        }
+
+        [Fact]
+        [Trait("Category", "SharpShaderAttachment")]
+        public void Compile_ShouldBuildAllFourteenCanonicalGraphicsAttachmentPasses()
+        {
+            string[] paths =
+            {
+                ResolveShaderPath(
+                    "Shaders", "ShaderLab", "Global", "DrawFullScreen.shader"),
+                ResolveShaderPath(
+                    "Shaders", "ShaderLab", "Global", "DrawSystemLUT.shader"),
+                ResolveShaderPath(
+                    "Shaders", "ShaderLab", "Global", "HybridFullscreen.shader"),
+                ResolveShaderPath(
+                    "Shaders", "ShaderLab", "Material", "InfinityLit.shader"),
+            };
+            int graphicsPassCount = 0;
+            foreach (string path in paths)
+            {
+                ShaderLab shader = ShaderLabUtil.ParseShaderLabFromFile(path);
+                var graphicsPasses = shader.Passes
+                    .Select(static (pass, index) => new
+                    {
+                        Pass = pass,
+                        Index = index,
+                    })
+                    .Where(static item => item.Pass.Program.Entries.Any(
+                        static entry => entry.Stage
+                            == EShaderLabShaderStage.ProgramFragment));
+                foreach (var graphicsPass in graphicsPasses)
+                {
+                    string sourceName =
+                        $"{path}.pass-{graphicsPass.Index}.hlsl";
+                    ShaderProgramCompilation compilation;
+                    try
+                    {
+                        compilation = ShaderLabCompiler.Shared.CompileProgram(
+                            graphicsPass.Pass.Program,
+                            sourceName,
+                            shader.SourcePath,
+                            new ShaderLabCompilerOptions(
+                                ShaderProgramTarget.All));
+                    }
+                    catch (ShaderCompilerException exception)
+                    {
+                        throw new InvalidOperationException(
+                            $"Canonical ShaderLab pass compile failed for "
+                            + $"'{path}' pass {graphicsPass.Index}: "
+                            + exception.Diagnostics,
+                            exception);
+                    }
+
+                    ++graphicsPassCount;
+                    Assert.Equal(
+                        ShaderProgramTarget.All,
+                        compilation.Manifest.Targets);
+                    ShaderAttachmentPhase expectedPhase =
+                        Assert.IsType<ShaderAttachmentPhase>(
+                            graphicsPass.Pass.Program.AttachmentPhase);
+                    foreach (ShaderInterfaceVariant variant in
+                             compilation.Manifest.Variants)
+                    {
+                        ShaderInterfaceEntry pixelEntry = Assert.Single(
+                            variant.Entries,
+                            static entry => entry.Stage
+                                == ShaderExecutionStage.Pixel);
+                        ShaderAttachmentPhase actualPhase =
+                            Assert.IsType<ShaderAttachmentPhase>(
+                                pixelEntry.AttachmentInterface.Phase);
+                        Assert.Equal(expectedPhase, actualPhase);
+                        Assert.Equal(
+                            new[]
+                            {
+                                ShaderArtifactKind.Dxil,
+                                ShaderArtifactKind.SpirV,
+                                ShaderArtifactKind.MslSource,
+                            },
+                            pixelEntry.Artifacts.Select(static artifact =>
+                                artifact.ArtifactKind));
+
+                        ShaderProgramArtifact dxil = AssertExactArtifact(
+                            compilation,
+                            variant.Key,
+                            pixelEntry,
+                            ShaderArtifactKind.Dxil);
+                        ShaderProgramArtifact spirv = AssertExactArtifact(
+                            compilation,
+                            variant.Key,
+                            pixelEntry,
+                            ShaderArtifactKind.SpirV);
+                        ShaderProgramArtifact msl = AssertExactArtifact(
+                            compilation,
+                            variant.Key,
+                            pixelEntry,
+                            ShaderArtifactKind.MslSource);
+
+                        AssertReflectionMatchesPhase(
+                            ReflectArtifact(
+                                graphicsPass.Pass.Program,
+                                shader.SourcePath,
+                                sourceName,
+                                variant,
+                                pixelEntry,
+                                dxil,
+                                ShaderTargetKind.Dxil),
+                            ShaderArtifactKind.Dxil,
+                            pixelEntry,
+                            actualPhase);
+                        AssertReflectionMatchesPhase(
+                            ReflectArtifact(
+                                graphicsPass.Pass.Program,
+                                shader.SourcePath,
+                                sourceName,
+                                variant,
+                                pixelEntry,
+                                spirv,
+                                ShaderTargetKind.SpirV),
+                            ShaderArtifactKind.SpirV,
+                            pixelEntry,
+                            actualPhase);
+                        AssertMslMatchesPhase(msl, pixelEntry, actualPhase);
+                    }
+                }
+            }
+
+            Assert.Equal(14, graphicsPassCount);
+        }
+
+        private static ShaderProgramArtifact AssertExactArtifact(
+            ShaderProgramCompilation compilation,
+            string variantKey,
+            ShaderInterfaceEntry entry,
+            ShaderArtifactKind artifactKind)
+        {
+            ShaderArtifactIdentity identity = Assert.Single(
+                entry.Artifacts,
+                artifact => artifact.ArtifactKind == artifactKind);
+            ShaderProgramArtifact artifact = compilation.GetArtifact(
+                variantKey,
+                entry.Name,
+                entry.Stage,
+                artifactKind);
+            Assert.Equal(identity, artifact.Identity);
+            Assert.False(artifact.Content.IsEmpty);
+            Assert.Equal(
+                identity.ContentDigest,
+                Convert.ToHexStringLower(SHA256.HashData(
+                    artifact.Content.Span)));
+            Assert.Equal(
+                identity.ByteLength,
+                checked((ulong)artifact.Content.Length));
+            return artifact;
+        }
+
+        private static ShaderArtifactReflection ReflectArtifact(
+            ShaderLabProgram program,
+            string sourcePath,
+            string sourceName,
+            ShaderInterfaceVariant variant,
+            ShaderInterfaceEntry entry,
+            ShaderProgramArtifact artifact,
+            ShaderTargetKind target)
+        {
+            ShaderCompileRequest request = new()
+            {
+                Source = program.Source,
+                SourceName = sourceName,
+                EntryPoint = entry.Name,
+                Stage = ShaderStageKind.Pixel,
+                ShaderModel = new ShaderModelVersion(6, 8),
+                Target = target,
+                Defines = variant.Defines.Select(static define =>
+                    new ShaderDefine(define, "1")).ToArray(),
+                IncludeDirs = new[]
+                {
+                    Path.GetDirectoryName(sourcePath)
+                        ?? throw new InvalidOperationException(
+                            "Canonical shader source requires a directory."),
+                },
+            };
+            if (target == ShaderTargetKind.Dxil)
+            {
+                ShaderCompileResult compiled = HLSLCrossCompiler.Compile(request);
+                Assert.Equal(artifact.Content.ToArray(), compiled.Bytecode);
+                return DxilArtifactReflector.Reflect(request, compiled);
+            }
+
+            if (target == ShaderTargetKind.SpirV)
+            {
+                return SpirvArtifactReflector.Reflect(
+                    request,
+                    new ShaderCompileResult
+                    {
+                        Bytecode = artifact.Content.ToArray(),
+                    });
+            }
+
+            throw new ArgumentOutOfRangeException(
+                nameof(target),
+                target,
+                "Canonical artifact reflection target is not supported.");
+        }
+
+        private static void AssertReflectionMatchesPhase(
+            ShaderArtifactReflection reflection,
+            ShaderArtifactKind expectedArtifactKind,
+            ShaderInterfaceEntry entry,
+            ShaderAttachmentPhase phase)
+        {
+            Assert.Equal(expectedArtifactKind, reflection.ArtifactKind);
+
+            ShaderEntryPointReflection reflectedEntry = Assert.Single(
+                reflection.EntryPoints);
+            Assert.Equal(entry.Name, reflectedEntry.Name);
+            Assert.Equal(entry.Stage, reflectedEntry.Stage);
+
+            ShaderStageIoReflection[] reflectedOutputs = reflectedEntry.StageOutputs
+                .Where(static output =>
+                    output.Direction == ShaderStageIoDirection.Output
+                    && output.Location.HasValue
+                    && output.BuiltIn is ShaderStageIoBuiltIn.None
+                        or ShaderStageIoBuiltIn.Color)
+                .OrderBy(static output => output.Location)
+                .ThenBy(static output => output.Index)
+                .ThenBy(static output => output.Component)
+                .ToArray();
+            if (reflection.ArtifactKind == ShaderArtifactKind.Dxil)
+            {
+                var expectedDxilOutputs = phase.Attachments
+                    .Where(static attachment =>
+                        attachment.OutputLocation.HasValue)
+                    .Select(static attachment => (
+                        Target: attachment.OutputIndex == 0
+                            ? attachment.OutputLocation!.Value
+                            : attachment.OutputIndex,
+                        attachment.OutputComponent))
+                    .OrderBy(static output => output.Target)
+                    .ThenBy(static output => output.OutputComponent)
+                    .ToArray();
+                Assert.Equal(
+                    expectedDxilOutputs,
+                    reflectedOutputs.Select(static output => (
+                            Target: output.Location!.Value,
+                            OutputComponent: output.Component))
+                        .ToArray());
+            }
+            else
+            {
+                var expectedSpirvOutputs = phase.Attachments
+                    .Where(static attachment =>
+                        attachment.OutputLocation.HasValue)
+                    .Select(static attachment => (
+                        Location: attachment.OutputLocation!.Value,
+                        attachment.OutputIndex,
+                        attachment.OutputComponent))
+                    .OrderBy(static output => output.Location)
+                    .ThenBy(static output => output.OutputIndex)
+                    .ThenBy(static output => output.OutputComponent)
+                    .ToArray();
+                Assert.Equal(
+                    expectedSpirvOutputs,
+                    reflectedOutputs.Select(static output => (
+                            Location: output.Location!.Value,
+                            OutputIndex: output.Index,
+                            OutputComponent: output.Component))
+                        .ToArray());
+
+                uint[] expectedInputs = phase.Attachments
+                    .Where(static attachment =>
+                        attachment.InputIndex.HasValue)
+                    .Select(static attachment =>
+                        attachment.InputIndex!.Value)
+                    .OrderBy(static index => index)
+                    .ToArray();
+                Assert.Equal(
+                    expectedInputs,
+                    reflectedEntry.InputAttachments
+                        .Select(static input => input.InputAttachmentIndex)
+                        .OrderBy(static index => index)
+                        .ToArray());
+            }
+        }
+
+        private static void AssertMslMatchesPhase(
+            ShaderProgramArtifact artifact,
+            ShaderInterfaceEntry entry,
+            ShaderAttachmentPhase phase)
+        {
+            Assert.Equal(ShaderArtifactKind.MslSource, artifact.Identity.ArtifactKind);
+            string source = Assert.IsType<string>(artifact.Text);
+            Assert.False(string.IsNullOrWhiteSpace(source));
+            MslArtifactReflection reflection = MslArtifactReflector.Reflect(
+                source,
+                entry.Name,
+                entry.Stage);
+            Assert.Equal(entry.Name, reflection.EntryPoint);
+            Assert.Equal(entry.Stage, reflection.Stage);
+
+            (uint Location, uint Index, ShaderAttachmentNumericClass NumericClass)[]
+                expectedOutputs = phase.Attachments
+                .Where(static attachment =>
+                    attachment.OutputLocation.HasValue)
+                .Select(static attachment => (
+                    attachment.OutputLocation!.Value,
+                    attachment.OutputIndex,
+                    attachment.NumericClass))
+                .Distinct()
+                .OrderBy(static output => output.Value)
+                .ThenBy(static output => output.OutputIndex)
+                .ToArray();
+            (uint Location, uint Index, ShaderAttachmentNumericClass NumericClass)[]
+                actualOutputs = reflection.ColorOutputs
+                .Select(static output => (
+                    output.Location,
+                    output.Index,
+                    output.NumericClass))
+                .ToArray();
+            Assert.Equal(expectedOutputs, actualOutputs);
+
+            (uint Location, ShaderAttachmentNumericClass NumericClass)[]
+                expectedInputs = phase.Attachments
+                .Where(static attachment =>
+                    attachment.InputIndex.HasValue
+                    && attachment.Ordering
+                        != ShaderAttachmentOrdering.RasterOrdered)
+                .Select(static attachment => (
+                    attachment.LogicalAttachmentId,
+                    attachment.NumericClass))
+                .Distinct()
+                .OrderBy(static input => input.LogicalAttachmentId)
+                .ToArray();
+            (uint Location, ShaderAttachmentNumericClass NumericClass)[]
+                actualInputs = reflection.ColorInputs
+                .Select(static input => (
+                    input.Location,
+                    input.NumericClass))
+                .ToArray();
+            Assert.Equal(expectedInputs, actualInputs);
+            Assert.Equal(phase.DepthExport, reflection.DepthExport);
+            Assert.Equal(phase.StencilExport, reflection.StencilExport);
+
+            int expectedRasterOrderGroups = phase.Attachments
+                .Where(static attachment =>
+                    attachment.Ordering
+                        == ShaderAttachmentOrdering.RasterOrdered)
+                .Select(static attachment => attachment.LogicalAttachmentId)
+                .Distinct()
+                .Count();
+            Assert.Equal(
+                expectedRasterOrderGroups,
+                reflection.RasterOrderGroups.Count);
+            Assert.All(
+                reflection.RasterOrderGroups,
+                static group =>
+                {
+                    Assert.Equal(MslResourceBindingKind.Texture, group.BindingKind);
+                    Assert.Equal(0u, group.Group);
+                });
+        }
+
         private static ShaderLabCompiler CreateCapturingCompiler(
             Action<ShaderCompileRequest> capture)
         {
@@ -322,6 +738,68 @@ void RayGen()
             return shaderLab;
         }
 
+        private static string CreateAttachmentShaderLabSource()
+        {
+            return """
+                Shader "Test/Attachment"
+                {
+                    Pass
+                    {
+                        AttachmentInterface
+                        {
+                            AbiRevision 1
+                            Phase 0
+                            DepthStencilAccess None
+                            DepthExport None
+                            StencilExport None
+                            Attachment
+                            {
+                                LogicalAttachmentId 0
+                                InputIndex None
+                                OutputLocation 0
+                                OutputIndex 0
+                                OutputComponent 0
+                                Aspect Color
+                                NumericClass FloatingPoint
+                                SampleMode SingleSample
+                                LayerMode SingleLayer
+                                Ordering None
+                                Feedback None
+                                SampledFeedbackBinding None
+                            }
+                        }
+                        HLSLPROGRAM
+                        #pragma vertex VSMain
+                        #pragma fragment PSMain
+                        float4 VSMain() : SV_Position { return 0; }
+                        float4 PSMain() : SV_Target0 { return 1; }
+                        ENDHLSL
+                    }
+                }
+                """;
+        }
+
+        private static string ResolveShaderPath(params string[] parts)
+        {
+            DirectoryInfo? current = new(AppContext.BaseDirectory);
+            while (current is not null)
+            {
+                if (File.Exists(Path.Combine(
+                        current.FullName,
+                        "InfinityBrowser.sln")))
+                {
+                    return Path.Combine(
+                        new[] { current.FullName, "Engine" }
+                            .Concat(parts)
+                            .ToArray());
+                }
+
+                current = current.Parent;
+            }
+
+            throw new InvalidOperationException(
+                "Unable to resolve repository root.");
+        }
         private static StandaloneShaderProgram CreateStandaloneProgram(
             string sourcePath)
         {

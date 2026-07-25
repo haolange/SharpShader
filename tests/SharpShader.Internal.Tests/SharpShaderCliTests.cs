@@ -72,7 +72,7 @@ namespace Infinity.Rendering.Tests
 
                 Assert.Equal(0, inspectExit);
                 Assert.Equal(string.Empty, inspectError.ToString());
-                Assert.Contains("schema: 1", inspectOutput.ToString());
+                Assert.Contains("schema: 2", inspectOutput.ToString());
                 Assert.Contains(
                     "dx12",
                     inspectOutput.ToString(),
@@ -120,6 +120,112 @@ namespace Infinity.Rendering.Tests
             }
         }
 
+        [Fact]
+        [Trait("Category", "SharpShaderAttachment")]
+        public void Execute_ShouldRequireAttachmentInterfaceForPixelEntries()
+        {
+            string root = Path.Combine(
+                Path.GetTempPath(),
+                $"sharpshader-cli-pixel-{Guid.NewGuid():N}");
+            Directory.CreateDirectory(root);
+            try
+            {
+                string sourcePath = Path.Combine(root, "pixel.hlsl");
+                string outputPath = Path.Combine(root, "package");
+                File.WriteAllText(
+                    sourcePath,
+                    "float4 Main() : SV_Target0 { return 1; }");
+                using StringWriter output = new();
+                using StringWriter error = new();
+
+                int exitCode = SharpShaderCli.Execute(
+                    new[]
+                    {
+                        "compile",
+                        "--source", sourcePath,
+                        "--entry", "pixel:Main",
+                        "--target", "dx12",
+                        "--output", outputPath,
+                    },
+                    output,
+                    error);
+
+                Assert.Equal(2, exitCode);
+                Assert.Contains(
+                    "--attachment-interface is required",
+                    error.ToString(),
+                    StringComparison.Ordinal);
+                Assert.False(Directory.Exists(outputPath));
+            }
+            finally
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+
+        [Theory]
+        [InlineData("unknown")]
+        [InlineData("duplicate")]
+        [InlineData("oldAbi")]
+        [Trait("Category", "SharpShaderAttachment")]
+        public void Execute_ShouldRejectNonCanonicalAttachmentInterfaceFiles(
+            string mutation)
+        {
+            string root = Path.Combine(
+                Path.GetTempPath(),
+                $"sharpshader-cli-attachment-{Guid.NewGuid():N}");
+            Directory.CreateDirectory(root);
+            try
+            {
+                string sourcePath = Path.Combine(root, "pixel.hlsl");
+                string interfacePath = Path.Combine(root, "attachments.json");
+                string outputPath = Path.Combine(root, "package");
+                File.WriteAllText(
+                    sourcePath,
+                    "float4 Main() : SV_Target0 { return 1; }");
+                string json = CreateAttachmentInterfaceJson();
+                json = mutation switch
+                {
+                    "unknown" => json.Replace(
+                        "{\"schemaRevision\":1,",
+                        "{\"schemaRevision\":1,\"unexpected\":true,",
+                        StringComparison.Ordinal),
+                    "duplicate" => json.Replace(
+                        "{\"schemaRevision\":1,",
+                        "{\"schemaRevision\":1,\"schemaRevision\":1,",
+                        StringComparison.Ordinal),
+                    "oldAbi" => json.Replace(
+                        "\"abiRevision\":1",
+                        "\"abiRevision\":0",
+                        StringComparison.Ordinal),
+                    _ => throw new ArgumentOutOfRangeException(nameof(mutation)),
+                };
+                File.WriteAllText(interfacePath, json);
+                using StringWriter output = new();
+                using StringWriter error = new();
+
+                int exitCode = SharpShaderCli.Execute(
+                    new[]
+                    {
+                        "compile",
+                        "--source", sourcePath,
+                        "--entry", "pixel:Main",
+                        "--target", "dx12",
+                        "--attachment-interface", interfacePath,
+                        "--output", outputPath,
+                    },
+                    output,
+                    error);
+
+                Assert.Equal(1, exitCode);
+                Assert.NotEqual(string.Empty, error.ToString());
+                Assert.False(Directory.Exists(outputPath));
+            }
+            finally
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
         [Fact]
         public void Execute_ShouldRejectAnExistingOutputBeforeCompilation()
         {
@@ -194,6 +300,12 @@ namespace Infinity.Rendering.Tests
                 "SharpShader.Tool compile",
                 error.ToString(),
                 StringComparison.Ordinal);
+        }
+        private static string CreateAttachmentInterfaceJson()
+        {
+            return """
+                {"schemaRevision":1,"interfaces":[{"abiRevision":1,"variantKey":"default","entryPoint":"Main","stage":"pixel","phase":{"phase":0,"depthStencilAccess":"none","depthExport":"none","stencilExport":"none","attachments":[{"logicalAttachmentId":0,"inputIndex":null,"outputLocation":0,"outputIndex":0,"outputComponent":0,"aspect":"color","numericClass":"floatingPoint","sampleMode":"singleSample","layerMode":"singleLayer","ordering":"none","feedback":"none","sampledFeedbackBinding":null}]}}]}
+                """;
         }
     }
 }

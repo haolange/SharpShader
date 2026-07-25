@@ -707,10 +707,10 @@ namespace Infinity.Rendering.Tests
             string cachePath = Directory
                 .EnumerateFiles(
                     directory.Path,
-                    "*.sharpshader-cache.json",
+                    "*.sharpshader-cache-r2.json",
                     SearchOption.TopDirectoryOnly)
                 .Single();
-            File.WriteAllText(cachePath, "{\"schemaVersion\":1,\"broken\":true}");
+            File.WriteAllText(cachePath, "{\"schemaVersion\":2,\"broken\":true}");
 
             int rebuildCount = 0;
             ShaderProgramCompilation rebuilt = CreateCountingCompiler(
@@ -758,7 +758,7 @@ namespace Infinity.Rendering.Tests
             Assert.Single(
                 Directory.EnumerateFiles(
                     directory.Path,
-                    "*.sharpshader-cache.json",
+                    "*.sharpshader-cache-r2.json",
                     SearchOption.TopDirectoryOnly));
             Assert.Empty(
                 Directory.EnumerateFiles(
@@ -1160,7 +1160,7 @@ namespace Infinity.Rendering.Tests
                 "*.sharpshader-dependencies.json"));
             Assert.Empty(Directory.EnumerateFiles(
                 cacheDirectory.Path,
-                "*.sharpshader-cache.json"));
+                "*.sharpshader-cache-r2.json"));
 
             File.Delete(shadowInclude);
             Assert.NotEmpty(compiler.Compile(request).Artifacts);
@@ -1399,6 +1399,27 @@ namespace Infinity.Rendering.Tests
             ShaderProgramTarget targets,
             IReadOnlyList<string>? includeDirectories = null)
         {
+            ShaderAttachmentInterface[] attachmentInterfaces = entries
+                .Where(static entry =>
+                    entry.Stage == ShaderExecutionStage.Pixel)
+                .Select(static entry => new ShaderAttachmentInterface(
+                    "default",
+                    entry.Name,
+                    entry.Stage,
+                    new ShaderAttachmentPhase(
+                        0,
+                        new[]
+                        {
+                            new ShaderAttachmentDeclaration(
+                                logicalAttachmentId: 0,
+                                inputIndex: null,
+                                outputLocation: 0,
+                                ShaderAttachmentAspect.Color,
+                                ShaderAttachmentNumericClass.FloatingPoint,
+                                ShaderAttachmentSampleMode.SingleSample,
+                                ShaderAttachmentLayerMode.SingleLayer),
+                        })))
+                .ToArray();
             return new ShaderProgramCompileRequest(
                 source,
                 sourceName,
@@ -1406,7 +1427,8 @@ namespace Infinity.Rendering.Tests
                 new[] { new ShaderProgramVariant("default") },
                 targets,
                 new ShaderModelVersion(6, 6),
-                includeDirectories: includeDirectories);
+                includeDirectories: includeDirectories,
+                attachmentInterfaces: attachmentInterfaces);
         }
 
         private static ShaderProgramCompiler CreateCountingCompiler(

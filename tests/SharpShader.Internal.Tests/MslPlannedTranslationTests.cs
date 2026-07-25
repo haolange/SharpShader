@@ -1,6 +1,7 @@
 using System;
 using System.Linq;
 using SharpShader.Compilation;
+using SharpShader.Compilation.Internal;
 using SharpShader.HLSLCrossCompiler;
 using SharpShader.HLSLCrossCompiler.Internal;
 using Xunit;
@@ -212,14 +213,14 @@ namespace Infinity.Rendering.Tests
                 Array.Empty<VulkanShaderBindingMapping>();
             MetalShaderBackendLayout metal = new();
 
-            ShaderCompileResult first = SpirvToMslTranslator.Translate(
+            ShaderCompileResult first = TranslatePlanned(
                 request with { Target = ShaderTargetKind.Msl },
                 multiEntry,
                 "ComputeB",
                 ShaderExecutionStage.Compute,
                 vulkan,
                 metal);
-            ShaderCompileResult second = SpirvToMslTranslator.Translate(
+            ShaderCompileResult second = TranslatePlanned(
                 request with { Target = ShaderTargetKind.Msl },
                 multiEntry,
                 "ComputeB",
@@ -247,7 +248,7 @@ namespace Infinity.Rendering.Tests
                 CreateDirectMetalLayout();
 
             ShaderCompilerException missing = Assert.Throws<ShaderCompilerException>(
-                () => SpirvToMslTranslator.Translate(
+                () => TranslatePlanned(
                     directRequest with { Target = ShaderTargetKind.Msl },
                     directSpirv,
                     "CSMain",
@@ -265,7 +266,7 @@ namespace Infinity.Rendering.Tests
                 slot: 8,
                 ShaderBindingClass.ShaderResource);
             ShaderCompilerException extra = Assert.Throws<ShaderCompilerException>(
-                () => SpirvToMslTranslator.Translate(
+                () => TranslatePlanned(
                     directRequest with { Target = ShaderTargetKind.Msl },
                     directSpirv,
                     "CSMain",
@@ -313,7 +314,7 @@ namespace Infinity.Rendering.Tests
             MetalShaderBackendLayout metal = CreateDirectMetalLayout();
 
             ShaderCompilerException entry = Assert.Throws<ShaderCompilerException>(
-                () => SpirvToMslTranslator.Translate(
+                () => TranslatePlanned(
                     request with { Target = ShaderTargetKind.Msl },
                     spirv,
                     "Missing",
@@ -321,12 +322,12 @@ namespace Infinity.Rendering.Tests
                     vulkan,
                     metal));
             Assert.Contains(
-                "was not found",
+                "identity do not match",
                 entry.Message,
                 StringComparison.Ordinal);
 
             ShaderCompilerException stage = Assert.Throws<ShaderCompilerException>(
-                () => SpirvToMslTranslator.Translate(
+                () => TranslatePlanned(
                     request with { Target = ShaderTargetKind.Msl },
                     spirv,
                     "CSMain",
@@ -334,13 +335,13 @@ namespace Infinity.Rendering.Tests
                     vulkan,
                     metal));
             Assert.Contains(
-                "was not found",
+                "identity do not match",
                 stage.Message,
                 StringComparison.Ordinal);
 
             ShaderCompilerException unsupported =
                 Assert.Throws<ShaderCompilerException>(
-                    () => SpirvToMslTranslator.Translate(
+                    () => TranslatePlanned(
                         request with { Target = ShaderTargetKind.Msl },
                         spirv,
                         "CSMain",
@@ -348,7 +349,7 @@ namespace Infinity.Rendering.Tests
                         vulkan,
                         metal));
             Assert.Contains(
-                "does not support stage Miss",
+                "identity do not match",
                 unsupported.Message,
                 StringComparison.Ordinal);
         }
@@ -552,13 +553,50 @@ namespace Infinity.Rendering.Tests
                 });
         }
 
+        private static ShaderCompileResult TranslatePlanned(
+            ShaderCompileRequest request,
+            ShaderCompileResult spirv,
+            string entryPoint,
+            ShaderExecutionStage stage,
+            VulkanShaderBindingMapping[] vulkanBindings,
+            MetalShaderBackendLayout metalLayout)
+        {
+            ShaderArtifactReflection reflection = SpirvArtifactReflector.Reflect(
+                request with { Target = ShaderTargetKind.SpirV },
+                spirv);
+            ShaderEntryPointReflection reflectedEntry = reflection.EntryPoints
+                .FirstOrDefault(entry =>
+                    string.Equals(
+                        entry.Name,
+                        entryPoint,
+                        StringComparison.Ordinal)
+                    && entry.Stage == stage)
+                ?? reflection.EntryPoints[0];
+            return SpirvToMslTranslator.Translate(
+                request,
+                spirv,
+                entryPoint,
+                stage,
+                vulkanBindings,
+                metalLayout,
+                new ShaderAttachmentInterface(
+                    "default",
+                    entryPoint,
+                    stage,
+                    stage == ShaderExecutionStage.Pixel
+                        ? new ShaderAttachmentPhase(0)
+                        : null),
+                reflectedEntry,
+                privateAttachmentDescriptorSet: 31,
+                privateMetalTextureBase: 16);
+        }
         private static ShaderCompileResult Translate(
             ShaderCompileRequest request,
             ShaderCompileResult spirv,
             VulkanShaderBindingMapping[] vulkan,
             MetalShaderBackendLayout metal)
         {
-            return SpirvToMslTranslator.Translate(
+            return TranslatePlanned(
                 request with { Target = ShaderTargetKind.Msl },
                 spirv,
                 "CSMain",

@@ -40,6 +40,8 @@ namespace Infinity.Rendering.Tests
                     "spirv-normalized-bindings.hlsl")).EntryPoints);
 
             Assert.Equal(ShaderExecutionStage.Compute, entry.Stage);
+            Assert.Empty(entry.StageInputs);
+            Assert.Empty(entry.StageOutputs);
             Assert.True(entry.ThreadGroupSize.HasValue);
             Assert.Equal(8u, entry.ThreadGroupSize.Value.X.FixedCount);
             Assert.Equal(4u, entry.ThreadGroupSize.Value.Y.FixedCount);
@@ -284,6 +286,71 @@ namespace Infinity.Rendering.Tests
             Assert.Contains("no DescriptorSet decoration", exception.Message, StringComparison.Ordinal);
         }
 
+        [Fact]
+        public void ComputeReflection_RejectsRasterBuiltInInsteadOfSilentlyIgnoringIt()
+        {
+            const string source = """
+                RWStructuredBuffer<uint> Output : register(u0, space0);
+
+                [numthreads(1, 1, 1)]
+                void CSMain(uint3 id : SV_DispatchThreadID)
+                {
+                    Output[0] = id.x;
+                }
+                """;
+
+            ShaderCompileRequest request = CreateComputeRequest(
+                source,
+                "spirv-compute-raster-builtin-negative.hlsl");
+            ShaderCompileResult compiled = HLSLCrossCompiler.Compile(request);
+            byte[] withRasterBuiltIn = ReplaceBuiltIn(
+                compiled.Bytecode,
+                BuiltIn.GlobalInvocationId,
+                BuiltIn.Position);
+
+            ShaderCompilerException exception = Assert.Throws<ShaderCompilerException>(
+                () => SpirvArtifactReflector.Reflect(
+                    request,
+                    compiled with { Bytecode = withRasterBuiltIn }));
+            Assert.Equal(ShaderCompilerErrorCode.CompileFailed, exception.ErrorCode);
+            Assert.Contains(
+                "not a recognized compute execution built-in",
+                exception.Message,
+                StringComparison.Ordinal);
+        }
+
+        [Fact]
+        public void ComputeReflection_RejectsLocationDecoratedBuiltInStageIo()
+        {
+            const string source = """
+                RWStructuredBuffer<uint> Output : register(u0, space0);
+
+                [numthreads(1, 1, 1)]
+                void CSMain(uint3 id : SV_DispatchThreadID)
+                {
+                    Output[0] = id.x;
+                }
+                """;
+
+            ShaderCompileRequest request = CreateComputeRequest(
+                source,
+                "spirv-compute-location-stage-io-negative.hlsl");
+            ShaderCompileResult compiled = HLSLCrossCompiler.Compile(request);
+            byte[] withLocation = AddLocationDecorationToBuiltIn(
+                compiled.Bytecode,
+                BuiltIn.GlobalInvocationId);
+
+            ShaderCompilerException exception = Assert.Throws<ShaderCompilerException>(
+                () => SpirvArtifactReflector.Reflect(
+                    request,
+                    compiled with { Bytecode = withLocation }));
+            Assert.Equal(ShaderCompilerErrorCode.CompileFailed, exception.ErrorCode);
+            Assert.Contains(
+                "has a Location decoration",
+                exception.Message,
+                StringComparison.Ordinal);
+        }
+
         private static ShaderCompileRequest CreateComputeRequest(
             string source,
             string sourceName)
@@ -368,6 +435,100 @@ namespace Infinity.Rendering.Tests
             }
 
             Assert.True(removed > 0, $"No {decoration} decorations were found in the compiled SPIR-V artifact.");
+            byte[] result = new byte[bytecode.Length];
+            Buffer.BlockCopy(words, 0, result, 0, result.Length);
+            return result;
+        }
+
+        private static byte[] AddLocationDecorationToBuiltIn(
+            byte[] bytecode,
+            BuiltIn builtIn)
+        {
+            Assert.Equal(0, bytecode.Length % sizeof(uint));
+            uint[] words = new uint[bytecode.Length / sizeof(uint)];
+            Buffer.BlockCopy(bytecode, 0, words, 0, bytecode.Length);
+            int insertionOffset = -1;
+            uint targetId = 0;
+            for (int offset = 5; offset < words.Length;)
+            {
+                uint instruction = words[offset];
+                int wordCount = checked((int)(instruction >> 16));
+                uint opcode = instruction & 0xFFFFu;
+                Assert.True(wordCount > 0, $"Invalid SPIR-V instruction at word {offset}.");
+                Assert.True(offset + wordCount <= words.Length);
+
+                const uint OpDecorate = 71;
+                if (opcode == OpDecorate
+                    && wordCount >= 4
+                    && words[offset + 2] == (uint)Decoration.BuiltIn
+                    && words[offset + 3] == (uint)builtIn)
+                {
+                    targetId = words[offset + 1];
+                    insertionOffset = offset + wordCount;
+                    break;
+                }
+
+                offset += wordCount;
+            }
+
+            Assert.True(
+                insertionOffset >= 0,
+                $"No {builtIn} BuiltIn decoration was found in the compiled "
+                + "SPIR-V artifact.");
+            uint[] expanded = new uint[words.Length + 4];
+            Array.Copy(words, 0, expanded, 0, insertionOffset);
+            const uint OpDecorateWordCount = 4;
+            const uint OpDecorateInstruction = 71;
+            expanded[insertionOffset] = (OpDecorateWordCount << 16) | OpDecorateInstruction;
+            expanded[insertionOffset + 1] = targetId;
+            expanded[insertionOffset + 2] = (uint)Decoration.Location;
+            expanded[insertionOffset + 3] = 0;
+            Array.Copy(
+                words,
+                insertionOffset,
+                expanded,
+                insertionOffset + OpDecorateWordCount,
+                words.Length - insertionOffset);
+
+            byte[] result = new byte[expanded.Length * sizeof(uint)];
+            Buffer.BlockCopy(expanded, 0, result, 0, result.Length);
+            return result;
+        }
+
+        private static byte[] ReplaceBuiltIn(
+            byte[] bytecode,
+            BuiltIn oldBuiltIn,
+            BuiltIn newBuiltIn)
+        {
+            Assert.Equal(0, bytecode.Length % sizeof(uint));
+            uint[] words = new uint[bytecode.Length / sizeof(uint)];
+            Buffer.BlockCopy(bytecode, 0, words, 0, bytecode.Length);
+            int replaced = 0;
+            for (int offset = 5; offset < words.Length;)
+            {
+                uint instruction = words[offset];
+                int wordCount = checked((int)(instruction >> 16));
+                uint opcode = instruction & 0xFFFFu;
+                Assert.True(wordCount > 0, $"Invalid SPIR-V instruction at word {offset}.");
+                Assert.True(offset + wordCount <= words.Length);
+
+                const uint OpDecorate = 71;
+                if (opcode == OpDecorate
+                    && wordCount >= 4
+                    && words[offset + 2] == (uint)Decoration.BuiltIn
+                    && words[offset + 3] == (uint)oldBuiltIn)
+                {
+                    words[offset + 3] = (uint)newBuiltIn;
+                    replaced++;
+                }
+
+                offset += wordCount;
+            }
+
+            Assert.True(
+                replaced > 0,
+                $"No {oldBuiltIn} BuiltIn decorations were found in the compiled "
+                + "SPIR-V artifact.");
             byte[] result = new byte[bytecode.Length];
             Buffer.BlockCopy(words, 0, result, 0, result.Length);
             return result;
