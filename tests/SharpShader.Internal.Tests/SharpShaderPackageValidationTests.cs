@@ -467,7 +467,8 @@ namespace Infinity.Rendering.Tests
                     !string.IsNullOrWhiteSpace(dependency.Include))
                 .Select(static dependency =>
                     dependency.Kind == "ProjectReference"
-                        ? Path.GetFileNameWithoutExtension(dependency.Include!)
+                        ? Path.GetFileNameWithoutExtension(
+                            NormalizeProjectPathSeparators(dependency.Include!))
                         : dependency.Include!)
                 .Any(candidate => string.Equals(
                     candidate,
@@ -484,9 +485,18 @@ namespace Infinity.Rendering.Tests
                 .Select(static element =>
                     (string?)element.Attribute("Include"))
                 .Where(static include => !string.IsNullOrWhiteSpace(include))
-                .Select(static include => Path.GetFileName(include!))
+                .Select(static include =>
+                    Path.GetFileName(NormalizeProjectPathSeparators(include!)))
                 .OrderBy(static fileName => fileName, StringComparer.Ordinal)
                 .ToArray();
+        }
+
+        private static string NormalizeProjectPathSeparators(string path)
+        {
+            // ProjectReference Include attributes commonly use Windows '\' even
+            // when the tree is checked out on Unix; Path.GetFileName only
+            // recognizes the platform directory separator.
+            return path.Replace('\\', '/');
         }
 
         private static async Task<ProcessResult> RunDotnetAsync(
