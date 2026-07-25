@@ -597,7 +597,15 @@ namespace SharpShader.Compilation.Internal
 
             try
             {
-                path = System.IO.Path.GetFullPath(capture.RequestedPath);
+                string fullPath = System.IO.Path.GetFullPath(capture.RequestedPath);
+                // DXC may probe directories (e.g. "/") through the include handler.
+                // Warm-cache identity only tracks ordinary files.
+                if (!File.Exists(fullPath))
+                {
+                    return false;
+                }
+
+                path = fullPath;
                 return true;
             }
             catch (Exception exception) when (

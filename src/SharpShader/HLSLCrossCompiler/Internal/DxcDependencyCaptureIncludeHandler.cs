@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Runtime.CompilerServices;
 using System.Runtime.ExceptionServices;
 using System.Runtime.InteropServices;
@@ -235,7 +236,15 @@ namespace SharpShader.HLSLCrossCompiler.Internal
                 ReadOnlySpan<byte> content = length == 0
                     ? ReadOnlySpan<byte>.Empty
                     : new ReadOnlySpan<byte>(contentPointer, checked((int)length));
-                state.Record(requestedPath, content);
+                // DXC on Unix probes parent directories (including "/") via LoadSource
+                // before resolving real includes. Only physical files are
+                // dependency-identity captures; directory probes still return
+                // the default-handler blob to DXC unchanged.
+                if (IsPhysicalIncludeFile(requestedPath))
+                {
+                    state.Record(requestedPath, content);
+                }
+
                 *includeSource = loaded;
                 return result;
             }
@@ -249,6 +258,13 @@ namespace SharpShader.HLSLCrossCompiler.Internal
                 state.RecordCallbackFailure(exception);
                 return EFail;
             }
+        }
+
+        private static bool IsPhysicalIncludeFile(string path)
+        {
+            return !string.IsNullOrWhiteSpace(path)
+                && Path.IsPathFullyQualified(path)
+                && File.Exists(path);
         }
 
         private static uint AddReference(IncludeHandlerInstance* instance)
