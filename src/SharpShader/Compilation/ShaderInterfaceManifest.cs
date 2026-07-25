@@ -234,12 +234,14 @@ namespace SharpShader.Compilation
         public string Name { get; }
         public ShaderExecutionStage Stage { get; }
         public ShaderLayoutSignature LogicalLayoutSignature { get; }
+        public ShaderAttachmentInterface AttachmentInterface { get; }
         public IReadOnlyList<ShaderArtifactIdentity> Artifacts => m_Artifacts;
 
         public ShaderInterfaceEntry(
             string name,
             ShaderExecutionStage stage,
             ShaderLayoutSignature logicalLayoutSignature,
+            ShaderAttachmentInterface attachmentInterface,
             IEnumerable<ShaderArtifactIdentity> artifacts)
         {
             if (string.IsNullOrWhiteSpace(name))
@@ -248,6 +250,18 @@ namespace SharpShader.Compilation
             }
 
             _ = ShaderStageMaskUtility.FromStage(stage);
+            ArgumentNullException.ThrowIfNull(attachmentInterface);
+            if (!string.Equals(
+                    attachmentInterface.EntryPoint,
+                    name,
+                    StringComparison.Ordinal)
+                || attachmentInterface.Stage != stage)
+            {
+                throw new ArgumentException(
+                    "The attachment interface identity must match the manifest entry.",
+                    nameof(attachmentInterface));
+            }
+
             ArgumentNullException.ThrowIfNull(artifacts);
             ShaderArtifactIdentity[] copy = new List<ShaderArtifactIdentity>(artifacts).ToArray();
             Array.Sort(copy, CompareArtifacts);
@@ -273,6 +287,7 @@ namespace SharpShader.Compilation
             Name = name;
             Stage = stage;
             LogicalLayoutSignature = logicalLayoutSignature;
+            AttachmentInterface = attachmentInterface;
             m_Artifacts = Array.AsReadOnly(copy);
         }
 
@@ -282,11 +297,20 @@ namespace SharpShader.Compilation
                 && string.Equals(Name, other.Name, StringComparison.Ordinal)
                 && Stage == other.Stage
                 && LogicalLayoutSignature == other.LogicalLayoutSignature
+                && AttachmentInterface.Equals(other.AttachmentInterface)
                 && ShaderManifestValidation.SequenceEqual(m_Artifacts, other.m_Artifacts);
         }
 
         public override bool Equals(object? obj) => Equals(obj as ShaderInterfaceEntry);
-        public override int GetHashCode() => HashCode.Combine(Name, Stage, LogicalLayoutSignature, ShaderManifestValidation.GetSequenceHashCode(m_Artifacts));
+        public override int GetHashCode()
+        {
+            return HashCode.Combine(
+                Name,
+                Stage,
+                LogicalLayoutSignature,
+                AttachmentInterface,
+                ShaderManifestValidation.GetSequenceHashCode(m_Artifacts));
+        }
 
         private static int CompareArtifacts(ShaderArtifactIdentity? left, ShaderArtifactIdentity? right)
         {
@@ -369,6 +393,16 @@ namespace SharpShader.Compilation
                         $"Shader variant contains duplicate entry {entryCopy[index].Name} ({entryCopy[index].Stage}).",
                         nameof(entries));
                 }
+
+                if (!string.Equals(
+                        entryCopy[index].AttachmentInterface.VariantKey,
+                        key,
+                        StringComparison.Ordinal))
+                {
+                    throw new ArgumentException(
+                        "The attachment interface variant key must match its manifest variant.",
+                        nameof(entries));
+                }
             }
 
             Key = key;
@@ -411,7 +445,7 @@ namespace SharpShader.Compilation
 
     public sealed class ShaderInterfaceManifest : IEquatable<ShaderInterfaceManifest>
     {
-        public const uint CurrentSchemaVersion = 1;
+        public const uint CurrentSchemaVersion = 2;
 
         private readonly ReadOnlyCollection<ShaderToolchainComponent> m_ToolchainComponents;
         private readonly ReadOnlyCollection<ShaderInterfaceLayout> m_LogicalLayouts;
@@ -420,6 +454,7 @@ namespace SharpShader.Compilation
 
         public uint SchemaVersion { get; }
         public string SourceDigest { get; }
+        public ShaderProgramTarget Targets { get; }
         public IReadOnlyList<ShaderToolchainComponent> ToolchainComponents => m_ToolchainComponents;
         public IReadOnlyList<ShaderInterfaceLayout> LogicalLayouts => m_LogicalLayouts;
         public IReadOnlyList<ShaderInterfaceVariant> Variants => m_Variants;
@@ -431,6 +466,7 @@ namespace SharpShader.Compilation
             IEnumerable<ShaderInterfaceLayout> logicalLayouts,
             IEnumerable<ShaderInterfaceVariant> variants,
             IEnumerable<ShaderBackendLayouts> backendLayouts,
+            ShaderProgramTarget targets,
             uint schemaVersion = CurrentSchemaVersion)
         {
             if (schemaVersion != CurrentSchemaVersion)
@@ -442,11 +478,20 @@ namespace SharpShader.Compilation
             }
 
             ShaderManifestValidation.ValidateSha256(sourceDigest, nameof(sourceDigest));
+            if (targets == ShaderProgramTarget.None
+                || (targets & ~ShaderProgramTarget.All) != 0)
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(targets),
+                    targets,
+                    "Manifest targets must contain at least one defined target.");
+            }
 
             ShaderToolchainComponent[] toolchainCopy = MaterializeToolchain(toolchainComponents);
             ShaderInterfaceLayout[] layoutCopy = MaterializeLayouts(logicalLayouts);
             ShaderInterfaceVariant[] variantCopy = MaterializeVariants(variants);
             ShaderBackendLayouts[] backendCopy = MaterializeBackends(backendLayouts);
+            ValidateArtifactCoverage(variantCopy, targets);
 
             Dictionary<ShaderLayoutSignature, ShaderInterfaceLayout> layoutsBySignature = new();
             foreach (ShaderInterfaceLayout layout in layoutCopy)
@@ -488,6 +533,7 @@ namespace SharpShader.Compilation
 
             SchemaVersion = schemaVersion;
             SourceDigest = sourceDigest;
+            Targets = targets;
             m_ToolchainComponents = Array.AsReadOnly(toolchainCopy);
             m_LogicalLayouts = Array.AsReadOnly(layoutCopy);
             m_Variants = Array.AsReadOnly(variantCopy);
@@ -499,6 +545,7 @@ namespace SharpShader.Compilation
             return other is not null
                 && SchemaVersion == other.SchemaVersion
                 && string.Equals(SourceDigest, other.SourceDigest, StringComparison.Ordinal)
+                && Targets == other.Targets
                 && ShaderManifestValidation.SequenceEqual(m_ToolchainComponents, other.m_ToolchainComponents)
                 && ShaderManifestValidation.SequenceEqual(m_LogicalLayouts, other.m_LogicalLayouts)
                 && ShaderManifestValidation.SequenceEqual(m_Variants, other.m_Variants)
@@ -509,13 +556,64 @@ namespace SharpShader.Compilation
 
         public override int GetHashCode()
         {
-            return HashCode.Combine(
-                SchemaVersion,
-                SourceDigest,
-                ShaderManifestValidation.GetSequenceHashCode(m_ToolchainComponents),
-                ShaderManifestValidation.GetSequenceHashCode(m_LogicalLayouts),
-                ShaderManifestValidation.GetSequenceHashCode(m_Variants),
-                ShaderManifestValidation.GetSequenceHashCode(m_BackendLayouts));
+            HashCode hash = new();
+            hash.Add(SchemaVersion);
+            hash.Add(SourceDigest, StringComparer.Ordinal);
+            hash.Add(Targets);
+            hash.Add(ShaderManifestValidation.GetSequenceHashCode(m_ToolchainComponents));
+            hash.Add(ShaderManifestValidation.GetSequenceHashCode(m_LogicalLayouts));
+            hash.Add(ShaderManifestValidation.GetSequenceHashCode(m_Variants));
+            hash.Add(ShaderManifestValidation.GetSequenceHashCode(m_BackendLayouts));
+            return hash.ToHashCode();
+        }
+
+        private static void ValidateArtifactCoverage(
+            IReadOnlyList<ShaderInterfaceVariant> variants,
+            ShaderProgramTarget targets)
+        {
+            HashSet<ShaderArtifactKind> required = new();
+            if ((targets & ShaderProgramTarget.DirectX12) != 0)
+            {
+                required.Add(ShaderArtifactKind.Dxil);
+            }
+            if ((targets & ShaderProgramTarget.Vulkan) != 0)
+            {
+                required.Add(ShaderArtifactKind.SpirV);
+            }
+            if ((targets & ShaderProgramTarget.MetalMsl) != 0)
+            {
+                required.Add(ShaderArtifactKind.MslSource);
+            }
+
+            foreach (ShaderInterfaceVariant variant in variants)
+            {
+                foreach (ShaderInterfaceEntry entry in variant.Entries)
+                {
+                    if (entry.Artifacts.Count != required.Count)
+                    {
+                        throw new ArgumentException(
+                            $"Variant {variant.Key} entry {entry.Name} has "
+                            + $"{entry.Artifacts.Count} artifacts, but targets {targets} "
+                            + $"require exactly {required.Count}.",
+                            nameof(variants));
+                    }
+
+                    HashSet<ShaderArtifactKind> actual = new();
+                    foreach (ShaderArtifactIdentity artifact in entry.Artifacts)
+                    {
+                        actual.Add(artifact.ArtifactKind);
+                    }
+
+                    if (!actual.SetEquals(required))
+                    {
+                        throw new ArgumentException(
+                            $"Variant {variant.Key} entry {entry.Name} artifact kinds "
+                            + $"[{string.Join(", ", actual)}] do not exactly match "
+                            + $"targets {targets}.",
+                            nameof(variants));
+                    }
+                }
+            }
         }
 
         private static ShaderToolchainComponent[] MaterializeToolchain(IEnumerable<ShaderToolchainComponent> components)

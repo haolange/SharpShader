@@ -10,13 +10,13 @@ namespace SharpShader.Compilation.Internal
 {
     internal sealed class ShaderProgramPersistentCache
     {
-        private const uint CurrentSchemaVersion = 1;
-        private const uint DependencySchemaVersion = 1;
-        private const string FileExtension = ".sharpshader-cache.json";
+        private const uint CurrentSchemaVersion = 2;
+        private const uint DependencySchemaVersion = 2;
+        private const string FileExtension = ".sharpshader-cache-r2.json";
         private const string DependencyFileExtension =
-            ".sharpshader-dependencies.json";
+            ".sharpshader-dependencies-r2.json";
         private const int MaximumPublishAttempts = 4;
-        private const string GlobalLockFileName = ".sharpshader-cache.lock";
+        private const string GlobalLockFileName = ".sharpshader-cache-r2.lock";
         private const int MaximumLockAttempts = 500;
         private const int LockRetryMilliseconds = 10;
         private const string TemporaryFileSuffix = ".tmp";

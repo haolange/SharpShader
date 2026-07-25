@@ -24,18 +24,35 @@ namespace SharpShader.HLSLCrossCompiler.Internal
             string entryPoint,
             ShaderExecutionStage stage,
             IReadOnlyList<VulkanShaderBindingMapping> vulkanBindings,
-            MetalShaderBackendLayout metalLayout)
+            MetalShaderBackendLayout metalLayout,
+            ShaderAttachmentInterface attachmentInterface,
+            ShaderEntryPointReflection postRemapSpirvReflection,
+            uint privateAttachmentDescriptorSet,
+            uint privateMetalTextureBase)
         {
             MslTranslationBindingPlan bindingPlan =
                 MslTranslationBindingPlan.Create(
                     entryPoint,
                     stage,
                     vulkanBindings,
-                    metalLayout);
-            return TranslateCore(
+                    metalLayout,
+                    attachmentInterface,
+                    postRemapSpirvReflection,
+                    privateAttachmentDescriptorSet,
+                    privateMetalTextureBase);
+            return Translate(
                 request,
                 spirvResult,
                 bindingPlan);
+        }
+
+        internal static ShaderCompileResult Translate(
+            ShaderCompileRequest request,
+            ShaderCompileResult spirvResult,
+            MslTranslationBindingPlan bindingPlan)
+        {
+            ArgumentNullException.ThrowIfNull(bindingPlan);
+            return TranslateCore(request, spirvResult, bindingPlan);
         }
 
         private static ShaderCompileResult TranslateCore(
@@ -105,6 +122,18 @@ namespace SharpShader.HLSLCrossCompiler.Internal
                 {
                     // SPIR-V emitted by modern DXC frequently requires MSL 2.x features.
                     effectiveMslVersion = requestedOptions.Platform == MslTargetPlatform.IOS ? 21000u : 23000u;
+                }
+
+                if (bindingPlan?.StencilExport
+                        == ShaderStencilExport.StencilReference
+                    && effectiveMslVersion < 20100)
+                {
+                    throw new ShaderCompilerException(
+                        ShaderCompilerErrorCode.MslTranslateFailed,
+                        "Metal stencil-reference export requires MSL 2.1 or "
+                        + $"newer, but version {effectiveMslVersion} was "
+                        + "requested.",
+                        spirvResult.Diagnostics);
                 }
 
                 ThrowIfFailed(
@@ -178,6 +207,42 @@ namespace SharpShader.HLSLCrossCompiler.Internal
                     cross,
                     context,
                     "Failed to set MSL point size built-in option.");
+
+                if (bindingPlan is not null)
+                {
+                    ThrowIfFailed(
+                        cross.CompilerOptionsSetBool(
+                            options,
+                            CompilerOption.MslEnableFragDepthBuiltin,
+                            bindingPlan.DepthExport == ShaderDepthExport.None
+                                ? (byte)0
+                                : (byte)1),
+                        cross,
+                        context,
+                        "Failed to set Metal fragment-depth output option.");
+                    ThrowIfFailed(
+                        cross.CompilerOptionsSetBool(
+                            options,
+                            CompilerOption.MslEnableFragStencilRefBuiltin,
+                            bindingPlan.StencilExport == ShaderStencilExport.None
+                                ? (byte)0
+                                : (byte)1),
+                        cross,
+                        context,
+                        "Failed to set Metal stencil-reference output option.");
+                }
+
+                if (bindingPlan?.UsesFramebufferFetch == true)
+                {
+                    ThrowIfFailed(
+                        cross.CompilerOptionsSetBool(
+                            options,
+                            CompilerOption.MslFramebufferFetchSubpass,
+                            1),
+                        cross,
+                        context,
+                        "Failed to enable Metal framebuffer-fetch subpass lowering.");
+                }
 
                 ThrowIfFailed(cross.CompilerInstallCompilerOptions(compiler, options), cross, context, "Failed to install MSL compiler options.");
 

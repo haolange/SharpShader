@@ -19,6 +19,8 @@ namespace SharpShader.Compilation.Internal
         private const uint KnownShaderInputFlags = 0x1F;
         private const int MaximumTypeNestingDepth = 64;
         private const int MaximumUtf8NameByteLength = 4096;
+        private const ulong D3DShaderRequiresStencilReference = 0x00000200;
+        private const ulong D3DShaderRequiresRasterOrderedViews = 0x00001000;
 
         private static readonly UTF8Encoding s_StrictUtf8 = new(false, true);
 
@@ -166,12 +168,27 @@ namespace SharpShader.Compilation.Internal
                 request,
                 reflection.Handle,
                 reflectedStage);
+            ShaderStageIoReflection[] stageInputs = ReflectStageIo(
+                request,
+                reflection.Handle,
+                shaderDescription.InputParameters,
+                ShaderStageIoDirection.Input);
+            ShaderStageIoReflection[] stageOutputs = ReflectStageIo(
+                request,
+                reflection.Handle,
+                shaderDescription.OutputParameters,
+                ShaderStageIoDirection.Output);
+            ShaderAttachmentArtifactRequirement attachmentRequirements =
+                ReflectAttachmentRequirements(reflection.Get().GetRequiresFlags());
 
             ShaderEntryPointReflection entryPoint = new(
                 request.EntryPoint,
                 reflectedStage,
                 resources,
-                threadGroupSize);
+                threadGroupSize,
+                stageInputs,
+                stageOutputs,
+                attachmentRequirements: attachmentRequirements);
 
             return new ShaderArtifactReflection(
                 ShaderArtifactKind.Dxil,
@@ -563,6 +580,209 @@ namespace SharpShader.Compilation.Internal
             }
 
             return ShaderThreadGroupSize.Fixed(x, y, z);
+        }
+
+        private static ShaderStageIoReflection[] ReflectStageIo(
+            ShaderCompileRequest request,
+            ID3D12ShaderReflection* reflection,
+            uint parameterCountValue,
+            ShaderStageIoDirection direction)
+        {
+            int parameterCount = ToManagedCount(
+                request,
+                parameterCountValue,
+                $"DXIL {direction} parameter count");
+            ShaderStageIoReflection[] parameters =
+                new ShaderStageIoReflection[parameterCount];
+            for (int parameterIndex = 0; parameterIndex < parameterCount; ++parameterIndex)
+            {
+                SignatureParameterDesc parameter = default;
+                int result = direction == ShaderStageIoDirection.Input
+                    ? reflection->GetInputParameterDesc((uint)parameterIndex, ref parameter)
+                    : reflection->GetOutputParameterDesc((uint)parameterIndex, ref parameter);
+                ThrowIfFailed(
+                    request,
+                    result,
+                    $"Failed to read DXIL {direction} parameter {parameterIndex}.");
+
+                string semanticName = ReadRequiredUtf8Name(
+                    request,
+                    parameter.SemanticName,
+                    $"DXIL {direction} parameter {parameterIndex}");
+                ShaderStageIoBuiltIn builtIn = MapStageIoBuiltIn(
+                    request,
+                    semanticName,
+                    parameter.SystemValueType);
+                uint component = FindFirstSetComponent(
+                    request,
+                    semanticName,
+                    parameter.Mask);
+                uint componentCount = CountContiguousComponents(
+                    request,
+                    semanticName,
+                    parameter.Mask,
+                    component);
+                uint? location = builtIn is ShaderStageIoBuiltIn.None
+                    or ShaderStageIoBuiltIn.Color
+                    ? parameter.Register
+                    : null;
+
+                parameters[parameterIndex] = new ShaderStageIoReflection(
+                    semanticName,
+                    direction,
+                    location,
+                    parameter.SemanticIndex,
+                    component,
+                    builtIn,
+                    MapStageIoNumericClass(
+                        request,
+                        semanticName,
+                        parameter.ComponentType),
+                    componentCount);
+            }
+
+            return parameters;
+        }
+
+        private static ShaderAttachmentArtifactRequirement ReflectAttachmentRequirements(
+            ulong requiresFlags)
+        {
+            ShaderAttachmentArtifactRequirement requirements =
+                ShaderAttachmentArtifactRequirement.None;
+            if ((requiresFlags & D3DShaderRequiresRasterOrderedViews) != 0)
+            {
+                requirements |= ShaderAttachmentArtifactRequirement.RasterOrderedViews;
+            }
+
+            if ((requiresFlags & D3DShaderRequiresStencilReference) != 0)
+            {
+                requirements |= ShaderAttachmentArtifactRequirement.StencilReferenceExport;
+            }
+
+            return requirements;
+        }
+
+        private static ShaderStageIoBuiltIn MapStageIoBuiltIn(
+            ShaderCompileRequest request,
+            string semanticName,
+            D3DName systemValue)
+        {
+            return systemValue switch
+            {
+                D3DName.D3DNameUndefined => ShaderStageIoBuiltIn.None,
+                D3DName.D3DNamePosition => ShaderStageIoBuiltIn.Position,
+                D3DName.D3DNameClipDistance => ShaderStageIoBuiltIn.ClipDistance,
+                D3DName.D3DNameCullDistance => ShaderStageIoBuiltIn.CullDistance,
+                D3DName.D3DNameRenderTargetArrayIndex =>
+                    ShaderStageIoBuiltIn.RenderTargetArrayIndex,
+                D3DName.D3DNameViewportArrayIndex =>
+                    ShaderStageIoBuiltIn.ViewportArrayIndex,
+                D3DName.D3DNameVertexID => ShaderStageIoBuiltIn.VertexId,
+                D3DName.D3DNamePrimitiveID => ShaderStageIoBuiltIn.PrimitiveId,
+                D3DName.D3DNameInstanceID => ShaderStageIoBuiltIn.InstanceId,
+                D3DName.D3DNameIsFrontFace => ShaderStageIoBuiltIn.FrontFace,
+                D3DName.D3DNameSampleIndex => ShaderStageIoBuiltIn.SampleIndex,
+                D3DName.D3DNameFinalQuadEdgeTessfactor
+                    or D3DName.D3DNameFinalTriEdgeTessfactor
+                    or D3DName.D3DNameFinalLineDetailTessfactor =>
+                        ShaderStageIoBuiltIn.TessellationFactor,
+                D3DName.D3DNameFinalQuadInsideTessfactor
+                    or D3DName.D3DNameFinalTriInsideTessfactor
+                    or D3DName.D3DNameFinalLineDensityTessfactor =>
+                        ShaderStageIoBuiltIn.InsideTessellationFactor,
+                D3DName.D3DNameBarycentrics => ShaderStageIoBuiltIn.Barycentrics,
+                D3DName.D3DNameShadingrate => ShaderStageIoBuiltIn.ShadingRate,
+                D3DName.D3DNameCullprimitive => ShaderStageIoBuiltIn.CullPrimitive,
+                D3DName.D3DNameTarget => ShaderStageIoBuiltIn.Color,
+                D3DName.D3DNameDepth => ShaderStageIoBuiltIn.Depth,
+                D3DName.D3DNameCoverage => ShaderStageIoBuiltIn.Coverage,
+                D3DName.D3DNameDepthGreaterEqual =>
+                    ShaderStageIoBuiltIn.DepthGreaterEqual,
+                D3DName.D3DNameDepthLessEqual =>
+                    ShaderStageIoBuiltIn.DepthLessEqual,
+                D3DName.D3DNameStencilRef =>
+                    ShaderStageIoBuiltIn.StencilReference,
+                D3DName.D3DNameInnerCoverage =>
+                    ShaderStageIoBuiltIn.InnerCoverage,
+                _ => throw ReflectionFailure(
+                    request,
+                    $"DXIL stage I/O {semanticName} has unsupported system-value "
+                    + $"semantic value {(int)systemValue}."),
+            };
+        }
+
+        private static ShaderAttachmentNumericClass MapStageIoNumericClass(
+            ShaderCompileRequest request,
+            string semanticName,
+            D3DRegisterComponentType componentType)
+        {
+            return componentType switch
+            {
+                D3DRegisterComponentType.D3DRegisterComponentFloat16
+                    or D3DRegisterComponentType.D3DRegisterComponentFloat32
+                    or D3DRegisterComponentType.D3DRegisterComponentFloat64 =>
+                        ShaderAttachmentNumericClass.FloatingPoint,
+                D3DRegisterComponentType.D3DRegisterComponentSint16
+                    or D3DRegisterComponentType.D3DRegisterComponentSint32
+                    or D3DRegisterComponentType.D3DRegisterComponentSint64 =>
+                        ShaderAttachmentNumericClass.SignedInteger,
+                D3DRegisterComponentType.D3DRegisterComponentUint16
+                    or D3DRegisterComponentType.D3DRegisterComponentUint32
+                    or D3DRegisterComponentType.D3DRegisterComponentUint64 =>
+                        ShaderAttachmentNumericClass.UnsignedInteger,
+                _ => throw ReflectionFailure(
+                    request,
+                    $"DXIL stage I/O {semanticName} has unsupported component type "
+                    + $"{componentType}."),
+            };
+        }
+
+        private static uint FindFirstSetComponent(
+            ShaderCompileRequest request,
+            string semanticName,
+            byte mask)
+        {
+            uint component = 0;
+            while (component < 4 && (mask & (1 << (int)component)) == 0)
+            {
+                ++component;
+            }
+
+            if (component == 4)
+            {
+                throw ReflectionFailure(
+                    request,
+                    $"DXIL stage I/O {semanticName} has an empty component mask.");
+            }
+
+            return component;
+        }
+
+        private static uint CountContiguousComponents(
+            ShaderCompileRequest request,
+            string semanticName,
+            byte mask,
+            uint firstComponent)
+        {
+            uint componentCount = 0;
+            uint component = firstComponent;
+            while (component < 4 && (mask & (1 << (int)component)) != 0)
+            {
+                ++componentCount;
+                ++component;
+            }
+
+            byte expectedMask = (byte)(((1u << (int)componentCount) - 1u)
+                << (int)firstComponent);
+            if ((mask & 0x0F) != expectedMask || (mask & 0xF0) != 0)
+            {
+                throw ReflectionFailure(
+                    request,
+                    $"DXIL stage I/O {semanticName} has non-contiguous component mask "
+                    + $"0x{mask:X2}.");
+            }
+
+            return componentCount;
         }
 
         private static ReflectedConstantBuffer[] ReflectConstantBuffers(

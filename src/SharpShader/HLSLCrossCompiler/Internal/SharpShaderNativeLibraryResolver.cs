@@ -134,9 +134,11 @@ namespace SharpShader.HLSLCrossCompiler.Internal
 
         internal sealed class LockedNativeFile : IDisposable
         {
+            private readonly object m_Sync = new();
             private readonly FileStream m_Stream;
             private readonly long m_Length;
             private readonly DateTime m_LastWriteTimeUtc;
+            private bool m_Disposed;
 
             public string Name { get; }
             public string Path { get; }
@@ -214,31 +216,58 @@ namespace SharpShader.HLSLCrossCompiler.Internal
 
             public ShaderToolchainComponent CreateComponent()
             {
-                return new ShaderToolchainComponent(Name, Version, ContentDigest);
+                lock (m_Sync)
+                {
+                    ThrowIfDisposed();
+                    return new ShaderToolchainComponent(Name, Version, ContentDigest);
+                }
             }
 
             public void ValidateUnchanged()
             {
-                if (m_Stream.Length != m_Length
-                    || File.GetLastWriteTimeUtc(Path) != m_LastWriteTimeUtc)
+                lock (m_Sync)
                 {
-                    throw new DllNotFoundException(
-                        $"Canonical {Name} library '{Path}' changed while it was being loaded.");
-                }
+                    ThrowIfDisposed();
+                    if (m_Stream.Length != m_Length
+                        || File.GetLastWriteTimeUtc(Path) != m_LastWriteTimeUtc)
+                    {
+                        throw new DllNotFoundException(
+                            $"Canonical {Name} library '{Path}' changed while it was being loaded.");
+                    }
 
-                m_Stream.Position = 0;
-                string digest = Convert.ToHexStringLower(SHA256.HashData(m_Stream));
-                m_Stream.Position = 0;
-                if (!string.Equals(digest, ContentDigest, StringComparison.Ordinal))
-                {
-                    throw new DllNotFoundException(
-                        $"Canonical {Name} library '{Path}' changed while it was being loaded.");
+                    m_Stream.Position = 0;
+                    string digest = Convert.ToHexStringLower(SHA256.HashData(m_Stream));
+                    m_Stream.Position = 0;
+                    if (!string.Equals(digest, ContentDigest, StringComparison.Ordinal))
+                    {
+                        throw new DllNotFoundException(
+                            $"Canonical {Name} library '{Path}' changed while it was being loaded.");
+                    }
                 }
             }
 
             public void Dispose()
             {
-                m_Stream.Dispose();
+                lock (m_Sync)
+                {
+                    if (m_Disposed)
+                    {
+                        return;
+                    }
+
+                    m_Disposed = true;
+                    m_Stream.Dispose();
+                }
+            }
+
+            private void ThrowIfDisposed()
+            {
+                if (m_Disposed)
+                {
+                    throw new ObjectDisposedException(
+                        nameof(LockedNativeFile),
+                        $"Canonical {Name} library lock for '{Path}' is disposed.");
+                }
             }
         }
     }

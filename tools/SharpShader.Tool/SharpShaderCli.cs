@@ -133,6 +133,7 @@ namespace SharpShader.Tool
             writer.WriteLine("  --variant-define <key>:<name>[=<value>] Attach a define to a declared variant.");
             writer.WriteLine("  --define <name>[=<value>]               Add a global define.");
             writer.WriteLine("  --include <directory>                   Add an include directory.");
+            writer.WriteLine("  --attachment-interface <json>          Required when any pixel entry is compiled.");
             writer.WriteLine("  --cache <directory>                     Enable the content-addressed persistent cache.");
             writer.WriteLine("  --shader-model <6.0-6.8>                Default: 6.8.");
             writer.WriteLine("  --metal-capacity <table>:<slot>:<t|s|b|u>=<count>");
@@ -195,6 +196,7 @@ namespace SharpShader.Tool
             public string SourcePath { get; private set; } = string.Empty;
             public string OutputDirectory { get; private set; } = string.Empty;
             public string? CacheDirectory { get; private set; }
+            public string? AttachmentInterfacePath { get; private set; }
             public ShaderProgramTarget Targets { get; private set; } =
                 ShaderProgramTarget.All;
             public ShaderModelVersion ShaderModel { get; private set; } =
@@ -264,6 +266,12 @@ namespace SharpShader.Tool
                         case "--include":
                             result.m_IncludeDirectories.Add(
                                 ReadValue(args, ref index, option));
+                            break;
+                        case "--attachment-interface":
+                            result.AttachmentInterfacePath = AssignOnce(
+                                result.AttachmentInterfacePath,
+                                ReadValue(args, ref index, option),
+                                option);
                             break;
                         case "--shader-model":
                             if (shaderModelSpecified)
@@ -338,7 +346,11 @@ namespace SharpShader.Tool
                     enableDebugInfo: EnableDebugInfo,
                     disableOptimizations: DisableOptimizations,
                     optimizationLevel: OptimizationLevel,
-                    treatWarningsAsErrors: TreatWarningsAsErrors);
+                    treatWarningsAsErrors: TreatWarningsAsErrors,
+                    attachmentInterfaces: AttachmentInterfacePath is null
+                        ? Array.Empty<ShaderAttachmentInterface>()
+                        : ShaderAttachmentInterfaceFile.Load(
+                            AttachmentInterfacePath));
             }
 
             private void Validate()
@@ -388,6 +400,28 @@ namespace SharpShader.Tool
                     {
                         throw new CliUsageException(
                             $"--variant-define references undeclared variant '{variantKey}'.");
+                    }
+                }
+
+                bool hasPixelEntry = m_Entries.Any(
+                    static entry =>
+                        entry.Stage == ShaderExecutionStage.Pixel);
+                if (hasPixelEntry
+                    && string.IsNullOrWhiteSpace(AttachmentInterfacePath))
+                {
+                    throw new CliUsageException(
+                        "--attachment-interface is required when compiling a pixel entry.");
+                }
+
+                if (!string.IsNullOrWhiteSpace(AttachmentInterfacePath))
+                {
+                    AttachmentInterfacePath = Path.GetFullPath(
+                        AttachmentInterfacePath);
+                    if (!File.Exists(AttachmentInterfacePath))
+                    {
+                        throw new FileNotFoundException(
+                            "Attachment interface file was not found.",
+                            AttachmentInterfacePath);
                     }
                 }
 

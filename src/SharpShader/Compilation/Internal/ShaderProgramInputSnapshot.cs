@@ -545,7 +545,8 @@ namespace SharpShader.Compilation.Internal
                 request.DisableOptimizations,
                 request.OptimizationLevel,
                 request.SkipValidation,
-                request.TreatWarningsAsErrors);
+                request.TreatWarningsAsErrors,
+                request.AttachmentInterfaces);
         }
 
         private void EnsureInitialTopologyCapture()
@@ -605,7 +606,7 @@ namespace SharpShader.Compilation.Internal
         {
             using IncrementalHash hash =
                 IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
-            AppendString(hash, "SharpShader.FrozenSource.v1");
+            AppendString(hash, "SharpShader.FrozenSource.v2");
             AppendUInt64(hash, checked((ulong)units.Count));
             foreach (ShaderProgramFrozenCompileUnit unit in units)
             {
@@ -636,7 +637,7 @@ namespace SharpShader.Compilation.Internal
         {
             using IncrementalHash hash =
                 IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
-            AppendString(hash, "SharpShader.ProgramCache.v2.Final");
+            AppendString(hash, "SharpShader.ProgramCache.v3.Final");
             AppendString(hash, provisionalKey);
             AppendString(hash, sourceDigest);
             return Convert.ToHexStringLower(hash.GetHashAndReset());
@@ -737,7 +738,7 @@ namespace SharpShader.Compilation.Internal
             IReadOnlyList<ShaderToolchainComponent> components)
         {
             using IncrementalHash hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
-            AppendString(hash, "SharpShader.ProgramCache.v2.Provisional");
+            AppendString(hash, "SharpShader.ProgramCache.v3.Provisional");
             AppendString(hash, request.Source);
             AppendString(hash, request.SourceName);
             AppendUInt64(hash, (ulong)request.Targets);
@@ -752,6 +753,7 @@ namespace SharpShader.Compilation.Internal
 
             AppendEntries(hash, request.Entries);
             AppendVariants(hash, request.Variants);
+            AppendAttachmentInterfaces(hash, request.AttachmentInterfaces);
             AppendDefines(hash, request.GlobalDefines);
             AppendStrings(hash, includeDirectories);
             AppendSpirvOptions(hash, request.SpirvOptions);
@@ -782,6 +784,65 @@ namespace SharpShader.Compilation.Internal
             {
                 AppendString(hash, variant.Key);
                 AppendDefines(hash, variant.Defines);
+            }
+        }
+
+        private static void AppendAttachmentInterfaces(
+            IncrementalHash hash,
+            IReadOnlyList<ShaderAttachmentInterface> attachmentInterfaces)
+        {
+            AppendUInt64(hash, checked((ulong)attachmentInterfaces.Count));
+            foreach (ShaderAttachmentInterface attachmentInterface in attachmentInterfaces)
+            {
+                AppendUInt64(hash, attachmentInterface.AbiRevision);
+                AppendString(hash, attachmentInterface.VariantKey);
+                AppendString(hash, attachmentInterface.EntryPoint);
+                AppendInt32(hash, (int)attachmentInterface.Stage);
+                AppendBoolean(hash, attachmentInterface.Phase is not null);
+                ShaderAttachmentPhase? phase = attachmentInterface.Phase;
+                if (phase is null)
+                {
+                    continue;
+                }
+
+                AppendUInt64(hash, phase.Phase);
+                AppendInt32(hash, (int)phase.DepthStencilAccess);
+                AppendInt32(hash, (int)phase.DepthExport);
+                AppendInt32(hash, (int)phase.StencilExport);
+                AppendUInt64(hash, checked((ulong)phase.Attachments.Count));
+                foreach (ShaderAttachmentDeclaration attachment in phase.Attachments)
+                {
+                    AppendUInt64(hash, attachment.LogicalAttachmentId);
+                    AppendNullableUInt64(hash, attachment.InputIndex);
+                    AppendNullableUInt64(hash, attachment.OutputLocation);
+                    AppendUInt64(hash, attachment.OutputIndex);
+                    AppendUInt64(hash, attachment.OutputComponent);
+                    AppendInt32(hash, (int)attachment.Aspect);
+                    AppendInt32(hash, (int)attachment.NumericClass);
+                    AppendInt32(hash, (int)attachment.SampleMode);
+                    AppendInt32(hash, (int)attachment.LayerMode);
+                    AppendInt32(hash, (int)attachment.Ordering);
+                    AppendInt32(hash, (int)attachment.Feedback);
+                    AppendBoolean(hash, attachment.SampledFeedbackBinding.HasValue);
+                    if (attachment.SampledFeedbackBinding.HasValue)
+                    {
+                        ShaderBindingKey key = attachment.SampledFeedbackBinding.Value;
+                        AppendUInt64(hash, key.Table);
+                        AppendUInt64(hash, key.Slot);
+                        AppendInt32(hash, (int)key.Type);
+                    }
+                }
+            }
+        }
+
+        private static void AppendNullableUInt64(
+            IncrementalHash hash,
+            uint? value)
+        {
+            AppendBoolean(hash, value.HasValue);
+            if (value.HasValue)
+            {
+                AppendUInt64(hash, value.Value);
             }
         }
 

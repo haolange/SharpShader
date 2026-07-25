@@ -2,6 +2,7 @@ using System;
 using System.Linq;
 using System.Numerics;
 using System.Collections.Generic;
+using SharpShader.Compilation;
 
 namespace SharpShader.ShaderLab
 {
@@ -273,6 +274,7 @@ namespace SharpShader.ShaderLab
         public string Source { get; set; } = string.Empty;
         public List<ShaderLabProgramEntry> Entries { get; set; } = new List<ShaderLabProgramEntry>();
         public List<ShaderKeywordGroup> KeywordGroups { get; set; } = new List<ShaderKeywordGroup>();
+        public ShaderAttachmentPhase? AttachmentPhase { get; set; }
 
         public List<ShaderVariantKey> EnumerateVariantKeys()
         {

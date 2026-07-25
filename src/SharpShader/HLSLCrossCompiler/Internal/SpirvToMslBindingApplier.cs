@@ -116,6 +116,19 @@ namespace SharpShader.HLSLCrossCompiler.Internal
         {
             Dictionary<(uint Set, uint Binding), MslTranslationResourceBinding>
                 plannedByPhysicalBinding = new(plan.Resources.Count);
+            if (plan.HasPrivateAttachments
+                && plan.Mode == MslTranslationBindingMode.ReferenceBuffer)
+            {
+                ThrowIfFailed(
+                    cross.CompilerMslAddDiscreteDescriptorSet(
+                        compiler,
+                        plan.PrivateAttachmentDescriptorSet),
+                    cross,
+                    context,
+                    $"Failed to keep private attachment descriptor set "
+                    + $"{plan.PrivateAttachmentDescriptorSet} outside Metal argument buffers.");
+            }
+
             foreach (MslTranslationResourceBinding planned in plan.Resources)
             {
                 if (!plannedByPhysicalBinding.TryAdd(
@@ -220,6 +233,33 @@ namespace SharpShader.HLSLCrossCompiler.Internal
                         $"Failed to map Vulkan descriptor set {argumentBuffer.DescriptorSet} to Metal reference buffer {argumentBuffer.MetalBufferIndex}.");
                 }
             }
+
+            foreach (MslTranslationShaderOutput output in plan.ShaderOutputs)
+            {
+                MslShaderInterfaceVar2 nativeOutput = default;
+                cross.MslShaderInterfaceVarInit2(&nativeOutput);
+                nativeOutput.Location = output.Location;
+                nativeOutput.Format = MslShaderVariableFormat.ShaderVariableFormatOther;
+                nativeOutput.Builtin = BuiltIn.Max;
+                nativeOutput.Vecsize = output.ComponentCount;
+                nativeOutput.Rate = MslShaderVariableRate.PerVertex;
+                ThrowIfFailed(
+                    cross.CompilerMslAddShaderOutput2(compiler, &nativeOutput),
+                    cross,
+                    context,
+                    $"Failed to register Metal color output location "
+                    + $"{output.Location} for logical attachment "
+                    + $"{output.LogicalAttachmentId}.");
+                ThrowIfFailed(
+                    cross.CompilerMslSetFragmentOutputComponents(
+                        compiler,
+                        output.Location,
+                        output.ComponentCount),
+                    cross,
+                    context,
+                    $"Failed to freeze Metal fragment output component count at "
+                    + $"location {output.Location}.");
+            }
         }
 
         public static void ValidateAdopted(
@@ -242,6 +282,20 @@ namespace SharpShader.HLSLCrossCompiler.Internal
                 throw Failure(
                     $"SPIRV-Cross did not adopt planned binding {resource.LogicalBinding} at Vulkan set={resource.DescriptorSet}, binding={resource.Binding} for entry point {plan.EntryPoint}.");
             }
+            foreach (MslTranslationShaderOutput output in plan.ShaderOutputs)
+            {
+                if (cross.CompilerMslIsShaderOutputUsed(
+                        compiler,
+                        output.Location) == 0)
+                {
+                    throw Failure(
+                        $"SPIRV-Cross did not adopt planned Metal color output "
+                        + $"location {output.Location} for logical attachment "
+                        + $"{output.LogicalAttachmentId} in entry point "
+                        + $"{plan.EntryPoint}.");
+                }
+            }
+
         }
 
         private static void ApplyResourceBinding(

@@ -13,6 +13,7 @@ namespace SharpShader.Compilation.Internal
             {
                 SchemaVersion = manifest.SchemaVersion,
                 SourceDigest = manifest.SourceDigest,
+                Targets = EncodeTargets(manifest.Targets),
                 Toolchain = Map(manifest.ToolchainComponents, EncodeToolchainComponent),
                 Layouts = Map(manifest.LogicalLayouts, EncodeLayout),
                 Variants = Map(manifest.Variants, EncodeVariant),
@@ -39,6 +40,7 @@ namespace SharpShader.Compilation.Internal
                 Map(layoutDocuments, DecodeLayout),
                 Map(variantDocuments, DecodeVariant),
                 Map(backendDocuments, DecodeBackendLayouts),
+                DecodeTargets(RequireArray(document.Targets, "targets")),
                 RequireValue(document.SchemaVersion, "schemaVersion"));
         }
 
@@ -300,6 +302,7 @@ namespace SharpShader.Compilation.Internal
                 Name = entry.Name,
                 Stage = entry.Stage.ToString(),
                 LogicalLayoutSignature = entry.LogicalLayoutSignature.ToString(),
+                AttachmentInterface = EncodeAttachmentInterface(entry.AttachmentInterface),
                 Artifacts = Map(entry.Artifacts, EncodeArtifact),
             };
         }
@@ -310,7 +313,130 @@ namespace SharpShader.Compilation.Internal
                 RequireString(document.Name, "entries[].name"),
                 ParseEnum<ShaderExecutionStage>(document.Stage, "entries[].stage"),
                 ParseSignature(document.LogicalLayoutSignature, "entries[].logicalLayoutSignature"),
+                DecodeAttachmentInterface(RequireObject(
+                    document.AttachmentInterface,
+                    "entries[].attachmentInterface")),
                 Map(RequireArray(document.Artifacts, "entries[].artifacts"), DecodeArtifact));
+        }
+
+        private static ShaderAttachmentInterfaceDocument EncodeAttachmentInterface(
+            ShaderAttachmentInterface attachmentInterface)
+        {
+            return new ShaderAttachmentInterfaceDocument
+            {
+                AbiRevision = attachmentInterface.AbiRevision,
+                VariantKey = attachmentInterface.VariantKey,
+                EntryPoint = attachmentInterface.EntryPoint,
+                Stage = attachmentInterface.Stage.ToString(),
+                Phase = attachmentInterface.Phase is null
+                    ? null
+                    : EncodeAttachmentPhase(attachmentInterface.Phase),
+            };
+        }
+
+        private static ShaderAttachmentInterface DecodeAttachmentInterface(
+            ShaderAttachmentInterfaceDocument document)
+        {
+            return new ShaderAttachmentInterface(
+                RequireString(document.VariantKey, "attachmentInterface.variantKey"),
+                RequireString(document.EntryPoint, "attachmentInterface.entryPoint"),
+                ParseEnum<ShaderExecutionStage>(
+                    document.Stage,
+                    "attachmentInterface.stage"),
+                document.Phase is null
+                    ? null
+                    : DecodeAttachmentPhase(document.Phase),
+                RequireValue(
+                    document.AbiRevision,
+                    "attachmentInterface.abiRevision"));
+        }
+
+        private static ShaderAttachmentPhaseDocument EncodeAttachmentPhase(
+            ShaderAttachmentPhase phase)
+        {
+            return new ShaderAttachmentPhaseDocument
+            {
+                Phase = phase.Phase,
+                DepthStencilAccess = phase.DepthStencilAccess.ToString(),
+                DepthExport = phase.DepthExport.ToString(),
+                StencilExport = phase.StencilExport.ToString(),
+                Attachments = Map(phase.Attachments, EncodeAttachmentDeclaration),
+            };
+        }
+
+        private static ShaderAttachmentPhase DecodeAttachmentPhase(
+            ShaderAttachmentPhaseDocument document)
+        {
+            return new ShaderAttachmentPhase(
+                RequireValue(document.Phase, "attachmentPhase.phase"),
+                Map(
+                    RequireArray(document.Attachments, "attachmentPhase.attachments"),
+                    DecodeAttachmentDeclaration),
+                ParseEnum<ShaderDepthStencilAccess>(
+                    document.DepthStencilAccess,
+                    "attachmentPhase.depthStencilAccess"),
+                ParseEnum<ShaderDepthExport>(
+                    document.DepthExport,
+                    "attachmentPhase.depthExport"),
+                ParseEnum<ShaderStencilExport>(
+                    document.StencilExport,
+                    "attachmentPhase.stencilExport"));
+        }
+
+        private static ShaderAttachmentDeclarationDocument EncodeAttachmentDeclaration(
+            ShaderAttachmentDeclaration declaration)
+        {
+            return new ShaderAttachmentDeclarationDocument
+            {
+                LogicalAttachmentId = declaration.LogicalAttachmentId,
+                InputIndex = declaration.InputIndex,
+                OutputLocation = declaration.OutputLocation,
+                OutputIndex = declaration.OutputIndex,
+                OutputComponent = declaration.OutputComponent,
+                Aspects = EncodeAttachmentAspects(declaration.Aspect),
+                NumericClass = declaration.NumericClass.ToString(),
+                SampleMode = declaration.SampleMode.ToString(),
+                LayerMode = declaration.LayerMode.ToString(),
+                Ordering = declaration.Ordering.ToString(),
+                Feedback = declaration.Feedback.ToString(),
+                SampledFeedbackBinding = declaration.SampledFeedbackBinding.HasValue
+                    ? EncodeBindingKey(declaration.SampledFeedbackBinding.Value)
+                    : null,
+            };
+        }
+
+        private static ShaderAttachmentDeclaration DecodeAttachmentDeclaration(
+            ShaderAttachmentDeclarationDocument document)
+        {
+            return new ShaderAttachmentDeclaration(
+                RequireValue(
+                    document.LogicalAttachmentId,
+                    "attachmentDeclaration.logicalAttachmentId"),
+                document.InputIndex,
+                document.OutputLocation,
+                DecodeAttachmentAspects(RequireArray(
+                    document.Aspects,
+                    "attachmentDeclaration.aspects")),
+                ParseEnum<ShaderAttachmentNumericClass>(
+                    document.NumericClass,
+                    "attachmentDeclaration.numericClass"),
+                ParseEnum<ShaderAttachmentSampleMode>(
+                    document.SampleMode,
+                    "attachmentDeclaration.sampleMode"),
+                ParseEnum<ShaderAttachmentLayerMode>(
+                    document.LayerMode,
+                    "attachmentDeclaration.layerMode"),
+                RequireValue(document.OutputIndex, "attachmentDeclaration.outputIndex"),
+                RequireValue(document.OutputComponent, "attachmentDeclaration.outputComponent"),
+                ParseEnum<ShaderAttachmentOrdering>(
+                    document.Ordering,
+                    "attachmentDeclaration.ordering"),
+                ParseEnum<ShaderAttachmentFeedback>(
+                    document.Feedback,
+                    "attachmentDeclaration.feedback"),
+                document.SampledFeedbackBinding is null
+                    ? null
+                    : DecodeBindingKey(document.SampledFeedbackBinding));
         }
 
         private static ShaderArtifactIdentityDocument EncodeArtifact(ShaderArtifactIdentity artifact)
@@ -497,6 +623,50 @@ namespace SharpShader.Compilation.Internal
                 RequireValue(document.ReferenceCount, "metal.referenceBufferBindings[].referenceCount"));
         }
 
+        private static string[] EncodeTargets(ShaderProgramTarget targets)
+        {
+            List<string> result = new();
+            foreach (ShaderProgramTarget target in new[]
+                     {
+                         ShaderProgramTarget.DirectX12,
+                         ShaderProgramTarget.Vulkan,
+                         ShaderProgramTarget.MetalMsl,
+                     })
+            {
+                if ((targets & target) != 0)
+                {
+                    result.Add(target.ToString());
+                }
+            }
+            return result.ToArray();
+        }
+
+        private static ShaderProgramTarget DecodeTargets(string[] values)
+        {
+            if (values.Length == 0)
+            {
+                throw new System.Text.Json.JsonException(
+                    "Manifest target arrays must not be empty.");
+            }
+
+            HashSet<ShaderProgramTarget> seen = new();
+            ShaderProgramTarget result = ShaderProgramTarget.None;
+            foreach (string value in values)
+            {
+                ShaderProgramTarget target = ParseEnum<ShaderProgramTarget>(
+                    value,
+                    "targets[]");
+                if (target is ShaderProgramTarget.None or ShaderProgramTarget.All
+                    || !seen.Add(target))
+                {
+                    throw new System.Text.Json.JsonException(
+                        $"Manifest target {target} is empty, composite, or duplicated.");
+                }
+                result |= target;
+            }
+            return result;
+        }
+
         private static string[] EncodeStages(ShaderStageMask mask)
         {
             List<string> stages = new();
@@ -546,6 +716,53 @@ namespace SharpShader.Compilation.Internal
             }
 
             return signature;
+        }
+
+        private static string[] EncodeAttachmentAspects(ShaderAttachmentAspect aspects)
+        {
+            List<string> result = new();
+            foreach (ShaderAttachmentAspect aspect in new[]
+                     {
+                         ShaderAttachmentAspect.Color,
+                         ShaderAttachmentAspect.Depth,
+                         ShaderAttachmentAspect.Stencil,
+                     })
+            {
+                if ((aspects & aspect) != 0)
+                {
+                    result.Add(aspect.ToString());
+                }
+            }
+
+            return result.ToArray();
+        }
+
+        private static ShaderAttachmentAspect DecodeAttachmentAspects(
+            string[] values)
+        {
+            if (values.Length == 0)
+            {
+                throw new System.Text.Json.JsonException(
+                    "Attachment aspect arrays must not be empty.");
+            }
+
+            ShaderAttachmentAspect result = ShaderAttachmentAspect.None;
+            HashSet<ShaderAttachmentAspect> seen = new();
+            foreach (string value in values)
+            {
+                ShaderAttachmentAspect aspect =
+                    ParseEnum<ShaderAttachmentAspect>(value, "attachmentDeclaration.aspects[]");
+                if (aspect == ShaderAttachmentAspect.None
+                    || !seen.Add(aspect))
+                {
+                    throw new System.Text.Json.JsonException(
+                        $"Attachment aspect {aspect} is empty or duplicated.");
+                }
+
+                result |= aspect;
+            }
+
+            return result;
         }
 
         private static TEnum ParseEnum<TEnum>(string? value, string path)

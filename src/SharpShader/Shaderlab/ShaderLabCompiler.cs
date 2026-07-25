@@ -224,6 +224,7 @@ namespace SharpShader.ShaderLab
                 sourcePath,
                 program.Entries.Select(MapEntry),
                 program.EnumerateVariantKeys(),
+                attachmentPhase: null,
                 sourcePath,
                 effectiveOptions);
             return m_ProgramCompiler.Compile(request, cancellationToken);
@@ -244,6 +245,7 @@ namespace SharpShader.ShaderLab
                 sourceName,
                 program.Entries.Select(MapEntry),
                 program.EnumerateVariantKeys(),
+                program.AttachmentPhase,
                 NormalizeSourcePath(sourcePath),
                 effectiveOptions);
             return m_ProgramCompiler.Compile(request, cancellationToken);
@@ -254,22 +256,29 @@ namespace SharpShader.ShaderLab
             string sourceName,
             IEnumerable<ShaderProgramEntry> entries,
             IReadOnlyList<ShaderVariantKey> variants,
+            ShaderAttachmentPhase? attachmentPhase,
             string sourcePath,
             ShaderLabCompilerOptions options)
         {
             List<string> includeDirectories = BuildIncludeDirectories(
                 sourcePath,
                 options.IncludeDirectories);
+            ShaderProgramEntry[] programEntries = entries.ToArray();
             ShaderProgramVariant[] programVariants = variants
                 .Select(static variant => new ShaderProgramVariant(
                     GetVariantKey(variant),
                     variant.Keywords.Select(static keyword =>
                         new ShaderDefine(keyword, "1"))))
                 .ToArray();
+            ShaderAttachmentInterface[] attachmentInterfaces =
+                BuildAttachmentInterfaces(
+                    programEntries,
+                    programVariants,
+                    attachmentPhase);
             return new ShaderProgramCompileRequest(
                 source,
                 sourceName,
-                entries,
+                programEntries,
                 programVariants,
                 options.Targets,
                 options.ShaderModel,
@@ -283,7 +292,65 @@ namespace SharpShader.ShaderLab
                 options.DisableOptimizations,
                 options.OptimizationLevel,
                 options.SkipValidation,
-                options.TreatWarningsAsErrors);
+                options.TreatWarningsAsErrors,
+                attachmentInterfaces);
+        }
+
+        private static ShaderAttachmentInterface[] BuildAttachmentInterfaces(
+            IReadOnlyList<ShaderProgramEntry> entries,
+            IReadOnlyList<ShaderProgramVariant> variants,
+            ShaderAttachmentPhase? attachmentPhase)
+        {
+            int pixelEntryCount = 0;
+            foreach (ShaderProgramEntry entry in entries)
+            {
+                if (entry.Stage == ShaderExecutionStage.Pixel)
+                {
+                    ++pixelEntryCount;
+                }
+            }
+
+            if (pixelEntryCount == 0)
+            {
+                if (attachmentPhase is not null)
+                {
+                    throw new ArgumentException(
+                        "A ShaderLab AttachmentInterface block requires at least "
+                        + "one pixel shader entry.",
+                        nameof(attachmentPhase));
+                }
+
+                return Array.Empty<ShaderAttachmentInterface>();
+            }
+
+            if (attachmentPhase is null)
+            {
+                throw new ArgumentException(
+                    "Every ShaderLab program with a pixel shader entry requires "
+                    + "one explicit AttachmentInterface block.",
+                    nameof(attachmentPhase));
+            }
+
+            List<ShaderAttachmentInterface> result = new(
+                checked(pixelEntryCount * variants.Count));
+            foreach (ShaderProgramVariant variant in variants)
+            {
+                foreach (ShaderProgramEntry entry in entries)
+                {
+                    if (entry.Stage != ShaderExecutionStage.Pixel)
+                    {
+                        continue;
+                    }
+
+                    result.Add(new ShaderAttachmentInterface(
+                        variant.Key,
+                        entry.Name,
+                        entry.Stage,
+                        attachmentPhase));
+                }
+            }
+
+            return result.ToArray();
         }
 
         private static List<string> BuildIncludeDirectories(

@@ -165,7 +165,23 @@ namespace SharpShader.Compilation.Internal
                         + $"entry {entry.Name} ({entry.Stage}).");
                 }
 
-                EntryState entryState = new(entry, reflectedEntry, unit);
+                ShaderAttachmentInterface attachmentInterface =
+                    snapshot.Request.GetAttachmentInterface(
+                        variantKey,
+                        entry.Name,
+                        entry.Stage);
+                ShaderAttachmentInterfaceValidator.ValidateDxil(
+                    attachmentInterface,
+                    reflectedEntry);
+                ShaderEntryPointReflection publicReflection =
+                    ShaderAttachmentInterfaceValidator.CreatePublicDxilReflection(
+                        attachmentInterface,
+                        reflectedEntry);
+                EntryState entryState = new(
+                    entry,
+                    attachmentInterface,
+                    publicReflection,
+                    unit);
                 unit.Entries.Add(entryState);
             }
 
@@ -379,7 +395,11 @@ namespace SharpShader.Compilation.Internal
                         entry.Definition.Name,
                         entry.Definition.Stage,
                         resources,
-                        entry.DxilEntry.ThreadGroupSize);
+                        entry.DxilEntry.ThreadGroupSize,
+                        entry.DxilEntry.StageInputs,
+                        entry.DxilEntry.StageOutputs,
+                        entry.DxilEntry.InputAttachments,
+                        entry.DxilEntry.AttachmentRequirements);
                     entry.LogicalEntry = rebuilt;
                     rebuiltEntries.Add(rebuilt);
                 }
@@ -423,6 +443,9 @@ namespace SharpShader.Compilation.Internal
                 SpirvCompileOptions options = CopySpirvOptions(
                     snapshot.Request.SpirvOptions,
                     shifts);
+                uint privateDescriptorSet =
+                    SpirvBindingRemapper.GetPrivateAttachmentDescriptorSet(
+                        variant.BackendLayouts!.Vulkan!);
 
                 foreach (CompileUnitState unit in variant.Units)
                 {
@@ -433,7 +456,11 @@ namespace SharpShader.Compilation.Internal
                         unit.Entries.Select(static entry => entry.Definition).ToArray(),
                         ShaderTargetKind.SpirV,
                         options,
-                        cancellationToken);
+                        cancellationToken,
+                        requiresOrderedFragmentInterlock:
+                            RequiresOrderedFragmentInterlock(unit.Entries),
+                        requiresStencilExport:
+                            RequiresStencilExport(unit.Entries));
                     request = FreezeCompileRequest(
                         snapshot,
                         request,
@@ -449,7 +476,43 @@ namespace SharpShader.Compilation.Internal
                     unit.RemappedSpirv = SpirvBindingRemapper.Remap(
                         intermediate.Bytecode,
                         unit.LogicalReflection!,
-                        subsetLayout);
+                        subsetLayout,
+                        unit.Entries
+                            .Select(static entry => entry.AttachmentInterface)
+                            .ToArray(),
+                        privateDescriptorSet);
+                    ShaderArtifactReflection spirvReflection =
+                        SpirvArtifactReflector.Reflect(
+                            request,
+                            new ShaderCompileResult
+                            {
+                                Bytecode = unit.RemappedSpirv,
+                            });
+                    Dictionary<(string Name, ShaderExecutionStage Stage),
+                        ShaderEntryPointReflection> spirvEntries = new();
+                    foreach (ShaderEntryPointReflection spirvEntry in
+                             spirvReflection.EntryPoints)
+                    {
+                        if (!spirvEntries.TryAdd(
+                                (spirvEntry.Name, spirvEntry.Stage),
+                                spirvEntry))
+                        {
+                            throw Failure(
+                                $"SPIR-V reflection contains duplicate entry "
+                                + $"{spirvEntry.Name} ({spirvEntry.Stage}).");
+                        }
+                    }
+
+                    foreach (EntryState entry in unit.Entries)
+                    {
+                        entry.SpirvEntry = spirvEntries[
+                            (entry.Definition.Name, entry.Definition.Stage)];
+                        ShaderAttachmentInterfaceValidator.ValidateSpirv(
+                            entry.AttachmentInterface,
+                            entry.SpirvEntry,
+                            privateDescriptorSet,
+                            subsetLayout);
+                    }
 
                     if ((targets & ShaderProgramTarget.Vulkan) != 0)
                     {
@@ -473,7 +536,8 @@ namespace SharpShader.Compilation.Internal
                                 snapshot,
                                 variant,
                                 entry,
-                                unit.RemappedSpirv);
+                                unit.RemappedSpirv,
+                                privateDescriptorSet);
                         }
                     }
                 }
@@ -489,7 +553,8 @@ namespace SharpShader.Compilation.Internal
             ShaderProgramInputSnapshot snapshot,
             VariantState variant,
             EntryState entry,
-            byte[] spirv)
+            byte[] spirv,
+            uint privateDescriptorSet)
         {
             ShaderArtifactReflection entryReflection = new(
                 ShaderArtifactKind.Dxil,
@@ -500,6 +565,23 @@ namespace SharpShader.Compilation.Internal
             MetalShaderBackendLayout metalSubset = CreateMetalSubset(
                 variant.BackendLayouts.Metal!,
                 entryReflection);
+            ShaderAttachmentInterfaceValidator.ValidateMetalStrategy(
+                entry.AttachmentInterface,
+                entry.SpirvEntry!,
+                vulkanSubset);
+            uint privateMetalTextureBase = GetPrivateMetalTextureBase(
+                variant.BackendLayouts.Metal!,
+                variant.Layout);
+            MslTranslationBindingPlan bindingPlan =
+                MslTranslationBindingPlan.Create(
+                    entry.Definition.Name,
+                    entry.Definition.Stage,
+                    vulkanSubset.Bindings,
+                    metalSubset,
+                    entry.AttachmentInterface,
+                    entry.SpirvEntry!,
+                    privateDescriptorSet,
+                    privateMetalTextureBase);
             ShaderCompileRequest request = CreateCompileRequest(
                 snapshot,
                 variant.Defines,
@@ -510,20 +592,86 @@ namespace SharpShader.Compilation.Internal
             ShaderCompileResult translated = SpirvToMslTranslator.Translate(
                 request,
                 new ShaderCompileResult { Bytecode = spirv },
-                entry.Definition.Name,
-                entry.Definition.Stage,
-                vulkanSubset.Bindings,
-                metalSubset);
+                bindingPlan);
             EnsureArtifactNotEmpty(translated, request, "MSL source");
 
             string text = translated.Text
                 ?? s_StrictUtf8.GetString(translated.Bytecode);
+            if (entry.Definition.Stage == ShaderExecutionStage.Pixel)
+            {
+                MslArtifactReflection mslReflection = MslArtifactReflector.Reflect(
+                    text,
+                    entry.Definition.Name,
+                    entry.Definition.Stage);
+                ShaderAttachmentInterfaceValidator.ValidateMsl(
+                    entry.AttachmentInterface,
+                    mslReflection,
+                    bindingPlan);
+            }
             entry.Artifacts.Add(CreateArtifact(
                 variant.Definition.Key,
                 entry.Definition,
                 ShaderArtifactKind.MslSource,
                 translated.Bytecode,
                 text));
+        }
+
+        private static uint GetPrivateMetalTextureBase(
+            MetalShaderBackendLayout layout,
+            ShaderInterfaceLayout logicalLayout)
+        {
+            ArgumentNullException.ThrowIfNull(layout);
+            ArgumentNullException.ThrowIfNull(logicalLayout);
+
+            Dictionary<ShaderBindingKey, ShaderLogicalBinding> logicalBindings = new();
+            foreach (ShaderLogicalBinding binding in logicalLayout.Bindings)
+            {
+                logicalBindings.Add(binding.Key, binding);
+            }
+
+            uint nextIndex = 0;
+            foreach (MetalDirectBindingMapping mapping in layout.DirectBindings)
+            {
+                if (mapping.Namespace != ShaderPhysicalBindingNamespace.Texture)
+                {
+                    continue;
+                }
+
+                ShaderLogicalBinding logicalBinding =
+                    logicalBindings.TryGetValue(
+                        mapping.LogicalBinding,
+                        out ShaderLogicalBinding? value)
+                    ? value
+                    : throw InvalidRequest(
+                        $"Metal layout contains unknown logical binding "
+                        + $"{mapping.LogicalBinding}.");
+                uint resourceCount = logicalBinding.Shape.Array.BoundedElementCount
+                    ?? throw InvalidRequest(
+                        $"Metal logical texture binding {mapping.LogicalBinding} "
+                        + "is unbounded and leaves no stable private attachment "
+                        + "texture range.");
+                nextIndex = Math.Max(
+                    nextIndex,
+                    checked(mapping.Index + resourceCount));
+            }
+
+            foreach (MetalReferenceBufferBindingMapping mapping in
+                     layout.ReferenceBufferBindings)
+            {
+                if (mapping.ResourceNamespace != ShaderPhysicalBindingNamespace.Texture)
+                {
+                    continue;
+                }
+
+                uint firstResource = checked((uint)(
+                    mapping.ByteOffset /
+                    MetalReferenceBufferBindingMapping.ReferenceByteSize));
+                nextIndex = Math.Max(
+                    nextIndex,
+                    checked(firstResource + mapping.ReferenceCount));
+            }
+
+            return nextIndex;
         }
 
         private static ShaderInterfaceManifest BuildManifest(
@@ -574,6 +722,7 @@ namespace SharpShader.Compilation.Internal
                         entry.Definition.Name,
                         entry.Definition.Stage,
                         variant.Layout.Signature,
+                        entry.AttachmentInterface,
                         entryArtifacts));
                 }
 
@@ -588,7 +737,8 @@ namespace SharpShader.Compilation.Internal
                 snapshot.ToolchainComponents,
                 layouts.Values,
                 manifestVariants,
-                backendLayouts.Values);
+                backendLayouts.Values,
+                snapshot.Request.Targets);
         }
 
         private static ShaderProgramArtifact CreateArtifact(
@@ -627,13 +777,80 @@ namespace SharpShader.Compilation.Internal
                 text);
         }
 
+        private static bool RequiresOrderedFragmentInterlock(
+            IReadOnlyList<EntryState> entries)
+        {
+            foreach (EntryState entry in entries)
+            {
+                ShaderAttachmentPhase? phase = entry.AttachmentInterface.Phase;
+                if (phase is null)
+                {
+                    continue;
+                }
+
+                foreach (ShaderAttachmentDeclaration attachment in phase.Attachments)
+                {
+                    if (attachment.Ordering == ShaderAttachmentOrdering.RasterOrdered)
+                    {
+                        return true;
+                    }
+                }
+            }
+
+            return false;
+        }
+
+        private static bool RequiresStencilExport(
+            IReadOnlyList<EntryState> entries)
+        {
+            foreach (EntryState entry in entries)
+            {
+                if (entry.AttachmentInterface.Phase?.StencilExport
+                    == ShaderStencilExport.StencilReference)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+        private static void ValidateOrderedFragmentInterlockTargetEnvironment(
+            SpirvCompileOptions options)
+        {
+            ArgumentNullException.ThrowIfNull(options);
+            string? environment = options.TargetEnvironment;
+            if (!string.IsNullOrWhiteSpace(environment)
+                && !environment.StartsWith("vulkan", StringComparison.OrdinalIgnoreCase))
+            {
+                throw InvalidRequest(
+                    $"Raster-ordered attachment compilation requires a Vulkan SPIR-V "
+                    + $"target environment, but '{environment}' was requested.");
+            }
+
+            foreach (string argument in options.AdditionalArguments)
+            {
+                if (!string.IsNullOrWhiteSpace(argument)
+                    && argument.StartsWith(
+                        "-fspv-target-env=",
+                        StringComparison.OrdinalIgnoreCase))
+                {
+                    throw InvalidRequest(
+                        "SPIR-V target environments must be supplied through "
+                        + "SpirvCompileOptions.TargetEnvironment so the attachment ABI "
+                        + "can validate ordered fragment-interlock support.");
+                }
+            }
+        }
+
         private static ShaderCompileRequest CreateCompileRequest(
             ShaderProgramInputSnapshot snapshot,
             IReadOnlyList<ShaderDefine> defines,
             IReadOnlyList<ShaderProgramEntry> entries,
             ShaderTargetKind target,
             SpirvCompileOptions spirvOptions,
-            CancellationToken cancellationToken)
+            CancellationToken cancellationToken,
+            bool requiresOrderedFragmentInterlock = false,
+            bool requiresStencilExport = false)
         {
             bool library = entries.Count != 0 && IsLibraryStage(entries[0].Stage);
             foreach (ShaderProgramEntry entry in entries)
@@ -645,9 +862,40 @@ namespace SharpShader.Compilation.Internal
                 }
             }
 
-            string[] extraArguments = target == ShaderTargetKind.SpirV
-                ? new[] { "-fvk-auto-shift-bindings" }
-                : Array.Empty<string>();
+            if (requiresOrderedFragmentInterlock
+                && target != ShaderTargetKind.SpirV)
+            {
+                throw new InvalidOperationException(
+                    "Ordered fragment interlock can be requested only for a SPIR-V compile unit.");
+            }
+
+            if (requiresOrderedFragmentInterlock)
+            {
+                ValidateOrderedFragmentInterlockTargetEnvironment(spirvOptions);
+            }
+
+            if (requiresStencilExport && target != ShaderTargetKind.SpirV)
+            {
+                throw new InvalidOperationException(
+                    "Stencil export can be requested only for a SPIR-V compile unit.");
+            }
+
+            List<string> extraArguments = new();
+            if (target == ShaderTargetKind.SpirV)
+            {
+                extraArguments.Add("-fvk-auto-shift-bindings");
+                if (requiresOrderedFragmentInterlock)
+                {
+                    extraArguments.Add(
+                        "-fspv-extension=SPV_EXT_fragment_shader_interlock");
+                }
+
+                if (requiresStencilExport)
+                {
+                    extraArguments.Add(
+                        "-fspv-extension=SPV_EXT_shader_stencil_export");
+                }
+            }
             return new ShaderCompileRequest
             {
                 Source = snapshot.Request.Source,
@@ -1037,17 +1285,21 @@ namespace SharpShader.Compilation.Internal
         private sealed class EntryState
         {
             public ShaderProgramEntry Definition { get; }
+            public ShaderAttachmentInterface AttachmentInterface { get; }
             public ShaderEntryPointReflection DxilEntry { get; }
             public CompileUnitState Unit { get; }
             public ShaderEntryPointReflection? LogicalEntry { get; set; }
+            public ShaderEntryPointReflection? SpirvEntry { get; set; }
             public List<ShaderProgramArtifact> Artifacts { get; } = new();
 
             public EntryState(
                 ShaderProgramEntry definition,
+                ShaderAttachmentInterface attachmentInterface,
                 ShaderEntryPointReflection dxilEntry,
                 CompileUnitState unit)
             {
                 Definition = definition;
+                AttachmentInterface = attachmentInterface;
                 DxilEntry = dxilEntry;
                 Unit = unit;
             }

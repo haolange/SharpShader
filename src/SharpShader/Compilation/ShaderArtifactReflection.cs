@@ -276,17 +276,30 @@ namespace SharpShader.Compilation
     public sealed class ShaderEntryPointReflection : IEquatable<ShaderEntryPointReflection>
     {
         private readonly ReadOnlyCollection<ShaderResourceBindingReflection> m_Resources;
+        private readonly ReadOnlyCollection<ShaderStageIoReflection> m_StageInputs;
+        private readonly ReadOnlyCollection<ShaderStageIoReflection> m_StageOutputs;
+        private readonly ReadOnlyCollection<ShaderInputAttachmentReflection> m_InputAttachments;
 
         public string Name { get; }
         public ShaderExecutionStage Stage { get; }
         public ShaderThreadGroupSize? ThreadGroupSize { get; }
         public IReadOnlyList<ShaderResourceBindingReflection> Resources => m_Resources;
+        public IReadOnlyList<ShaderStageIoReflection> StageInputs => m_StageInputs;
+        public IReadOnlyList<ShaderStageIoReflection> StageOutputs => m_StageOutputs;
+        public IReadOnlyList<ShaderInputAttachmentReflection> InputAttachments =>
+            m_InputAttachments;
+        public ShaderAttachmentArtifactRequirement AttachmentRequirements { get; }
 
         public ShaderEntryPointReflection(
             string name,
             ShaderExecutionStage stage,
             IEnumerable<ShaderResourceBindingReflection>? resources = null,
-            ShaderThreadGroupSize? threadGroupSize = null)
+            ShaderThreadGroupSize? threadGroupSize = null,
+            IEnumerable<ShaderStageIoReflection>? stageInputs = null,
+            IEnumerable<ShaderStageIoReflection>? stageOutputs = null,
+            IEnumerable<ShaderInputAttachmentReflection>? inputAttachments = null,
+            ShaderAttachmentArtifactRequirement attachmentRequirements =
+                ShaderAttachmentArtifactRequirement.None)
         {
             if (string.IsNullOrWhiteSpace(name))
             {
@@ -327,10 +340,108 @@ namespace SharpShader.Compilation
             }
 
             Array.Sort(copy, CompareResources);
+            ShaderStageIoReflection[] inputCopy = MaterializeStageIo(
+                stageInputs,
+                ShaderStageIoDirection.Input,
+                nameof(stageInputs));
+            ShaderStageIoReflection[] outputCopy = MaterializeStageIo(
+                stageOutputs,
+                ShaderStageIoDirection.Output,
+                nameof(stageOutputs));
+            ShaderInputAttachmentReflection[] inputAttachmentCopy =
+                inputAttachments is null
+                    ? Array.Empty<ShaderInputAttachmentReflection>()
+                    : new List<ShaderInputAttachmentReflection>(
+                        inputAttachments).ToArray();
+            Array.Sort(
+                inputAttachmentCopy,
+                static (left, right) =>
+                {
+                    int index = left.InputAttachmentIndex.CompareTo(
+                        right.InputAttachmentIndex);
+                    return index != 0
+                        ? index
+                        : string.CompareOrdinal(left.Name, right.Name);
+                });
+            for (int index = 0; index < inputAttachmentCopy.Length; ++index)
+            {
+                ArgumentNullException.ThrowIfNull(inputAttachmentCopy[index]);
+                if (index > 0
+                    && inputAttachmentCopy[index - 1].InputAttachmentIndex
+                        == inputAttachmentCopy[index].InputAttachmentIndex)
+                {
+                    throw new ArgumentException(
+                        $"Entry point contains duplicate input attachment index "
+                        + $"{inputAttachmentCopy[index].InputAttachmentIndex}.",
+                        nameof(inputAttachments));
+                }
+            }
+
+            const ShaderAttachmentArtifactRequirement knownRequirements =
+                ShaderAttachmentArtifactRequirement.RasterOrderedViews |
+                ShaderAttachmentArtifactRequirement.StencilReferenceExport |
+                ShaderAttachmentArtifactRequirement.FramebufferLocalRead |
+                ShaderAttachmentArtifactRequirement.OrderedPixelFragmentInterlock |
+                ShaderAttachmentArtifactRequirement.UnorderedFragmentInterlock |
+                ShaderAttachmentArtifactRequirement.SampleOrderedFragmentInterlock |
+                ShaderAttachmentArtifactRequirement.ShadingRateOrderedFragmentInterlock;
+            if ((attachmentRequirements & ~knownRequirements) != 0)
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(attachmentRequirements),
+                    attachmentRequirements,
+                    "Attachment artifact requirements contain unknown flags.");
+            }
+
+            if (stage != ShaderExecutionStage.Pixel
+                && (inputAttachmentCopy.Length != 0
+                    || attachmentRequirements
+                        != ShaderAttachmentArtifactRequirement.None))
+            {
+                throw new ArgumentException(
+                    "Only pixel shader entries may declare attachment-specific reflection.");
+            }
+
             Name = name;
             Stage = stage;
             ThreadGroupSize = threadGroupSize;
             m_Resources = Array.AsReadOnly(copy);
+            m_StageInputs = Array.AsReadOnly(inputCopy);
+            m_StageOutputs = Array.AsReadOnly(outputCopy);
+            m_InputAttachments = Array.AsReadOnly(inputAttachmentCopy);
+            AttachmentRequirements = attachmentRequirements;
+        }
+
+        private static ShaderStageIoReflection[] MaterializeStageIo(
+            IEnumerable<ShaderStageIoReflection>? values,
+            ShaderStageIoDirection expectedDirection,
+            string parameterName)
+        {
+            ShaderStageIoReflection[] copy = values is null
+                ? Array.Empty<ShaderStageIoReflection>()
+                : new List<ShaderStageIoReflection>(values).ToArray();
+            Array.Sort(copy, CompareStageIo);
+            for (int index = 0; index < copy.Length; ++index)
+            {
+                ArgumentNullException.ThrowIfNull(copy[index]);
+                if (copy[index].Direction != expectedDirection)
+                {
+                    throw new ArgumentException(
+                        $"Stage I/O {copy[index].Name} has direction "
+                        + $"{copy[index].Direction}; expected {expectedDirection}.",
+                        parameterName);
+                }
+
+                if (index > 0
+                    && HaveSameStageIoLocation(copy[index - 1], copy[index]))
+                {
+                    throw new ArgumentException(
+                        "Entry point contains duplicate stage I/O locations.",
+                        parameterName);
+                }
+            }
+
+            return copy;
         }
 
         private static int CompareResources(
@@ -379,13 +490,55 @@ namespace SharpShader.Compilation
                 : left.PhysicalLocation.Namespace.CompareTo(right.PhysicalLocation.Namespace);
         }
 
+        private static int CompareStageIo(
+            ShaderStageIoReflection left,
+            ShaderStageIoReflection right)
+        {
+            int builtIn = left.BuiltIn.CompareTo(right.BuiltIn);
+            if (builtIn != 0)
+            {
+                return builtIn;
+            }
+
+            int location = Nullable.Compare(left.Location, right.Location);
+            if (location != 0)
+            {
+                return location;
+            }
+
+            int index = left.Index.CompareTo(right.Index);
+            if (index != 0)
+            {
+                return index;
+            }
+
+            int component = left.Component.CompareTo(right.Component);
+            return component != 0
+                ? component
+                : string.CompareOrdinal(left.Name, right.Name);
+        }
+
+        private static bool HaveSameStageIoLocation(
+            ShaderStageIoReflection left,
+            ShaderStageIoReflection right)
+        {
+            return left.BuiltIn == right.BuiltIn
+                && left.Location == right.Location
+                && left.Index == right.Index
+                && left.Component == right.Component;
+        }
+
         public bool Equals(ShaderEntryPointReflection? other)
         {
             if (other is null
                 || !string.Equals(Name, other.Name, StringComparison.Ordinal)
                 || Stage != other.Stage
                 || ThreadGroupSize != other.ThreadGroupSize
-                || m_Resources.Count != other.m_Resources.Count)
+                || AttachmentRequirements != other.AttachmentRequirements
+                || m_Resources.Count != other.m_Resources.Count
+                || m_StageInputs.Count != other.m_StageInputs.Count
+                || m_StageOutputs.Count != other.m_StageOutputs.Count
+                || m_InputAttachments.Count != other.m_InputAttachments.Count)
             {
                 return false;
             }
@@ -393,6 +546,30 @@ namespace SharpShader.Compilation
             for (int index = 0; index < m_Resources.Count; ++index)
             {
                 if (!m_Resources[index].Equals(other.m_Resources[index]))
+                {
+                    return false;
+                }
+            }
+
+            for (int index = 0; index < m_StageInputs.Count; ++index)
+            {
+                if (!m_StageInputs[index].Equals(other.m_StageInputs[index]))
+                {
+                    return false;
+                }
+            }
+
+            for (int index = 0; index < m_StageOutputs.Count; ++index)
+            {
+                if (!m_StageOutputs[index].Equals(other.m_StageOutputs[index]))
+                {
+                    return false;
+                }
+            }
+
+            for (int index = 0; index < m_InputAttachments.Count; ++index)
+            {
+                if (!m_InputAttachments[index].Equals(other.m_InputAttachments[index]))
                 {
                     return false;
                 }
@@ -409,9 +586,25 @@ namespace SharpShader.Compilation
             hash.Add(Name, StringComparer.Ordinal);
             hash.Add(Stage);
             hash.Add(ThreadGroupSize);
+            hash.Add(AttachmentRequirements);
             foreach (ShaderResourceBindingReflection resource in m_Resources)
             {
                 hash.Add(resource);
+            }
+
+            foreach (ShaderStageIoReflection stageInput in m_StageInputs)
+            {
+                hash.Add(stageInput);
+            }
+
+            foreach (ShaderStageIoReflection stageOutput in m_StageOutputs)
+            {
+                hash.Add(stageOutput);
+            }
+
+            foreach (ShaderInputAttachmentReflection inputAttachment in m_InputAttachments)
+            {
+                hash.Add(inputAttachment);
             }
 
             return hash.ToHashCode();
@@ -420,7 +613,7 @@ namespace SharpShader.Compilation
 
     public sealed class ShaderArtifactReflection : IEquatable<ShaderArtifactReflection>
     {
-        public const uint CurrentSchemaVersion = 1;
+        public const uint CurrentSchemaVersion = 2;
 
         private readonly ReadOnlyCollection<ShaderEntryPointReflection> m_EntryPoints;
 
@@ -438,9 +631,12 @@ namespace SharpShader.Compilation
                 throw new ArgumentOutOfRangeException(nameof(artifactKind), artifactKind, "Shader artifact kind is not defined.");
             }
 
-            if (schemaVersion == 0)
+            if (schemaVersion != CurrentSchemaVersion)
             {
-                throw new ArgumentOutOfRangeException(nameof(schemaVersion), "Reflection schema version must be greater than zero.");
+                throw new ArgumentOutOfRangeException(
+                    nameof(schemaVersion),
+                    schemaVersion,
+                    $"Reflection schema version must be exactly {CurrentSchemaVersion}.");
             }
 
             ArgumentNullException.ThrowIfNull(entryPoints);

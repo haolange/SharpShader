@@ -39,12 +39,39 @@ namespace SharpShader.ShaderLab
                 shaderLab.Tags[tag.Key] = tag.Value;
             }
 
+            HashSet<int> claimedAttachmentBlocks = new();
             foreach (ShaderLabParsedPass parsedPass in parsed.Passes)
             {
                 ShaderLabPass pass = new ShaderLabPass();
                 foreach (ShaderLabParsedTag tag in parsedPass.Tags)
                 {
                     pass.Tags[tag.Key] = tag.Value;
+                }
+
+                ShaderLabExtractedAttachmentBlock? attachmentBlock = null;
+                for (int blockIndex = 0;
+                     blockIndex < preprocessed.AttachmentBlocks.Count;
+                     ++blockIndex)
+                {
+                    ShaderLabExtractedAttachmentBlock candidate =
+                        preprocessed.AttachmentBlocks[blockIndex];
+                    if (candidate.StartIndex < parsedPass.SourceStartIndex
+                        || candidate.EndIndex > parsedPass.SourceEndIndex)
+                    {
+                        continue;
+                    }
+
+                    if (attachmentBlock is not null)
+                    {
+                        throw new ShaderLabParseException(
+                            candidate.Line,
+                            candidate.Column,
+                            "A ShaderLab Pass may contain only one "
+                            + "AttachmentInterface block.");
+                    }
+
+                    attachmentBlock = candidate;
+                    claimedAttachmentBlocks.Add(blockIndex);
                 }
 
                 if (!string.IsNullOrWhiteSpace(parsedPass.HlslPlaceholder))
@@ -57,8 +84,35 @@ namespace SharpShader.ShaderLab
                     pass.Program = ParseProgram(programSource ?? string.Empty);
                 }
 
+                if (attachmentBlock is not null)
+                {
+                    pass.Program.AttachmentPhase =
+                        ShaderLabAttachmentInterfaceParser.Parse(attachmentBlock);
+                }
+
                 pass.State = ParseRenderState(parsedPass.StateSource, parsedPass.StencilBlockContent);
                 shaderLab.Passes.Add(pass);
+            }
+
+            if (claimedAttachmentBlocks.Count
+                != preprocessed.AttachmentBlocks.Count)
+            {
+                for (int blockIndex = 0;
+                     blockIndex < preprocessed.AttachmentBlocks.Count;
+                     ++blockIndex)
+                {
+                    if (claimedAttachmentBlocks.Contains(blockIndex))
+                    {
+                        continue;
+                    }
+
+                    ShaderLabExtractedAttachmentBlock unclaimed =
+                        preprocessed.AttachmentBlocks[blockIndex];
+                    throw new ShaderLabParseException(
+                        unclaimed.Line,
+                        unclaimed.Column,
+                        "AttachmentInterface is valid only inside a ShaderLab Pass.");
+                }
             }
 
             return shaderLab;

@@ -11,15 +11,18 @@ namespace SharpShader.Compilation.Internal
         public string? SourceDigest { get; set; }
 
         [JsonPropertyOrder(2)]
-        public ShaderToolchainComponentDocument[]? Toolchain { get; set; }
+        public string[]? Targets { get; set; }
 
         [JsonPropertyOrder(3)]
-        public ShaderInterfaceLayoutDocument[]? Layouts { get; set; }
+        public ShaderToolchainComponentDocument[]? Toolchain { get; set; }
 
         [JsonPropertyOrder(4)]
-        public ShaderInterfaceVariantDocument[]? Variants { get; set; }
+        public ShaderInterfaceLayoutDocument[]? Layouts { get; set; }
 
         [JsonPropertyOrder(5)]
+        public ShaderInterfaceVariantDocument[]? Variants { get; set; }
+
+        [JsonPropertyOrder(6)]
         public ShaderBackendLayoutsDocument[]? BackendLayouts { get; set; }
     }
 
@@ -197,7 +200,85 @@ namespace SharpShader.Compilation.Internal
         public string? LogicalLayoutSignature { get; set; }
 
         [JsonPropertyOrder(3)]
+        public ShaderAttachmentInterfaceDocument? AttachmentInterface { get; set; }
+
+        [JsonPropertyOrder(4)]
         public ShaderArtifactIdentityDocument[]? Artifacts { get; set; }
+    }
+
+    internal sealed class ShaderAttachmentInterfaceDocument
+    {
+        [JsonPropertyOrder(0)]
+        public uint? AbiRevision { get; set; }
+
+        [JsonPropertyOrder(1)]
+        public string? VariantKey { get; set; }
+
+        [JsonPropertyOrder(2)]
+        public string? EntryPoint { get; set; }
+
+        [JsonPropertyOrder(3)]
+        public string? Stage { get; set; }
+
+        [JsonPropertyOrder(4)]
+        public ShaderAttachmentPhaseDocument? Phase { get; set; }
+    }
+
+    internal sealed class ShaderAttachmentPhaseDocument
+    {
+        [JsonPropertyOrder(0)]
+        public uint? Phase { get; set; }
+
+        [JsonPropertyOrder(1)]
+        public string? DepthStencilAccess { get; set; }
+
+        [JsonPropertyOrder(2)]
+        public string? DepthExport { get; set; }
+
+        [JsonPropertyOrder(3)]
+        public string? StencilExport { get; set; }
+
+        [JsonPropertyOrder(4)]
+        public ShaderAttachmentDeclarationDocument[]? Attachments { get; set; }
+    }
+
+    internal sealed class ShaderAttachmentDeclarationDocument
+    {
+        [JsonPropertyOrder(0)]
+        public uint? LogicalAttachmentId { get; set; }
+
+        [JsonPropertyOrder(1)]
+        public uint? InputIndex { get; set; }
+
+        [JsonPropertyOrder(2)]
+        public uint? OutputLocation { get; set; }
+
+        [JsonPropertyOrder(3)]
+        public uint? OutputIndex { get; set; }
+
+        [JsonPropertyOrder(4)]
+        public uint? OutputComponent { get; set; }
+
+        [JsonPropertyOrder(5)]
+        public string[]? Aspects { get; set; }
+
+        [JsonPropertyOrder(6)]
+        public string? NumericClass { get; set; }
+
+        [JsonPropertyOrder(7)]
+        public string? SampleMode { get; set; }
+
+        [JsonPropertyOrder(8)]
+        public string? LayerMode { get; set; }
+
+        [JsonPropertyOrder(9)]
+        public string? Ordering { get; set; }
+
+        [JsonPropertyOrder(10)]
+        public string? Feedback { get; set; }
+
+        [JsonPropertyOrder(11)]
+        public ShaderBindingKeyDocument? SampledFeedbackBinding { get; set; }
     }
 
     internal sealed class ShaderArtifactIdentityDocument

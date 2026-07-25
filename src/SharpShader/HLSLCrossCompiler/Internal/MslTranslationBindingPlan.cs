@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using SharpShader.Compilation;
+using SharpShader.Compilation.Internal;
 
 namespace SharpShader.HLSLCrossCompiler.Internal
 {
@@ -19,6 +20,7 @@ namespace SharpShader.HLSLCrossCompiler.Internal
         public ShaderPhysicalBindingNamespace MetalNamespace { get; }
         public uint MetalIndex { get; }
         public uint ResourceCount { get; }
+        public bool IsPrivateAttachment { get; }
 
         public MslTranslationResourceBinding(
             ShaderBindingKey logicalBinding,
@@ -27,7 +29,8 @@ namespace SharpShader.HLSLCrossCompiler.Internal
             VulkanDescriptorKind descriptorKind,
             ShaderPhysicalBindingNamespace metalNamespace,
             uint metalIndex,
-            uint resourceCount)
+            uint resourceCount,
+            bool isPrivateAttachment = false)
         {
             LogicalBinding = logicalBinding;
             DescriptorSet = descriptorSet;
@@ -36,6 +39,7 @@ namespace SharpShader.HLSLCrossCompiler.Internal
             MetalNamespace = metalNamespace;
             MetalIndex = metalIndex;
             ResourceCount = resourceCount;
+            IsPrivateAttachment = isPrivateAttachment;
         }
     }
 
@@ -53,36 +57,82 @@ namespace SharpShader.HLSLCrossCompiler.Internal
         }
     }
 
+    internal readonly struct MslTranslationShaderOutput
+    {
+        public uint Location { get; }
+        public uint LogicalAttachmentId { get; }
+        public uint ComponentCount { get; }
+        public ShaderAttachmentNumericClass NumericClass { get; }
+
+        public MslTranslationShaderOutput(
+            uint location,
+            uint logicalAttachmentId,
+            uint componentCount,
+            ShaderAttachmentNumericClass numericClass)
+        {
+            Location = location;
+            LogicalAttachmentId = logicalAttachmentId;
+            ComponentCount = componentCount;
+            NumericClass = numericClass;
+        }
+    }
+
     internal sealed class MslTranslationBindingPlan
     {
         private readonly MslTranslationResourceBinding[] m_Resources;
         private readonly MslTranslationArgumentBufferBinding[] m_ArgumentBuffers;
+        private readonly MslTranslationShaderOutput[] m_ShaderOutputs;
 
         public string EntryPoint { get; }
         public ShaderExecutionStage Stage { get; }
         public MslTranslationBindingMode Mode { get; }
         public IReadOnlyList<MslTranslationResourceBinding> Resources => m_Resources;
         public IReadOnlyList<MslTranslationArgumentBufferBinding> ArgumentBuffers => m_ArgumentBuffers;
+        public IReadOnlyList<MslTranslationShaderOutput> ShaderOutputs => m_ShaderOutputs;
+        public uint PrivateAttachmentDescriptorSet { get; }
+        public bool HasPrivateAttachments { get; }
+        public bool UsesFramebufferFetch { get; }
+        public bool UsesRasterOrderGroups { get; }
+        public ShaderDepthExport DepthExport { get; }
+        public ShaderStencilExport StencilExport { get; }
 
         private MslTranslationBindingPlan(
             string entryPoint,
             ShaderExecutionStage stage,
             MslTranslationBindingMode mode,
             MslTranslationResourceBinding[] resources,
-            MslTranslationArgumentBufferBinding[] argumentBuffers)
+            MslTranslationArgumentBufferBinding[] argumentBuffers,
+            MslTranslationShaderOutput[] shaderOutputs,
+            uint privateAttachmentDescriptorSet,
+            bool hasPrivateAttachments,
+            bool usesFramebufferFetch,
+            bool usesRasterOrderGroups,
+            ShaderDepthExport depthExport,
+            ShaderStencilExport stencilExport)
         {
             EntryPoint = entryPoint;
             Stage = stage;
             Mode = mode;
             m_Resources = resources;
             m_ArgumentBuffers = argumentBuffers;
+            m_ShaderOutputs = shaderOutputs;
+            PrivateAttachmentDescriptorSet = privateAttachmentDescriptorSet;
+            HasPrivateAttachments = hasPrivateAttachments;
+            UsesFramebufferFetch = usesFramebufferFetch;
+            UsesRasterOrderGroups = usesRasterOrderGroups;
+            DepthExport = depthExport;
+            StencilExport = stencilExport;
         }
 
         public static MslTranslationBindingPlan Create(
             string entryPoint,
             ShaderExecutionStage stage,
             IReadOnlyList<VulkanShaderBindingMapping> vulkanBindings,
-            MetalShaderBackendLayout metalLayout)
+            MetalShaderBackendLayout metalLayout,
+            ShaderAttachmentInterface attachmentInterface,
+            ShaderEntryPointReflection postRemapSpirvReflection,
+            uint privateAttachmentDescriptorSet,
+            uint privateMetalTextureBase)
         {
             if (string.IsNullOrWhiteSpace(entryPoint))
             {
@@ -96,6 +146,22 @@ namespace SharpShader.HLSLCrossCompiler.Internal
 
             ArgumentNullException.ThrowIfNull(vulkanBindings);
             ArgumentNullException.ThrowIfNull(metalLayout);
+            ArgumentNullException.ThrowIfNull(attachmentInterface);
+            ArgumentNullException.ThrowIfNull(postRemapSpirvReflection);
+            if (!string.Equals(
+                    attachmentInterface.EntryPoint,
+                    entryPoint,
+                    StringComparison.Ordinal)
+                || attachmentInterface.Stage != stage
+                || !string.Equals(
+                    postRemapSpirvReflection.Name,
+                    entryPoint,
+                    StringComparison.Ordinal)
+                || postRemapSpirvReflection.Stage != stage)
+            {
+                throw Failure(
+                    "MSL attachment contract, reflection, and translation entry identity do not match.");
+            }
 
             bool hasDirectBindings = metalLayout.DirectBindings.Count != 0;
             bool hasReferenceBindings = metalLayout.ReferenceBufferBindings.Count != 0;
@@ -138,6 +204,9 @@ namespace SharpShader.HLSLCrossCompiler.Internal
 
             List<MslTranslationResourceBinding> resources = new(metalBindingCount);
             List<MslTranslationArgumentBufferBinding> argumentBuffers = new();
+            List<MslTranslationShaderOutput> shaderOutputs = new();
+            bool usesFramebufferFetch = false;
+            bool usesRasterOrderGroups = false;
             if (mode == MslTranslationBindingMode.Direct)
             {
                 AddDirectBindings(
@@ -163,6 +232,17 @@ namespace SharpShader.HLSLCrossCompiler.Internal
                 }
             }
 
+            AddAttachmentBindings(
+                attachmentInterface,
+                postRemapSpirvReflection,
+                privateAttachmentDescriptorSet,
+                privateMetalTextureBase,
+                physicalVulkanBindings,
+                resources,
+                shaderOutputs,
+                out usesFramebufferFetch,
+                out usesRasterOrderGroups);
+
             resources.Sort(static (left, right) =>
             {
                 int descriptorSet = left.DescriptorSet.CompareTo(right.DescriptorSet);
@@ -172,13 +252,172 @@ namespace SharpShader.HLSLCrossCompiler.Internal
             });
             argumentBuffers.Sort(static (left, right) =>
                 left.DescriptorSet.CompareTo(right.DescriptorSet));
+            shaderOutputs.Sort(static (left, right) =>
+                left.Location.CompareTo(right.Location));
 
             return new MslTranslationBindingPlan(
                 entryPoint,
                 stage,
                 mode,
                 resources.ToArray(),
-                argumentBuffers.ToArray());
+                argumentBuffers.ToArray(),
+                shaderOutputs.ToArray(),
+                privateAttachmentDescriptorSet,
+                resources.Exists(static resource => resource.IsPrivateAttachment),
+                usesFramebufferFetch,
+                usesRasterOrderGroups,
+                attachmentInterface.Phase?.DepthExport
+                    ?? ShaderDepthExport.None,
+                attachmentInterface.Phase?.StencilExport
+                    ?? ShaderStencilExport.None);
+        }
+
+        private static void AddAttachmentBindings(
+            ShaderAttachmentInterface attachmentInterface,
+            ShaderEntryPointReflection reflection,
+            uint privateDescriptorSet,
+            uint privateMetalTextureBase,
+            HashSet<(uint Set, uint Binding)> physicalVulkanBindings,
+            List<MslTranslationResourceBinding> resources,
+            List<MslTranslationShaderOutput> shaderOutputs,
+            out bool usesFramebufferFetch,
+            out bool usesRasterOrderGroups)
+        {
+            usesFramebufferFetch = false;
+            usesRasterOrderGroups = false;
+            ShaderAttachmentPhase? phase = attachmentInterface.Phase;
+            if (phase is null)
+            {
+                return;
+            }
+
+            Dictionary<(uint Location, uint Index), ShaderStageIoReflection> reflectedOutputs =
+                new();
+            foreach (ShaderStageIoReflection output in reflection.StageOutputs)
+            {
+                if (output.BuiltIn == ShaderStageIoBuiltIn.None
+                    && output.Location.HasValue
+                    && !reflectedOutputs.TryAdd(
+                        (output.Location.Value, output.Index),
+                        output))
+                {
+                    throw Failure(
+                        $"SPIR-V has duplicate color outputs at location/index "
+                        + $"{output.Location.Value}/{output.Index}.");
+                }
+            }
+
+            Dictionary<uint, uint> primaryOutputs = new();
+            HashSet<uint> outputLocations = new();
+            HashSet<uint> localInputIndices = new();
+            HashSet<uint> rasterOrderedLogicalIds = new();
+            foreach (ShaderAttachmentDeclaration attachment in phase.Attachments)
+            {
+                if (attachment.OutputLocation.HasValue
+                    && attachment.OutputIndex == 0)
+                {
+                    uint location = attachment.OutputLocation.Value;
+                    if (!primaryOutputs.TryAdd(
+                            location,
+                            attachment.LogicalAttachmentId))
+                    {
+                        throw Failure(
+                            $"MSL output location {location} has more than one primary "
+                            + "logical attachment.");
+                    }
+
+                    if (!reflectedOutputs.TryGetValue(
+                            (location, 0),
+                            out ShaderStageIoReflection? reflectedOutput))
+                    {
+                        throw Failure(
+                            $"SPIR-V is missing primary output location {location} "
+                            + "required by the Metal attachment strategy.");
+                    }
+
+                    shaderOutputs.Add(new MslTranslationShaderOutput(
+                        location,
+                        attachment.LogicalAttachmentId,
+                        reflectedOutput.ComponentCount,
+                        attachment.NumericClass));
+                    outputLocations.Add(location);
+                }
+
+                if (attachment.Ordering == ShaderAttachmentOrdering.RasterOrdered)
+                {
+                    if (!rasterOrderedLogicalIds.Add(attachment.LogicalAttachmentId))
+                    {
+                        continue;
+                    }
+
+                    uint binding = checked(
+                        SpirvBindingRemapper.RasterOrderedBindingBase
+                        + attachment.LogicalAttachmentId);
+                    if (!physicalVulkanBindings.Add((privateDescriptorSet, binding)))
+                    {
+                        throw Failure(
+                            $"Private raster-ordered attachment collides at Vulkan "
+                            + $"set={privateDescriptorSet}, binding={binding}.");
+                    }
+
+                    uint metalTextureIndex = checked(
+                        privateMetalTextureBase
+                        + attachment.LogicalAttachmentId);
+                    resources.Add(new MslTranslationResourceBinding(
+                        new ShaderBindingKey(
+                            ShaderAttachmentDeclaration.ReservedAttachmentBindingTable,
+                            attachment.LogicalAttachmentId,
+                            ShaderBindingClass.UnorderedAccess),
+                        privateDescriptorSet,
+                        binding,
+                        VulkanDescriptorKind.StorageImage,
+                        ShaderPhysicalBindingNamespace.Texture,
+                        metalTextureIndex,
+                        resourceCount: 1,
+                        isPrivateAttachment: true));
+                    usesRasterOrderGroups = true;
+                    continue;
+                }
+
+                if (!attachment.InputIndex.HasValue
+                    || !localInputIndices.Add(attachment.InputIndex.Value))
+                {
+                    continue;
+                }
+
+                uint inputIndex = attachment.InputIndex.Value;
+
+                if (!physicalVulkanBindings.Add((privateDescriptorSet, inputIndex)))
+                {
+                    throw Failure(
+                        $"Private input attachment collides at Vulkan set="
+                        + $"{privateDescriptorSet}, binding={inputIndex}.");
+                }
+
+                resources.Add(new MslTranslationResourceBinding(
+                    new ShaderBindingKey(
+                        ShaderAttachmentDeclaration.ReservedAttachmentBindingTable,
+                        inputIndex,
+                        ShaderBindingClass.ShaderResource),
+                    privateDescriptorSet,
+                    inputIndex,
+                    VulkanDescriptorKind.InputAttachment,
+                    ShaderPhysicalBindingNamespace.Texture,
+                    attachment.LogicalAttachmentId,
+                    resourceCount: 1,
+                    isPrivateAttachment: true));
+                usesFramebufferFetch = true;
+            }
+
+            foreach ((uint location, uint logicalAttachmentId) in primaryOutputs)
+            {
+                if (!outputLocations.Contains(location))
+                {
+                    throw Failure(
+                        $"Metal output mapping for logical attachment "
+                        + $"{logicalAttachmentId} at location {location} was not frozen.");
+                }
+            }
         }
 
         private static void AddDirectBindings(

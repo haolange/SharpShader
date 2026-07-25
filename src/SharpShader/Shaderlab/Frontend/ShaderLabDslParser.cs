@@ -19,6 +19,8 @@ namespace SharpShader.ShaderLab.Frontend
         public string StateSource { get; set; } = string.Empty;
         public string StencilBlockContent { get; set; } = string.Empty;
         public string HlslPlaceholder { get; set; } = string.Empty;
+        public int SourceStartIndex { get; set; }
+        public int SourceEndIndex { get; set; }
     }
 
     internal readonly struct ShaderLabParsedTag
@@ -99,7 +101,11 @@ namespace SharpShader.ShaderLab.Frontend
 
         private static ShaderLabParsedPass ParsePass(string source, ShaderLabParser.PassBlockContext passBlock)
         {
-            ShaderLabParsedPass pass = new ShaderLabParsedPass();
+            ShaderLabParsedPass pass = new ShaderLabParsedPass
+            {
+                SourceStartIndex = passBlock.Start.StartIndex,
+                SourceEndIndex = passBlock.Stop.StopIndex,
+            };
             List<string> stateSegments = new List<string>();
 
             foreach (ShaderLabParser.PassElementContext element in passBlock.passElement())
