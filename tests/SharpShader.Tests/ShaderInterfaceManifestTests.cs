@@ -68,7 +68,8 @@ namespace Infinity.Rendering.Tests
                 CreateToolchain(),
                 new[] { first, second },
                 new[] { CreateVariant(forcedSignature) },
-                new[] { CreateBackendLayouts(first) }));
+                new[] { CreateBackendLayouts(first) },
+                ShaderProgramTarget.All));
         }
 
         [Fact]
@@ -87,12 +88,13 @@ namespace Infinity.Rendering.Tests
             Assert.Equal(
                 canonicalJson,
                 ShaderInterfaceManifestSerializer.Serialize(roundTrip));
-            Assert.Contains("\"schemaVersion\":1", canonicalJson, StringComparison.Ordinal);
+            Assert.Contains("\"schemaVersion\":2", canonicalJson, StringComparison.Ordinal);
             Assert.Contains("\"logicalLayoutSignature\"", canonicalJson, StringComparison.Ordinal);
             Assert.Contains("\"referenceBufferBindings\":[]", canonicalJson, StringComparison.Ordinal);
         }
 
         [Theory]
+        [Trait("Category", "SharpShaderAttachment")]
         [InlineData("unknown")]
         [InlineData("duplicate")]
         [InlineData("missing")]
@@ -108,20 +110,20 @@ namespace Infinity.Rendering.Tests
             string mutated = mutation switch
             {
                 "unknown" => json.Replace(
-                    "{\"schemaVersion\":1,",
-                    "{\"schemaVersion\":1,\"unexpected\":true,",
+                    "{\"schemaVersion\":2,",
+                    "{\"schemaVersion\":2,\"unexpected\":true,",
                     StringComparison.Ordinal),
                 "duplicate" => json.Replace(
-                    "{\"schemaVersion\":1,",
-                    "{\"schemaVersion\":1,\"schemaVersion\":1,",
+                    "{\"schemaVersion\":2,",
+                    "{\"schemaVersion\":2,\"schemaVersion\":2,",
                     StringComparison.Ordinal),
                 "missing" => json.Replace(
                     $"\"sourceDigest\":\"{SourceDigest}\",",
                     string.Empty,
                     StringComparison.Ordinal),
                 "schema" => json.Replace(
-                    "\"schemaVersion\":1",
                     "\"schemaVersion\":2",
+                    "\"schemaVersion\":1",
                     StringComparison.Ordinal),
                 "numericEnum" => json.Replace(
                     "\"stage\":\"Pixel\"",
@@ -263,6 +265,75 @@ namespace Infinity.Rendering.Tests
             Assert.Throws<ArgumentException>(() => new ShaderInterfaceLayout(new[] { array, overlap }));
         }
 
+        [Fact]
+        [Trait("Category", "SharpShaderAttachment")]
+        public void Manifest_ShouldRequireExactArtifactCoverageForEveryEntry()
+        {
+            ShaderInterfaceLayout layout = CreateLayout();
+            ShaderBackendLayouts backends = CreateBackendLayouts(layout);
+
+            Assert.Throws<ArgumentException>(() => CreateCoverageManifest(
+                ShaderProgramTarget.DirectX12 | ShaderProgramTarget.Vulkan,
+                CreateCoverageEntry("MissingSpirV", ShaderArtifactKind.Dxil)));
+            Assert.Throws<ArgumentException>(() => CreateCoverageManifest(
+                ShaderProgramTarget.DirectX12,
+                CreateCoverageEntry(
+                    "ExtraSpirV",
+                    ShaderArtifactKind.Dxil,
+                    ShaderArtifactKind.SpirV)));
+            Assert.Throws<ArgumentException>(() => CreateCoverageManifest(
+                ShaderProgramTarget.DirectX12 | ShaderProgramTarget.Vulkan,
+                CreateCoverageEntry(
+                    "CompleteEntry",
+                    ShaderArtifactKind.Dxil,
+                    ShaderArtifactKind.SpirV),
+                CreateCoverageEntry(
+                    "IncompleteSibling",
+                    ShaderArtifactKind.Dxil)));
+
+            ShaderInterfaceManifest CreateCoverageManifest(
+                ShaderProgramTarget targets,
+                params ShaderInterfaceEntry[] entries)
+            {
+                return new ShaderInterfaceManifest(
+                    SourceDigest,
+                    CreateToolchain(),
+                    new[] { layout },
+                    new[]
+                    {
+                        new ShaderInterfaceVariant(
+                            "coverage",
+                            defines: null,
+                            entries),
+                    },
+                    new[] { backends },
+                    targets);
+            }
+
+            ShaderInterfaceEntry CreateCoverageEntry(
+                string name,
+                params ShaderArtifactKind[] artifactKinds)
+            {
+                ShaderArtifactIdentity[] artifacts = artifactKinds
+                    .Select((kind, artifactIndex) =>
+                        new ShaderArtifactIdentity(
+                            kind,
+                            ArtifactDigest,
+                            byteLength: (ulong)(artifactIndex + 1),
+                            artifactName:
+                                $"{name}.{kind.ToString().ToLowerInvariant()}"))
+                    .ToArray();
+                return new ShaderInterfaceEntry(
+                    name,
+                    ShaderExecutionStage.Compute,
+                    layout.Signature,
+                    new ShaderAttachmentInterface(
+                        "coverage",
+                        name,
+                        ShaderExecutionStage.Compute),
+                    artifacts);
+            }
+        }
         private static ShaderInterfaceManifest CreateManifest(bool reverseInputs = false)
         {
             ShaderInterfaceLayout layout = CreateLayout(reverseInputs);
@@ -286,7 +357,8 @@ namespace Infinity.Rendering.Tests
                 toolchain,
                 new[] { layout },
                 new[] { variant },
-                new[] { backendLayouts });
+                new[] { backendLayouts },
+                ShaderProgramTarget.All);
         }
 
         private static ShaderInterfaceLayout CreateLayout(
@@ -324,7 +396,7 @@ namespace Infinity.Rendering.Tests
             {
                 new ShaderArtifactIdentity(ShaderArtifactKind.Dxil, ArtifactDigest, 128, "shader.dxil"),
                 new ShaderArtifactIdentity(ShaderArtifactKind.SpirV, ArtifactDigest, 256, "shader.spv"),
-                new ShaderArtifactIdentity(ShaderArtifactKind.MetalLibrary, ArtifactDigest, 512, "shader.metallib"),
+                new ShaderArtifactIdentity(ShaderArtifactKind.MslSource, ArtifactDigest, 512, "shader.metal"),
             };
             string[] defines = { "QUALITY=HIGH", "USE_FOG=1" };
             if (reverseInputs)
@@ -342,6 +414,11 @@ namespace Infinity.Rendering.Tests
                         "MainPS",
                         ShaderExecutionStage.Pixel,
                         signature,
+                        new ShaderAttachmentInterface(
+                            "quality-high",
+                            "MainPS",
+                            ShaderExecutionStage.Pixel,
+                            new ShaderAttachmentPhase(0)),
                         artifacts),
                 });
         }

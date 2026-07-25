@@ -320,6 +320,22 @@ namespace Infinity.Rendering.Tests
                 new[] { entry }));
         }
 
+        [Theory]
+        [InlineData(0u)]
+        [InlineData(1u)]
+        [InlineData(3u)]
+        public void ArtifactReflection_ShouldRejectNonCurrentSchema(uint schemaVersion)
+        {
+            ShaderEntryPointReflection entry = new(
+                "MainPS",
+                ShaderExecutionStage.Pixel);
+
+            Assert.Throws<ArgumentOutOfRangeException>(() =>
+                new ShaderArtifactReflection(
+                    ShaderArtifactKind.Dxil,
+                    new[] { entry },
+                    schemaVersion));
+        }
         [Fact]
         public void EntryPoint_ShouldRejectDuplicateLogicalBindings()
         {

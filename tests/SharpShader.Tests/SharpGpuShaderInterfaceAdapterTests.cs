@@ -386,6 +386,11 @@ namespace Infinity.Rendering.Tests
 
         private sealed class TrackingArgumentTableLayout : RHIArgumentTableLayout
         {
+            public TrackingArgumentTableLayout()
+                : base(new RHIArgumentTableLayoutDescriptor())
+            {
+            }
+
             public int ReleaseCount { get; private set; }
 
             protected override void Release()
