@@ -127,7 +127,7 @@ namespace SharpShader.Compilation
 
                 mappings[index] = new MetalDirectBindingMapping(
                     binding.Key,
-                    MetalShaderBackendLayout.RootArgumentTable,
+                    MetalShaderBackendLayout.RootBindingTable,
                     bindingNamespace,
                     physicalIndex);
 
@@ -177,7 +177,7 @@ namespace SharpShader.Compilation
                 uint referenceCount = ResolveReferenceCount(binding, arrayCapacities);
                 mappings[index] = new MetalReferenceBufferBindingMapping(
                     binding.Key,
-                    MetalShaderBackendLayout.RootArgumentTable,
+                    MetalShaderBackendLayout.RootBindingTable,
                     ShaderBackendLayoutSemantics.GetMetalNamespace(binding),
                     referenceBufferIndex,
                     byteOffset,

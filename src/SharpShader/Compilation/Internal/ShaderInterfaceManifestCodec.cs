@@ -573,7 +573,7 @@ namespace SharpShader.Compilation.Internal
             return new MetalDirectBindingMappingDocument
             {
                 LogicalBinding = EncodeBindingKey(mapping.LogicalBinding),
-                ArgumentTable = mapping.ArgumentTable,
+                BindingTable = mapping.BindingTable,
                 Namespace = mapping.Namespace.ToString(),
                 Index = mapping.Index,
             };
@@ -584,7 +584,7 @@ namespace SharpShader.Compilation.Internal
         {
             return new MetalDirectBindingMapping(
                 DecodeBindingKey(RequireObject(document.LogicalBinding, "metal.directBindings[].logicalBinding")),
-                RequireValue(document.ArgumentTable, "metal.directBindings[].argumentTable"),
+                RequireValue(document.BindingTable, "metal.directBindings[].bindingTable"),
                 ParseEnum<ShaderPhysicalBindingNamespace>(
                     document.Namespace,
                     "metal.directBindings[].namespace"),
@@ -597,7 +597,7 @@ namespace SharpShader.Compilation.Internal
             return new MetalReferenceBufferBindingMappingDocument
             {
                 LogicalBinding = EncodeBindingKey(mapping.LogicalBinding),
-                ArgumentTable = mapping.ArgumentTable,
+                BindingTable = mapping.BindingTable,
                 ResourceNamespace = mapping.ResourceNamespace.ToString(),
                 ReferenceBufferIndex = mapping.ReferenceBufferIndex,
                 ByteOffset = mapping.ByteOffset,
@@ -612,7 +612,7 @@ namespace SharpShader.Compilation.Internal
                 DecodeBindingKey(RequireObject(
                     document.LogicalBinding,
                     "metal.referenceBufferBindings[].logicalBinding")),
-                RequireValue(document.ArgumentTable, "metal.referenceBufferBindings[].argumentTable"),
+                RequireValue(document.BindingTable, "metal.referenceBufferBindings[].bindingTable"),
                 ParseEnum<ShaderPhysicalBindingNamespace>(
                     document.ResourceNamespace,
                     "metal.referenceBufferBindings[].resourceNamespace"),

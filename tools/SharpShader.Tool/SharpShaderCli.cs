@@ -980,7 +980,7 @@ namespace SharpShader.Tool
                     {
                         output.WriteLine(
                             $"  metal-direct {mapping.LogicalBinding} -> "
-                            + $"table={mapping.ArgumentTable},"
+                            + $"table={mapping.BindingTable},"
                             + $"namespace={mapping.Namespace},index={mapping.Index}");
                     }
 
@@ -989,7 +989,7 @@ namespace SharpShader.Tool
                     {
                         output.WriteLine(
                             $"  metal-reference {mapping.LogicalBinding} -> "
-                            + $"table={mapping.ArgumentTable},"
+                            + $"table={mapping.BindingTable},"
                             + $"buffer={mapping.ReferenceBufferIndex},"
                             + $"offset={mapping.ByteOffset},"
                             + $"count={mapping.ReferenceCount},"

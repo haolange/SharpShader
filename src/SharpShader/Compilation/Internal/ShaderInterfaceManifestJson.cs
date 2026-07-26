@@ -368,7 +368,7 @@ namespace SharpShader.Compilation.Internal
         public ShaderBindingKeyDocument? LogicalBinding { get; set; }
 
         [JsonPropertyOrder(1)]
-        public uint? ArgumentTable { get; set; }
+        public uint? BindingTable { get; set; }
 
         [JsonPropertyOrder(2)]
         public string? Namespace { get; set; }
@@ -383,7 +383,7 @@ namespace SharpShader.Compilation.Internal
         public ShaderBindingKeyDocument? LogicalBinding { get; set; }
 
         [JsonPropertyOrder(1)]
-        public uint? ArgumentTable { get; set; }
+        public uint? BindingTable { get; set; }
 
         [JsonPropertyOrder(2)]
         public string? ResourceNamespace { get; set; }

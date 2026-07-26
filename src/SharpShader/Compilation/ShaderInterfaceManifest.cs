@@ -810,10 +810,10 @@ namespace SharpShader.Compilation
                     uint expectedIndex = nextDirectIndex.TryGetValue(expectedNamespace, out uint nextIndex)
                         ? nextIndex
                         : 0;
-                    if (mapping.ArgumentTable != MetalShaderBackendLayout.RootArgumentTable || mapping.Index != expectedIndex)
+                    if (mapping.BindingTable != MetalShaderBackendLayout.RootBindingTable || mapping.Index != expectedIndex)
                     {
                         throw new ArgumentException(
-                            $"Metal direct binding {mapping.LogicalBinding} must map to dense physical argument table {MetalShaderBackendLayout.RootArgumentTable}, {expectedNamespace} index {expectedIndex}.");
+                            $"Metal direct binding {mapping.LogicalBinding} must map to dense physical binding table {MetalShaderBackendLayout.RootBindingTable}, {expectedNamespace} index {expectedIndex}.");
                     }
 
                     nextDirectIndex[expectedNamespace] = checked(expectedIndex + 1);
@@ -849,11 +849,11 @@ namespace SharpShader.Compilation
                         hasCurrentLogicalTable = true;
                     }
 
-                    if (mapping.ArgumentTable != MetalShaderBackendLayout.RootArgumentTable
+                    if (mapping.BindingTable != MetalShaderBackendLayout.RootBindingTable
                         || mapping.ReferenceBufferIndex != expectedReferenceBufferIndex)
                     {
                         throw new ArgumentException(
-                            $"Metal reference binding {mapping.LogicalBinding} must use root argument table {MetalShaderBackendLayout.RootArgumentTable} and dense physical root buffer slot {expectedReferenceBufferIndex}.");
+                            $"Metal reference binding {mapping.LogicalBinding} must use root binding table {MetalShaderBackendLayout.RootBindingTable} and dense physical root buffer slot {expectedReferenceBufferIndex}.");
                     }
 
                     uint? boundedCount = logical.Shape.Array.BoundedElementCount;

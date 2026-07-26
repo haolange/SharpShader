@@ -427,10 +427,10 @@ namespace SharpShader.HLSLCrossCompiler.Internal
         {
             foreach (MetalDirectBindingMapping metal in metalLayout.DirectBindings)
             {
-                if (metal.ArgumentTable != MetalShaderBackendLayout.RootArgumentTable)
+                if (metal.BindingTable != MetalShaderBackendLayout.RootBindingTable)
                 {
                     throw Failure(
-                        $"Metal direct binding {metal.LogicalBinding} targets unsupported argument table {metal.ArgumentTable}.");
+                        $"Metal direct binding {metal.LogicalBinding} targets unsupported binding table {metal.BindingTable}.");
                 }
 
                 VulkanShaderBindingMapping vulkan = TakeVulkanBinding(
@@ -460,10 +460,10 @@ namespace SharpShader.HLSLCrossCompiler.Internal
             Dictionary<uint, uint> descriptorSetByBuffer = new();
             foreach (MetalReferenceBufferBindingMapping metal in metalLayout.ReferenceBufferBindings)
             {
-                if (metal.ArgumentTable != MetalShaderBackendLayout.RootArgumentTable)
+                if (metal.BindingTable != MetalShaderBackendLayout.RootBindingTable)
                 {
                     throw Failure(
-                        $"Metal reference binding {metal.LogicalBinding} targets unsupported argument table {metal.ArgumentTable}.");
+                        $"Metal reference binding {metal.LogicalBinding} targets unsupported binding table {metal.BindingTable}.");
                 }
 
                 VulkanShaderBindingMapping vulkan = TakeVulkanBinding(

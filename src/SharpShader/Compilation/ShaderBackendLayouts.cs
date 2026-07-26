@@ -109,20 +109,20 @@ namespace SharpShader.Compilation
     public readonly struct MetalDirectBindingMapping : IEquatable<MetalDirectBindingMapping>
     {
         public ShaderBindingKey LogicalBinding { get; }
-        public uint ArgumentTable { get; }
+        public uint BindingTable { get; }
         public ShaderPhysicalBindingNamespace Namespace { get; }
         public uint Index { get; }
 
         public MetalDirectBindingMapping(
             ShaderBindingKey logicalBinding,
-            uint argumentTable,
+            uint bindingTable,
             ShaderPhysicalBindingNamespace bindingNamespace,
             uint index)
         {
             ShaderBackendLayoutValidation.ValidateMetalNamespace(bindingNamespace, nameof(bindingNamespace));
 
             LogicalBinding = logicalBinding;
-            ArgumentTable = argumentTable;
+            BindingTable = bindingTable;
             Namespace = bindingNamespace;
             Index = index;
         }
@@ -130,13 +130,13 @@ namespace SharpShader.Compilation
         public bool Equals(MetalDirectBindingMapping other)
         {
             return LogicalBinding == other.LogicalBinding
-                && ArgumentTable == other.ArgumentTable
+                && BindingTable == other.BindingTable
                 && Namespace == other.Namespace
                 && Index == other.Index;
         }
 
         public override bool Equals(object? obj) => obj is MetalDirectBindingMapping other && Equals(other);
-        public override int GetHashCode() => HashCode.Combine(LogicalBinding, ArgumentTable, Namespace, Index);
+        public override int GetHashCode() => HashCode.Combine(LogicalBinding, BindingTable, Namespace, Index);
         public static bool operator ==(MetalDirectBindingMapping left, MetalDirectBindingMapping right) => left.Equals(right);
         public static bool operator !=(MetalDirectBindingMapping left, MetalDirectBindingMapping right) => !left.Equals(right);
     }
@@ -146,7 +146,7 @@ namespace SharpShader.Compilation
         public const uint ReferenceByteSize = 8;
 
         public ShaderBindingKey LogicalBinding { get; }
-        public uint ArgumentTable { get; }
+        public uint BindingTable { get; }
         public ShaderPhysicalBindingNamespace ResourceNamespace { get; }
         public uint ReferenceBufferIndex { get; }
         public ulong ByteOffset { get; }
@@ -154,7 +154,7 @@ namespace SharpShader.Compilation
 
         public MetalReferenceBufferBindingMapping(
             ShaderBindingKey logicalBinding,
-            uint argumentTable,
+            uint bindingTable,
             ShaderPhysicalBindingNamespace resourceNamespace,
             uint referenceBufferIndex,
             ulong byteOffset,
@@ -176,7 +176,7 @@ namespace SharpShader.Compilation
             _ = checked(byteOffset + checked((ulong)referenceCount * ReferenceByteSize));
 
             LogicalBinding = logicalBinding;
-            ArgumentTable = argumentTable;
+            BindingTable = bindingTable;
             ResourceNamespace = resourceNamespace;
             ReferenceBufferIndex = referenceBufferIndex;
             ByteOffset = byteOffset;
@@ -188,7 +188,7 @@ namespace SharpShader.Compilation
         public bool Equals(MetalReferenceBufferBindingMapping other)
         {
             return LogicalBinding == other.LogicalBinding
-                && ArgumentTable == other.ArgumentTable
+                && BindingTable == other.BindingTable
                 && ResourceNamespace == other.ResourceNamespace
                 && ReferenceBufferIndex == other.ReferenceBufferIndex
                 && ByteOffset == other.ByteOffset
@@ -196,7 +196,7 @@ namespace SharpShader.Compilation
         }
 
         public override bool Equals(object? obj) => obj is MetalReferenceBufferBindingMapping other && Equals(other);
-        public override int GetHashCode() => HashCode.Combine(LogicalBinding, ArgumentTable, ResourceNamespace, ReferenceBufferIndex, ByteOffset, ReferenceCount);
+        public override int GetHashCode() => HashCode.Combine(LogicalBinding, BindingTable, ResourceNamespace, ReferenceBufferIndex, ByteOffset, ReferenceCount);
         public static bool operator ==(MetalReferenceBufferBindingMapping left, MetalReferenceBufferBindingMapping right) => left.Equals(right);
         public static bool operator !=(MetalReferenceBufferBindingMapping left, MetalReferenceBufferBindingMapping right) => !left.Equals(right);
     }
@@ -287,7 +287,7 @@ namespace SharpShader.Compilation
 
     public sealed class MetalShaderBackendLayout : IEquatable<MetalShaderBackendLayout>
     {
-        public const uint RootArgumentTable = 0;
+        public const uint RootBindingTable = 0;
 
         private readonly ReadOnlyCollection<MetalDirectBindingMapping> m_DirectBindings;
         private readonly ReadOnlyCollection<MetalReferenceBufferBindingMapping> m_ReferenceBufferBindings;
@@ -317,10 +317,10 @@ namespace SharpShader.Compilation
                     throw new ArgumentException($"Metal layout contains duplicate logical binding {mapping.LogicalBinding}.", nameof(directBindings));
                 }
 
-                if (!directLocations.Add((mapping.ArgumentTable, mapping.Namespace, mapping.Index)))
+                if (!directLocations.Add((mapping.BindingTable, mapping.Namespace, mapping.Index)))
                 {
                     throw new ArgumentException(
-                        $"Metal layout contains duplicate direct {mapping.Namespace} index {mapping.Index} in argument table {mapping.ArgumentTable}.",
+                        $"Metal layout contains duplicate direct {mapping.Namespace} index {mapping.Index} in binding table {mapping.BindingTable}.",
                         nameof(directBindings));
                 }
             }
@@ -333,11 +333,11 @@ namespace SharpShader.Compilation
                     throw new ArgumentException($"Metal layout contains duplicate logical binding {mapping.LogicalBinding}.", nameof(referenceBufferBindings));
                 }
 
-                (uint Table, uint BufferIndex) bufferKey = (mapping.ArgumentTable, mapping.ReferenceBufferIndex);
-                if (directLocations.Contains((mapping.ArgumentTable, ShaderPhysicalBindingNamespace.Buffer, mapping.ReferenceBufferIndex)))
+                (uint Table, uint BufferIndex) bufferKey = (mapping.BindingTable, mapping.ReferenceBufferIndex);
+                if (directLocations.Contains((mapping.BindingTable, ShaderPhysicalBindingNamespace.Buffer, mapping.ReferenceBufferIndex)))
                 {
                     throw new ArgumentException(
-                        $"Metal reference buffer index {mapping.ReferenceBufferIndex} collides with a direct buffer in argument table {mapping.ArgumentTable}.",
+                        $"Metal reference buffer index {mapping.ReferenceBufferIndex} collides with a direct buffer in binding table {mapping.BindingTable}.",
                         nameof(referenceBufferBindings));
                 }
 
@@ -352,7 +352,7 @@ namespace SharpShader.Compilation
                     if (mapping.ByteOffset < existing.EndByteOffset && existing.ByteOffset < mapping.EndByteOffset)
                     {
                         throw new ArgumentException(
-                            $"Metal reference-buffer ranges overlap in argument table {mapping.ArgumentTable}, buffer {mapping.ReferenceBufferIndex}.",
+                            $"Metal reference-buffer ranges overlap in binding table {mapping.BindingTable}, buffer {mapping.ReferenceBufferIndex}.",
                             nameof(referenceBufferBindings));
                     }
                 }
