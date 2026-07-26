@@ -16,13 +16,13 @@ namespace Infinity.Rendering.Tests
             ShaderInterfaceLayout layout = CreateSameSlotLayout(table: 7);
             ShaderBackendLayouts backends = ShaderBackendLayoutPlanner.Plan(layout);
 
-            SharpGpuArgumentTableLayoutPlan plan =
-                SharpGpuShaderInterfaceAdapter.CreateArgumentTableLayoutPlan(
+            SharpGpuBindingTableLayoutPlan plan =
+                SharpGpuShaderInterfaceAdapter.CreateBindingTableLayoutPlan(
                     layout,
                     backends,
                     ERHIBackend.DirectX12);
-            RHIArgumentTableLayoutDescriptor descriptor =
-                Assert.Single(plan.CreateArgumentTableLayoutDescriptors());
+            RHIBindingTableLayoutDescriptor descriptor =
+                Assert.Single(plan.CreateBindingTableLayoutDescriptors());
 
             Assert.Equal(7u, descriptor.Index);
             Assert.Equal(4, descriptor.Elements.Length);
@@ -57,20 +57,20 @@ namespace Infinity.Rendering.Tests
             ShaderInterfaceLayout layout = new(new[] { constants, sampler, texture });
             ShaderBackendLayouts backends = ShaderBackendLayoutPlanner.Plan(layout);
 
-            SharpGpuArgumentTableLayoutPlan plan =
-                SharpGpuShaderInterfaceAdapter.CreateArgumentTableLayoutPlan(
+            SharpGpuBindingTableLayoutPlan plan =
+                SharpGpuShaderInterfaceAdapter.CreateBindingTableLayoutPlan(
                     layout,
                     backends,
                     ERHIBackend.Vulkan);
-            RHIArgumentTableLayoutDescriptor[] descriptors =
-                plan.CreateArgumentTableLayoutDescriptors();
+            RHIBindingTableLayoutDescriptor[] descriptors =
+                plan.CreateBindingTableLayoutDescriptors();
 
             Assert.Equal(new uint[] { 0, 1 }, descriptors.Select(descriptor => descriptor.Index));
             Assert.Equal(new uint[] { 0, 1 }, descriptors[0].Elements.ToArray().Select(element => element.Slot));
             Assert.Equal(0u, Assert.Single(descriptors[1].Elements.ToArray()).Slot);
-            Assert.Equal(0u, plan.GetBinding(texture.Key).ArgumentTableIndex);
+            Assert.Equal(0u, plan.GetBinding(texture.Key).BindingTableIndex);
             Assert.Equal(1u, plan.GetBinding(sampler.Key).Slot);
-            Assert.Equal(1u, plan.GetBinding(constants.Key).ArgumentTableIndex);
+            Assert.Equal(1u, plan.GetBinding(constants.Key).BindingTableIndex);
         }
 
         [Fact]
@@ -79,13 +79,13 @@ namespace Infinity.Rendering.Tests
             ShaderInterfaceLayout layout = CreateSameSlotLayout(table: 12);
             ShaderBackendLayouts backends = ShaderBackendLayoutPlanner.Plan(layout);
 
-            SharpGpuArgumentTableLayoutPlan plan =
-                SharpGpuShaderInterfaceAdapter.CreateArgumentTableLayoutPlan(
+            SharpGpuBindingTableLayoutPlan plan =
+                SharpGpuShaderInterfaceAdapter.CreateBindingTableLayoutPlan(
                     layout,
                     backends,
                     ERHIBackend.Metal);
-            RHIArgumentTableLayoutDescriptor descriptor =
-                Assert.Single(plan.CreateArgumentTableLayoutDescriptors());
+            RHIBindingTableLayoutDescriptor descriptor =
+                Assert.Single(plan.CreateBindingTableLayoutDescriptors());
 
             Assert.Equal(0u, descriptor.Index);
             Assert.Equal(0u, plan.GetBinding(
@@ -111,13 +111,13 @@ namespace Infinity.Rendering.Tests
             ShaderInterfaceLayout layout = new(new[] { constants, sampler, textures });
             ShaderBackendLayouts backends = ShaderBackendLayoutPlanner.Plan(layout);
 
-            SharpGpuArgumentTableLayoutPlan plan =
-                SharpGpuShaderInterfaceAdapter.CreateArgumentTableLayoutPlan(
+            SharpGpuBindingTableLayoutPlan plan =
+                SharpGpuShaderInterfaceAdapter.CreateBindingTableLayoutPlan(
                     layout,
                     backends,
                     ERHIBackend.Metal);
-            RHIArgumentTableLayoutDescriptor[] descriptors =
-                plan.CreateArgumentTableLayoutDescriptors();
+            RHIBindingTableLayoutDescriptor[] descriptors =
+                plan.CreateBindingTableLayoutDescriptors();
 
             Assert.Equal(new uint[] { 0, 1 }, descriptors.Select(descriptor => descriptor.Index));
             Assert.Equal(
@@ -146,13 +146,13 @@ namespace Infinity.Rendering.Tests
             ShaderBackendLayouts dx12Only = new(layout.Signature, dx12: planned.Dx12);
 
             Assert.Throws<ArgumentException>(() =>
-                SharpGpuShaderInterfaceAdapter.CreateArgumentTableLayoutPlan(
+                SharpGpuShaderInterfaceAdapter.CreateBindingTableLayoutPlan(
                     layout,
                     dx12Only,
                     ERHIBackend.DirectX12));
 
-            SharpGpuArgumentTableLayoutPlan plan =
-                SharpGpuShaderInterfaceAdapter.CreateArgumentTableLayoutPlan(
+            SharpGpuBindingTableLayoutPlan plan =
+                SharpGpuShaderInterfaceAdapter.CreateBindingTableLayoutPlan(
                     layout,
                     dx12Only,
                     ERHIBackend.DirectX12,
@@ -160,7 +160,7 @@ namespace Infinity.Rendering.Tests
             Assert.Equal(4u, Assert.Single(plan.Bindings).Count);
 
             Assert.Throws<ArgumentException>(() =>
-                SharpGpuShaderInterfaceAdapter.CreateArgumentTableLayoutPlan(
+                SharpGpuShaderInterfaceAdapter.CreateBindingTableLayoutPlan(
                     layout,
                     planned,
                     ERHIBackend.Vulkan,
@@ -184,7 +184,7 @@ namespace Infinity.Rendering.Tests
                 ShaderStageMask.Compute);
             ShaderInterfaceLayout textureLayout = new(new[] { texture1D });
             Assert.Throws<NotSupportedException>(() =>
-                SharpGpuShaderInterfaceAdapter.CreateArgumentTableLayoutPlan(
+                SharpGpuShaderInterfaceAdapter.CreateBindingTableLayoutPlan(
                     textureLayout,
                     ShaderBackendLayoutPlanner.Plan(textureLayout),
                     ERHIBackend.DirectX12));
@@ -200,7 +200,7 @@ namespace Infinity.Rendering.Tests
                 ShaderStageMask.Compute);
             ShaderInterfaceLayout typedLayout = new(new[] { typedBuffer });
             Assert.Throws<NotSupportedException>(() =>
-                SharpGpuShaderInterfaceAdapter.CreateArgumentTableLayoutPlan(
+                SharpGpuShaderInterfaceAdapter.CreateBindingTableLayoutPlan(
                     typedLayout,
                     ShaderBackendLayoutPlanner.Plan(typedLayout),
                     ERHIBackend.Vulkan));
@@ -216,7 +216,7 @@ namespace Infinity.Rendering.Tests
                 ShaderStageMask.Hull);
             ShaderInterfaceLayout hullLayout = new(new[] { hullTexture });
             Assert.Throws<NotSupportedException>(() =>
-                SharpGpuShaderInterfaceAdapter.CreateArgumentTableLayoutPlan(
+                SharpGpuShaderInterfaceAdapter.CreateBindingTableLayoutPlan(
                     hullLayout,
                     ShaderBackendLayoutPlanner.Plan(hullLayout),
                     ERHIBackend.DirectX12));
@@ -232,7 +232,7 @@ namespace Infinity.Rendering.Tests
                 [runtime.Key] = uint.MaxValue,
             };
             Assert.Throws<ArgumentOutOfRangeException>(() =>
-                SharpGpuShaderInterfaceAdapter.CreateArgumentTableLayoutPlan(
+                SharpGpuShaderInterfaceAdapter.CreateBindingTableLayoutPlan(
                     runtimeLayout,
                     ShaderBackendLayoutPlanner.Plan(runtimeLayout, excessiveCapacity),
                     ERHIBackend.Metal,
@@ -243,16 +243,16 @@ namespace Infinity.Rendering.Tests
         public void DescriptorCopies_ShouldNotMutateImmutablePlan()
         {
             ShaderInterfaceLayout layout = CreateSameSlotLayout(table: 0);
-            SharpGpuArgumentTableLayoutPlan plan =
-                SharpGpuShaderInterfaceAdapter.CreateArgumentTableLayoutPlan(
+            SharpGpuBindingTableLayoutPlan plan =
+                SharpGpuShaderInterfaceAdapter.CreateBindingTableLayoutPlan(
                     layout,
                     ShaderBackendLayoutPlanner.Plan(layout),
                     ERHIBackend.Vulkan);
 
-            RHIArgumentTableLayoutDescriptor[] first = plan.CreateArgumentTableLayoutDescriptors();
+            RHIBindingTableLayoutDescriptor[] first = plan.CreateBindingTableLayoutDescriptors();
             first[0].Index = 99;
             first[0].Elements.Span[0].Slot = 99;
-            RHIArgumentTableLayoutDescriptor[] second = plan.CreateArgumentTableLayoutDescriptors();
+            RHIBindingTableLayoutDescriptor[] second = plan.CreateBindingTableLayoutDescriptors();
 
             Assert.Equal(0u, second[0].Index);
             Assert.Equal(0u, second[0].Elements.Span[0].Slot);
@@ -266,16 +266,16 @@ namespace Infinity.Rendering.Tests
                 CreateTexture(table: 4, slot: 0, ShaderResourceAccess.ReadOnly),
                 CreateConstantBuffer(table: 9, slot: 0),
             });
-            SharpGpuArgumentTableLayoutPlan plan =
-                SharpGpuShaderInterfaceAdapter.CreateArgumentTableLayoutPlan(
+            SharpGpuBindingTableLayoutPlan plan =
+                SharpGpuShaderInterfaceAdapter.CreateBindingTableLayoutPlan(
                     layout,
                     ShaderBackendLayoutPlanner.Plan(layout),
                     ERHIBackend.Vulkan);
-            TrackingArgumentTableLayout first = new();
+            TrackingBindingTableLayout first = new();
             int invocation = 0;
 
             Assert.Throws<InvalidOperationException>(() =>
-                plan.CreateArgumentTableLayouts(descriptor =>
+                plan.CreateBindingTableLayouts(descriptor =>
                 {
                     return invocation++ == 0
                         ? first
@@ -284,11 +284,11 @@ namespace Infinity.Rendering.Tests
             Assert.True(first.IsDisposed);
             Assert.Equal(1, first.ReleaseCount);
 
-            TrackingArgumentTableLayout second = new();
-            TrackingArgumentTableLayout third = new();
+            TrackingBindingTableLayout second = new();
+            TrackingBindingTableLayout third = new();
             invocation = 0;
-            SharpGpuArgumentTableLayouts owner =
-                plan.CreateArgumentTableLayouts(descriptor =>
+            SharpGpuBindingTableLayouts owner =
+                plan.CreateBindingTableLayouts(descriptor =>
                     invocation++ == 0 ? second : third);
             owner.Dispose();
             owner.Dispose();
@@ -311,7 +311,7 @@ namespace Infinity.Rendering.Tests
                 .GetReferencedAssemblies()
                 .Select(reference => reference.Name!)
                 .ToArray();
-            string[] gpuReferences = typeof(RHIArgumentTableLayoutDescriptor)
+            string[] gpuReferences = typeof(RHIBindingTableLayoutDescriptor)
                 .Assembly
                 .GetReferencedAssemblies()
                 .Select(reference => reference.Name!)
@@ -384,10 +384,10 @@ namespace Infinity.Rendering.Tests
                 ShaderStageMask.Compute);
         }
 
-        private sealed class TrackingArgumentTableLayout : RHIArgumentTableLayout
+        private sealed class TrackingBindingTableLayout : RHIBindingTableLayout
         {
-            public TrackingArgumentTableLayout()
-                : base(new RHIArgumentTableLayoutDescriptor())
+            public TrackingBindingTableLayout()
+                : base(new RHIBindingTableLayoutDescriptor())
             {
             }
 

@@ -73,7 +73,7 @@ namespace Infinity.Rendering.Tests
                     (ShaderPhysicalBindingNamespace.Texture, 1u),
                 },
                 result.Metal.DirectBindings.Select(mapping => (mapping.Namespace, mapping.Index)));
-            Assert.All(result.Metal.DirectBindings, mapping => Assert.Equal(MetalShaderBackendLayout.RootArgumentTable, mapping.ArgumentTable));
+            Assert.All(result.Metal.DirectBindings, mapping => Assert.Equal(MetalShaderBackendLayout.RootBindingTable, mapping.BindingTable));
         }
 
         [Fact]
@@ -123,8 +123,8 @@ namespace Infinity.Rendering.Tests
             Assert.All(
                 result.Metal.ReferenceBufferBindings,
                 mapping => Assert.Equal(
-                    MetalShaderBackendLayout.RootArgumentTable,
-                    mapping.ArgumentTable));
+                    MetalShaderBackendLayout.RootBindingTable,
+                    mapping.BindingTable));
             Assert.All(result.Metal.ReferenceBufferBindings, mapping => Assert.Equal(1u, mapping.ReferenceCount));
 
             Assert.Equal(new uint[] { 0, 1, 0 }, result.Vulkan!.Bindings.Select(mapping => mapping.Binding));
@@ -258,7 +258,7 @@ namespace Infinity.Rendering.Tests
 
             Assert.Throws<OverflowException>(() => new MetalReferenceBufferBindingMapping(
                 key,
-                MetalShaderBackendLayout.RootArgumentTable,
+                MetalShaderBackendLayout.RootBindingTable,
                 ShaderPhysicalBindingNamespace.Texture,
                 referenceBufferIndex: 0,
                 byteOffset: ulong.MaxValue - 7,

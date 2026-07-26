@@ -20,8 +20,8 @@ namespace Infinity.Rendering.Tests
                 layout,
                 ShaderBackendLayoutPlanner.Plan(layout));
 
-            SharpGpuArgumentTableLayoutPlan plan =
-                SharpGpuShaderInterfaceAdapter.CreateArgumentTableLayoutPlan(
+            SharpGpuBindingTableLayoutPlan plan =
+                SharpGpuShaderInterfaceAdapter.CreateBindingTableLayoutPlan(
                     manifest,
                     "default",
                     "MainCS",
@@ -41,7 +41,7 @@ namespace Infinity.Rendering.Tests
             ShaderInterfaceManifest complete = CreateManifest(layout, planned);
 
             KeyNotFoundException missingVariant = Assert.Throws<KeyNotFoundException>(() =>
-                SharpGpuShaderInterfaceAdapter.CreateArgumentTableLayoutPlan(
+                SharpGpuShaderInterfaceAdapter.CreateBindingTableLayoutPlan(
                     complete,
                     "missing",
                     "MainCS",
@@ -50,7 +50,7 @@ namespace Infinity.Rendering.Tests
             Assert.Contains("variant 'missing'", missingVariant.Message, StringComparison.Ordinal);
 
             KeyNotFoundException missingEntry = Assert.Throws<KeyNotFoundException>(() =>
-                SharpGpuShaderInterfaceAdapter.CreateArgumentTableLayoutPlan(
+                SharpGpuShaderInterfaceAdapter.CreateBindingTableLayoutPlan(
                     complete,
                     "default",
                     "MainCS",
@@ -63,7 +63,7 @@ namespace Infinity.Rendering.Tests
                 layout,
                 new ShaderBackendLayouts(layout.Signature, dx12: planned.Dx12));
             ArgumentException missingBackend = Assert.Throws<ArgumentException>(() =>
-                SharpGpuShaderInterfaceAdapter.CreateArgumentTableLayoutPlan(
+                SharpGpuShaderInterfaceAdapter.CreateBindingTableLayoutPlan(
                     dx12Only,
                     "default",
                     "MainCS",
@@ -81,14 +81,14 @@ namespace Infinity.Rendering.Tests
                 ShaderBackendLayoutPlanner.Plan(layout));
 
             Assert.Throws<ArgumentException>(() =>
-                SharpGpuShaderInterfaceAdapter.CreateArgumentTableLayoutPlan(
+                SharpGpuShaderInterfaceAdapter.CreateBindingTableLayoutPlan(
                     manifest,
                     " ",
                     "MainCS",
                     ShaderExecutionStage.Compute,
                     ERHIBackend.DirectX12));
             Assert.Throws<ArgumentException>(() =>
-                SharpGpuShaderInterfaceAdapter.CreateArgumentTableLayoutPlan(
+                SharpGpuShaderInterfaceAdapter.CreateBindingTableLayoutPlan(
                     manifest,
                     "default",
                     string.Empty,
@@ -282,7 +282,7 @@ namespace Infinity.Rendering.Tests
 
         [Fact]
         [Trait("Category", "SharpShaderAttachment")]
-        public void ArgumentTablePlan_ShouldRejectInputAttachmentResources()
+        public void BindingTablePlan_ShouldRejectInputAttachmentResources()
         {
             ShaderBindingKey key = new(
                 0,
@@ -312,7 +312,7 @@ namespace Infinity.Rendering.Tests
                 }));
 
             Assert.Throws<NotSupportedException>(() =>
-                SharpGpuShaderInterfaceAdapter.CreateArgumentTableLayoutPlan(
+                SharpGpuShaderInterfaceAdapter.CreateBindingTableLayoutPlan(
                     layout,
                     backends,
                     ERHIBackend.DirectX12));

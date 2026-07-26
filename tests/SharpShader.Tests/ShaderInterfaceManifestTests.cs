@@ -234,7 +234,7 @@ namespace Infinity.Rendering.Tests
                     mapping => mapping.LogicalBinding.Type == ShaderBindingClass.ShaderResource
                         ? new MetalReferenceBufferBindingMapping(
                             mapping.LogicalBinding,
-                            mapping.ArgumentTable,
+                            mapping.BindingTable,
                             mapping.ResourceNamespace,
                             mapping.ReferenceBufferIndex,
                             mapping.ByteOffset,
@@ -451,17 +451,17 @@ namespace Infinity.Rendering.Tests
             {
                 new MetalDirectBindingMapping(
                     texture,
-                    MetalShaderBackendLayout.RootArgumentTable,
+                    MetalShaderBackendLayout.RootBindingTable,
                     ShaderPhysicalBindingNamespace.Texture,
                     0),
                 new MetalDirectBindingMapping(
                     sampler,
-                    MetalShaderBackendLayout.RootArgumentTable,
+                    MetalShaderBackendLayout.RootBindingTable,
                     ShaderPhysicalBindingNamespace.Sampler,
                     0),
                 new MetalDirectBindingMapping(
                     constants,
-                    MetalShaderBackendLayout.RootArgumentTable,
+                    MetalShaderBackendLayout.RootBindingTable,
                     ShaderPhysicalBindingNamespace.Buffer,
                     0),
             };
