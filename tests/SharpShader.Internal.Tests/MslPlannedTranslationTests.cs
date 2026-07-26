@@ -171,12 +171,12 @@ namespace Infinity.Rendering.Tests
                 {
                     new MetalDirectBindingMapping(
                         inputKey,
-                        MetalShaderBackendLayout.RootArgumentTable,
+                        MetalShaderBackendLayout.RootBindingTable,
                         ShaderPhysicalBindingNamespace.Texture,
                         0),
                     new MetalDirectBindingMapping(
                         outputKey,
-                        MetalShaderBackendLayout.RootArgumentTable,
+                        MetalShaderBackendLayout.RootBindingTable,
                         ShaderPhysicalBindingNamespace.Texture,
                         1),
                 });
@@ -281,7 +281,7 @@ namespace Infinity.Rendering.Tests
                         directMetal.DirectBindings.Append(
                             new MetalDirectBindingMapping(
                                 extraKey,
-                                MetalShaderBackendLayout.RootArgumentTable,
+                                MetalShaderBackendLayout.RootBindingTable,
                                 ShaderPhysicalBindingNamespace.Texture,
                                 index: 8)))));
             Assert.Contains(
@@ -451,7 +451,7 @@ namespace Infinity.Rendering.Tests
                             7,
                             0,
                             ShaderBindingClass.ShaderResource),
-                        MetalShaderBackendLayout.RootArgumentTable,
+                        MetalShaderBackendLayout.RootBindingTable,
                         ShaderPhysicalBindingNamespace.Texture,
                         0),
                     new MetalDirectBindingMapping(
@@ -459,7 +459,7 @@ namespace Infinity.Rendering.Tests
                             7,
                             0,
                             ShaderBindingClass.Sampler),
-                        MetalShaderBackendLayout.RootArgumentTable,
+                        MetalShaderBackendLayout.RootBindingTable,
                         ShaderPhysicalBindingNamespace.Sampler,
                         0),
                     new MetalDirectBindingMapping(
@@ -467,7 +467,7 @@ namespace Infinity.Rendering.Tests
                             7,
                             0,
                             ShaderBindingClass.ConstantBuffer),
-                        MetalShaderBackendLayout.RootArgumentTable,
+                        MetalShaderBackendLayout.RootBindingTable,
                         ShaderPhysicalBindingNamespace.Buffer,
                         0),
                     new MetalDirectBindingMapping(
@@ -475,7 +475,7 @@ namespace Infinity.Rendering.Tests
                             7,
                             0,
                             ShaderBindingClass.UnorderedAccess),
-                        MetalShaderBackendLayout.RootArgumentTable,
+                        MetalShaderBackendLayout.RootBindingTable,
                         ShaderPhysicalBindingNamespace.Buffer,
                         1),
                 });
@@ -524,7 +524,7 @@ namespace Infinity.Rendering.Tests
                             4,
                             0,
                             ShaderBindingClass.ShaderResource),
-                        MetalShaderBackendLayout.RootArgumentTable,
+                        MetalShaderBackendLayout.RootBindingTable,
                         ShaderPhysicalBindingNamespace.Texture,
                         referenceBufferIndex: 0,
                         byteOffset: 0,
@@ -534,7 +534,7 @@ namespace Infinity.Rendering.Tests
                             4,
                             0,
                             ShaderBindingClass.Sampler),
-                        MetalShaderBackendLayout.RootArgumentTable,
+                        MetalShaderBackendLayout.RootBindingTable,
                         ShaderPhysicalBindingNamespace.Sampler,
                         referenceBufferIndex: 0,
                         byteOffset: checked(
@@ -545,7 +545,7 @@ namespace Infinity.Rendering.Tests
                             9,
                             0,
                             ShaderBindingClass.UnorderedAccess),
-                        MetalShaderBackendLayout.RootArgumentTable,
+                        MetalShaderBackendLayout.RootBindingTable,
                         ShaderPhysicalBindingNamespace.Buffer,
                         referenceBufferIndex: 1,
                         byteOffset: 0,
