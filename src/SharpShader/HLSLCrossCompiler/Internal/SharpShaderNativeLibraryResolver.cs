@@ -433,18 +433,43 @@ namespace SharpShader.HLSLCrossCompiler.Internal
                 int markerIndex = normalized.IndexOf(
                     marker,
                     StringComparison.OrdinalIgnoreCase);
-                if (markerIndex < 0)
+                if (markerIndex >= 0)
                 {
-                    continue;
+                    string binariesRoot = normalized.Substring(
+                        0,
+                        markerIndex + marker.Length - 1);
+                    if (emitted.Add(binariesRoot))
+                    {
+                        yield return binariesRoot;
+                    }
                 }
 
-                string binariesRoot = normalized.Substring(
-                    0,
-                    markerIndex + marker.Length - 1);
-                if (emitted.Add(binariesRoot))
+                foreach (string ancestorRoot in EnumerateAncestorBinariesRoots(fullPath))
                 {
-                    yield return binariesRoot;
+                    if (emitted.Add(ancestorRoot))
+                    {
+                        yield return ancestorRoot;
+                    }
                 }
+            }
+        }
+
+        private static IEnumerable<string> EnumerateAncestorBinariesRoots(string location)
+        {
+            DirectoryInfo? current = Directory.Exists(location)
+                ? new DirectoryInfo(location)
+                : Directory.GetParent(location);
+            while (current is not null)
+            {
+                string binariesRoot = Path.Combine(current.FullName, "Binaries");
+                if (Directory.Exists(
+                    Path.Combine(binariesRoot, "ThirdParty", "Microsoft", "DXC")))
+                {
+                    yield return Path.GetFullPath(binariesRoot);
+                    yield break;
+                }
+
+                current = current.Parent;
             }
         }
 

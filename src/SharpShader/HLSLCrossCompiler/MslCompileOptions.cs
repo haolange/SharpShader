@@ -1,11 +1,5 @@
 namespace SharpShader.HLSLCrossCompiler
 {
-    public enum MslTargetPlatform
-    {
-        MacOS,
-        IOS,
-    }
-
     public sealed record MslCompileOptions
     {
         public static MslCompileOptions Default { get; } = new();

@@ -1,0 +1,6 @@
+# SharpShader.Tool analyzer policy [ADR-0060]
+
+[*.cs]
+dotnet_diagnostic.CA1859.severity = none
+dotnet_diagnostic.CA1720.severity = none
+dotnet_diagnostic.CA1512.severity = none

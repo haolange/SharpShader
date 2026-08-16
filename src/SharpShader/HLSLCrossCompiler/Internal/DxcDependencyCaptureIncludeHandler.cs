@@ -84,7 +84,7 @@ namespace SharpShader.HLSLCrossCompiler.Internal
             {
                 stateHandle.Free();
                 m_State.Dispose();
-                throw new OutOfMemoryException(
+                throw new InvalidOperationException(
                     "Failed to allocate the DXC dependency-capture include handler.");
             }
 
@@ -119,7 +119,7 @@ namespace SharpShader.HLSLCrossCompiler.Internal
                 checked((nuint)(4 * sizeof(void*))));
             if (vtable == null)
             {
-                throw new OutOfMemoryException(
+                throw new InvalidOperationException(
                     "Failed to allocate the DXC include-handler vtable.");
             }
 

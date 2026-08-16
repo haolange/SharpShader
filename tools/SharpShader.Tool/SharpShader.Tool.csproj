@@ -8,6 +8,11 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <AssemblyName>SharpShader.Tool</AssemblyName>
     <RootNamespace>SharpShader.Tool</RootNamespace>
+    <WarningLevel>5</WarningLevel>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <EnableNETAnalyzers>true</EnableNETAnalyzers>
+    <AnalysisLevel>latest</AnalysisLevel>
+    <AnalysisMode>Recommended</AnalysisMode>
   </PropertyGroup>
 
   <ItemGroup>

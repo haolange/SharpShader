@@ -1,4 +1,5 @@
 using System;
+using System.Globalization;
 using System.IO;
 using System.Text;
 using System.Text.Json;
@@ -280,7 +281,7 @@ namespace SharpShader.HLSLCrossCompiler.Internal
             if (omittedCharacters > 0)
             {
                 captured.AppendLine();
-                captured.Append($"[output truncated; omitted {omittedCharacters} characters]");
+                captured.Append(CultureInfo.InvariantCulture, $"[output truncated; omitted {omittedCharacters} characters]");
             }
 
             return captured.ToString();

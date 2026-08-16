@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -54,7 +55,7 @@ namespace SharpShader.Tool
                 throw Invalid(
                     $"Attachment interface schema revision must be "
                     + $"{CurrentSchemaRevision}, not "
-                    + $"{document.SchemaRevision?.ToString() ?? "missing"}.");
+                    + $"{document.SchemaRevision?.ToString(CultureInfo.InvariantCulture) ?? "missing"}.");
             }
 
             if (document.Interfaces is null)
@@ -423,4 +424,4 @@ namespace SharpShader.Tool
             public ShaderBindingClass? Type { get; set; }
         }
     }
-}
+}

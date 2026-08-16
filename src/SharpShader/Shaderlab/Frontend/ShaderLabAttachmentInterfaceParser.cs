@@ -376,7 +376,7 @@ namespace SharpShader.ShaderLab.Frontend
                 m_Current = m_Tokenizer.Read();
             }
 
-            private void RequireFirst(ref bool seen, Token field)
+            private static void RequireFirst(ref bool seen, Token field)
             {
                 if (seen)
                 {
