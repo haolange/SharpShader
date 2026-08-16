@@ -2,6 +2,7 @@ using Xunit;
 using System;
 using System.IO;
 using System.Linq;
+using System.Collections.Generic;
 using System.Security.Cryptography;
 using SharpShader.Compilation;
 using SharpShader.Compilation.Internal;
@@ -106,15 +107,12 @@ void Main(uint3 id : SV_DispatchThreadID)
         [Fact]
         public void CompileProgram_ShouldFailClosedForUnknownStage()
         {
-            ShaderLabProgram program = new ShaderLabProgram
-            {
-                Source = "float4 Main() : SV_Target { return 1; }",
-            };
-            program.Entries.Add(new ShaderLabProgramEntry
-            {
-                Stage = EShaderLabShaderStage.Undefined,
-                EntryName = "Main",
-            });
+            ShaderLabProgram program = new ShaderLabProgram(
+                "float4 Main() : SV_Target { return 1; }",
+                new[]
+                {
+                    new ShaderLabProgramEntry(EShaderLabShaderStage.Undefined, "Main"),
+                });
 
             ArgumentOutOfRangeException exception =
                 Assert.Throws<ArgumentOutOfRangeException>(() =>
@@ -716,26 +714,24 @@ void RayGen()
 
         private static ShaderLab CreateShaderLab(string sourcePath)
         {
-            ShaderLabProgram program = new ShaderLabProgram
-            {
-                Source = "float4 VSMain() : SV_Position { return 0; }",
-            };
-            program.Entries.Add(new ShaderLabProgramEntry
-            {
-                Stage = EShaderLabShaderStage.ProgramVertex,
-                EntryName = "VSMain",
-            });
-            ShaderLabPass pass = new ShaderLabPass
-            {
-                Program = program,
-            };
-            pass.Tags.Add("Name", "Forward/Main");
-            ShaderLab shaderLab = new ShaderLab
-            {
-                SourcePath = sourcePath,
-            };
-            shaderLab.Passes.Add(pass);
-            return shaderLab;
+            ShaderLabProgram program = new ShaderLabProgram(
+                "float4 VSMain() : SV_Position { return 0; }",
+                new[]
+                {
+                    new ShaderLabProgramEntry(EShaderLabShaderStage.ProgramVertex, "VSMain"),
+                });
+            ShaderLabPass pass = new ShaderLabPass(
+                program,
+                new Dictionary<string, string>(StringComparer.Ordinal)
+                {
+                    ["Name"] = "Forward/Main",
+                });
+            return new ShaderLab(
+                string.Empty,
+                sourcePath,
+                new[] { pass },
+                new Dictionary<string, string>(StringComparer.Ordinal),
+                Array.Empty<ShaderLabProperty>());
         }
 
         private static string CreateAttachmentShaderLabSource()
@@ -803,18 +799,14 @@ void RayGen()
         private static StandaloneShaderProgram CreateStandaloneProgram(
             string sourcePath)
         {
-            StandaloneShaderProgram program = new StandaloneShaderProgram
-            {
-                Kind = StandaloneShaderProgramKind.Compute,
-                SourcePath = sourcePath,
-                Source = "[numthreads(1,1,1)] void CSMain() { }",
-            };
-            program.Entries.Add(new StandaloneShaderEntry
-            {
-                Stage = StandaloneShaderStage.Compute,
-                EntryName = "CSMain",
-            });
-            return program;
+            return new StandaloneShaderProgram(
+                StandaloneShaderProgramKind.Compute,
+                sourcePath,
+                "[numthreads(1,1,1)] void CSMain() { }",
+                new[]
+                {
+                    new StandaloneShaderEntry(StandaloneShaderStage.Compute, "CSMain"),
+                });
         }
 
         private static bool TryCreateDirectorySymbolicLink(

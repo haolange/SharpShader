@@ -415,9 +415,20 @@ void main(uint3 dispatchThreadId : SV_DispatchThreadID)
                 return;
             }
 
+            // Desktop Hybrid raster/compute now consumes Manifest + adapter.
+            // This Raw gate keeps compiler coverage of the same HLSL sources.
+            string repoRoot = ResolveRepositoryRoot();
+            string computePath = Path.Combine(repoRoot, "Engine", "Shaders", "Compute", "Global", "HybridCompute.compute");
+            string fullscreenPath = Path.Combine(repoRoot, "Engine", "Shaders", "ShaderLab", "Global", "HybridFullscreen.shader");
+            string sceneMeshPath = Path.Combine(repoRoot, "Engine", "Shaders", "ShaderLab", "Global", "HybridSceneMesh.shader");
+            string computeSource = ShaderLabUtil.ParseComputeProgramFromFile(computePath).Source;
+            string fullscreenSource = ShaderLabUtil.ParseShaderLabFromFile(fullscreenPath).Passes.Single().Program.Source;
+            string sceneMeshSource = ShaderLabUtil.ParseShaderLabFromFile(sceneMeshPath).Passes.Single().Program.Source;
+
             ShaderCompileResult vertexResult = HLSLCrossCompiler.Compile(new ShaderCompileRequest
             {
-                Source = HybridVertexShaderSource,
+                Source = fullscreenSource,
+                SourceName = fullscreenPath,
                 EntryPoint = "VSMain",
                 Stage = ShaderStageKind.Vertex,
                 ShaderModel = shaderModel,
@@ -428,7 +439,8 @@ void main(uint3 dispatchThreadId : SV_DispatchThreadID)
 
             ShaderCompileResult pixelResult = HLSLCrossCompiler.Compile(new ShaderCompileRequest
             {
-                Source = HybridPixelShaderSource,
+                Source = fullscreenSource,
+                SourceName = fullscreenPath,
                 EntryPoint = "PSMain",
                 Stage = ShaderStageKind.Pixel,
                 ShaderModel = shaderModel,
@@ -439,9 +451,22 @@ void main(uint3 dispatchThreadId : SV_DispatchThreadID)
 
             ShaderCompileResult computeResult = HLSLCrossCompiler.Compile(new ShaderCompileRequest
             {
-                Source = HybridComputeShaderSource,
+                Source = computeSource,
+                SourceName = computePath,
                 EntryPoint = "CSMain",
                 Stage = ShaderStageKind.Compute,
+                ShaderModel = shaderModel,
+                Target = ShaderTargetKind.Dxil,
+                EnableDebugInfo = true,
+                DisableOptimizations = true,
+            });
+
+            ShaderCompileResult sceneMeshVertexResult = HLSLCrossCompiler.Compile(new ShaderCompileRequest
+            {
+                Source = sceneMeshSource,
+                SourceName = sceneMeshPath,
+                EntryPoint = "VSSceneMesh",
+                Stage = ShaderStageKind.Vertex,
                 ShaderModel = shaderModel,
                 Target = ShaderTargetKind.Dxil,
                 EnableDebugInfo = true,
@@ -451,6 +476,7 @@ void main(uint3 dispatchThreadId : SV_DispatchThreadID)
             Assert.NotEmpty(vertexResult.Bytecode);
             Assert.NotEmpty(pixelResult.Bytecode);
             Assert.NotEmpty(computeResult.Bytecode);
+            Assert.NotEmpty(sceneMeshVertexResult.Bytecode);
             Assert.NotEmpty(vertexResult.ReflectionData);
             Assert.NotEmpty(pixelResult.ReflectionData);
             Assert.NotEmpty(computeResult.ReflectionData);
