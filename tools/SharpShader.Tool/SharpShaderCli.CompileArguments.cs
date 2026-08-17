@@ -154,6 +154,11 @@ namespace SharpShader.Tool
                 return result;
             }
 
+            public ShaderProgramVariant[] CreateVariantsForCSharp()
+            {
+                return CreateVariants();
+            }
+
             public ShaderProgramCompileRequest CreateRequest()
             {
                 string sourcePath = Path.GetFullPath(SourcePath);
@@ -211,7 +216,11 @@ namespace SharpShader.Tool
                         $"Output path already exists: {OutputDirectory}");
                 }
 
-                if (m_Entries.Count == 0)
+                bool csharpSource = string.Equals(
+                    Path.GetExtension(SourcePath),
+                    ".cs",
+                    StringComparison.OrdinalIgnoreCase);
+                if (m_Entries.Count == 0 && !csharpSource)
                 {
                     throw new CliUsageException(
                         "At least one --entry is required.");
@@ -233,7 +242,7 @@ namespace SharpShader.Tool
                     }
                 }
 
-                bool hasPixelEntry = m_Entries.Any(
+                bool hasPixelEntry = !csharpSource && m_Entries.Any(
                     static entry =>
                         entry.Stage == ShaderExecutionStage.Pixel);
                 if (hasPixelEntry

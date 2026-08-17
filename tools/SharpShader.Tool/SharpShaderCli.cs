@@ -4,6 +4,7 @@ using System.Runtime.CompilerServices;
 using System.Text;
 
 using SharpShader.Compilation;
+using SharpShader.CSharp;
 using SharpShader.HLSLCrossCompiler;
 
 [assembly: InternalsVisibleTo("Infinity.Rendering.Tests")]
@@ -65,10 +66,7 @@ namespace SharpShader.Tool
             TextWriter output)
         {
             CompileArguments parsed = CompileArguments.Parse(args);
-            ShaderProgramCompiler compiler = new(
-                new ShaderProgramCompilerOptions(parsed.CacheDirectory));
-            ShaderProgramCompilation compilation = compiler.Compile(
-                parsed.CreateRequest());
+            ShaderProgramCompilation compilation = CompileSource(parsed);
 
             ShaderArtifactPackage.Write(
                 parsed.OutputDirectory,
@@ -103,6 +101,34 @@ namespace SharpShader.Tool
             return SuccessExitCode;
         }
 
+        private static ShaderProgramCompilation CompileSource(CompileArguments parsed)
+        {
+            if (string.Equals(
+                    Path.GetExtension(parsed.SourcePath),
+                    ".cs",
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                CSharpShaderCompilation compilation = new CSharpShaderCompiler(
+                    new ShaderProgramCompiler(
+                        new ShaderProgramCompilerOptions(parsed.CacheDirectory)))
+                    .Compile(
+                        ReadUtf8TextBounded(parsed.SourcePath),
+                        parsed.SourcePath,
+                        new CSharpShaderCompilerOptions(
+                            parsed.Targets,
+                            parsed.ShaderModel,
+                            variants: parsed.CreateVariantsForCSharp(),
+                            enableDebugInfo: parsed.EnableDebugInfo,
+                            disableOptimizations: parsed.DisableOptimizations,
+                            optimizationLevel: parsed.OptimizationLevel));
+                return compilation.Primary.Program;
+            }
+
+            return new ShaderProgramCompiler(
+                new ShaderProgramCompilerOptions(parsed.CacheDirectory))
+                .Compile(parsed.CreateRequest());
+        }
+
         private static int Help(TextWriter output)
         {
             WriteUsage(output);
@@ -124,7 +150,8 @@ namespace SharpShader.Tool
 
         private static void WriteUsage(TextWriter writer)
         {
-            writer.WriteLine("SharpShader.Tool compile --source <file> --entry <stage>:<name> --output <directory> [options]");
+            writer.WriteLine("SharpShader.Tool compile --source <file> --output <directory> [options]");
+            writer.WriteLine("  .hlsl/.shader require --entry; .cs discovers SharpSL attributes.");
             writer.WriteLine("SharpShader.Tool inspect <package-directory|manifest.json>");
             writer.WriteLine("SharpShader.Tool validate <package-directory|manifest.json>");
             writer.WriteLine("Compile options:");
