@@ -24,8 +24,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\..\Runtime\Graphics\SharpShader.CSharp.Frontend\SharpShader.CSharp.Frontend.csproj" PrivateAssets="all" />
-    <ProjectReference Include="..\..\..\Runtime\Graphics\SharpShader.CSharp.ShaderLib\SharpShader.CSharp.ShaderLib.csproj" PrivateAssets="all" />
+    <ProjectReference Include="..\..\..\Runtime\Graphics\SharpShader\CSharp\Frontend\SharpShader.CSharp.Frontend.csproj" PrivateAssets="all" />
+    <ProjectReference Include="..\..\..\Runtime\Graphics\SharpShader\CSharp\ShaderLib\SharpShader.CSharp.ShaderLib.csproj" PrivateAssets="all" />
   </ItemGroup>
 
   <ItemGroup>

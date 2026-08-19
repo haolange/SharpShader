@@ -1,0 +1,7 @@
+# SharpShader.SharpGPU analyzer policy [ADR-0060]
+# Same contract exceptions as SharpShader: IReadOnly* layouts and domain exceptions.
+
+[*.cs]
+dotnet_diagnostic.CA1859.severity = none
+dotnet_diagnostic.CA1720.severity = none
+dotnet_diagnostic.CA1512.severity = none

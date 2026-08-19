@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Platforms>x64;ARM64</Platforms>
+    <AssemblyName>SharpShader.CSharp</AssemblyName>
+    <RootNamespace>SharpShader.CSharp</RootNamespace>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <WarningLevel>5</WarningLevel>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <EnableNETAnalyzers>true</EnableNETAnalyzers>
+    <AnalysisLevel>latest</AnalysisLevel>
+    <AnalysisMode>Recommended</AnalysisMode>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\SharpShader.csproj" />
+    <ProjectReference Include="Frontend\SharpShader.CSharp.Frontend.csproj" />
+    <ProjectReference Include="ShaderLib\SharpShader.CSharp.ShaderLib.csproj" />
+    <ProjectReference Include="..\..\..\Core\Infinity.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Infinity.Rendering.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Remove="Frontend\**\*.cs" />
+    <Compile Remove="ShaderLib\**\*.cs" />
+  </ItemGroup>
+
+</Project>

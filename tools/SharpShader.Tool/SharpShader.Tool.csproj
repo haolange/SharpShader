@@ -17,7 +17,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\Runtime\Graphics\SharpShader\SharpShader.csproj" />
-    <ProjectReference Include="..\..\Runtime\Graphics\SharpShader.CSharp\SharpShader.CSharp.csproj" />
+    <ProjectReference Include="..\..\Runtime\Graphics\SharpShader\CSharp\SharpShader.CSharp.csproj" />
   </ItemGroup>
 
 </Project>

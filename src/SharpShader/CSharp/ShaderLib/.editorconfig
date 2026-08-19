@@ -1,0 +1,12 @@
+# SharpSL ShaderLib analyzer policy [ADR-0061]
+# - CA1859 would force concrete collection types over IReadOnly* contracts
+# - CA1720 rejects GPU scalar names Int/Float
+# - CA1512 rejects domain-specific ArgumentOutOfRangeException messages
+
+[*.cs]
+dotnet_diagnostic.CA1859.severity = none
+dotnet_diagnostic.CA1720.severity = none
+dotnet_diagnostic.CA1512.severity = none
+dotnet_diagnostic.CA1822.severity = none
+dotnet_diagnostic.CA1051.severity = none
+dotnet_diagnostic.CA1711.severity = none

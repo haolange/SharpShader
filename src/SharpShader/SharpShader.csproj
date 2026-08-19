@@ -41,6 +41,11 @@
 	</ItemGroup>
 
 	<ItemGroup>
+	  <Compile Remove="SharpGPU\**\*.cs" />
+	  <Compile Remove="CSharp\**\*.cs" />
+	</ItemGroup>
+
+	<ItemGroup>
 	  <Compile Update="Shaderlab\Frontend\Generated\**\*.cs">
 	    <AutoGen>true</AutoGen>
 	    <DesignTime>true</DesignTime>
