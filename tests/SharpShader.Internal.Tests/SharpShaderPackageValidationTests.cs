@@ -406,7 +406,8 @@ namespace Infinity.Rendering.Tests
                 "SharpGPU.csproj");
             string adapterProjectPath = Path.Combine(
                 graphicsRoot,
-                "SharpShader.SharpGPU",
+                "SharpShader",
+                "SharpGPU",
                 "SharpShader.SharpGPU.csproj");
 
             Assert.False(
