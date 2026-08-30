@@ -126,9 +126,6 @@ namespace SharpShader.ShaderLab.Frontend
                 bool hasNumericClass = false;
                 bool hasSampleMode = false;
                 bool hasLayerMode = false;
-                bool hasOrdering = false;
-                bool hasFeedback = false;
-                bool hasSampledFeedbackBinding = false;
                 uint logicalAttachmentId = 0;
                 uint? inputIndex = null;
                 uint? outputLocation = null;
@@ -138,9 +135,6 @@ namespace SharpShader.ShaderLab.Frontend
                 ShaderAttachmentNumericClass numericClass = default;
                 ShaderAttachmentSampleMode sampleMode = default;
                 ShaderAttachmentLayerMode layerMode = default;
-                ShaderAttachmentOrdering ordering = default;
-                ShaderAttachmentFeedback feedback = default;
-                ShaderBindingKey? sampledFeedbackBinding = null;
 
                 while (m_Current.Kind != TokenKind.RightBrace)
                 {
@@ -193,18 +187,6 @@ namespace SharpShader.ShaderLab.Frontend
                             layerMode = ReadEnum<ShaderAttachmentLayerMode>(
                                 "LayerMode");
                             break;
-                        case "Ordering":
-                            RequireFirst(ref hasOrdering, field);
-                            ordering = ReadEnum<ShaderAttachmentOrdering>("Ordering");
-                            break;
-                        case "Feedback":
-                            RequireFirst(ref hasFeedback, field);
-                            feedback = ReadEnum<ShaderAttachmentFeedback>("Feedback");
-                            break;
-                        case "SampledFeedbackBinding":
-                            RequireFirst(ref hasSampledFeedbackBinding, field);
-                            sampledFeedbackBinding = ParseSampledFeedbackBinding();
-                            break;
                         default:
                             throw Error(
                                 field,
@@ -222,11 +204,6 @@ namespace SharpShader.ShaderLab.Frontend
                 RequirePresent(hasNumericClass, "NumericClass");
                 RequirePresent(hasSampleMode, "SampleMode");
                 RequirePresent(hasLayerMode, "LayerMode");
-                RequirePresent(hasOrdering, "Ordering");
-                RequirePresent(hasFeedback, "Feedback");
-                RequirePresent(
-                    hasSampledFeedbackBinding,
-                    "SampledFeedbackBinding");
                 return new ShaderAttachmentDeclaration(
                     logicalAttachmentId,
                     inputIndex,
@@ -236,65 +213,7 @@ namespace SharpShader.ShaderLab.Frontend
                     sampleMode,
                     layerMode,
                     outputIndex,
-                    outputComponent,
-                    ordering,
-                    feedback,
-                    sampledFeedbackBinding);
-            }
-
-            private ShaderBindingKey? ParseSampledFeedbackBinding()
-            {
-                if (m_Current.Kind == TokenKind.Identifier
-                    && string.Equals(m_Current.Text, "None", StringComparison.Ordinal))
-                {
-                    Advance();
-                    return null;
-                }
-
-                Expect(TokenKind.LeftBrace);
-                bool hasTable = false;
-                bool hasSlot = false;
-                bool hasType = false;
-                uint table = 0;
-                uint slot = 0;
-                ShaderBindingClass type = default;
-                while (m_Current.Kind != TokenKind.RightBrace)
-                {
-                    if (m_Current.Kind == TokenKind.End)
-                    {
-                        throw Error(
-                            m_Current,
-                            "SampledFeedbackBinding is missing its closing brace.");
-                    }
-
-                    Token field = Expect(TokenKind.Identifier);
-                    switch (field.Text)
-                    {
-                        case "Table":
-                            RequireFirst(ref hasTable, field);
-                            table = ReadUInt32("Table");
-                            break;
-                        case "Slot":
-                            RequireFirst(ref hasSlot, field);
-                            slot = ReadUInt32("Slot");
-                            break;
-                        case "Type":
-                            RequireFirst(ref hasType, field);
-                            type = ReadEnum<ShaderBindingClass>("Type");
-                            break;
-                        default:
-                            throw Error(
-                                field,
-                                $"Unknown SampledFeedbackBinding field "
-                                + $"'{field.Text}'.");
-                    }
-                }
-
-                Expect(TokenKind.RightBrace);
-                RequirePresent(hasTable, "SampledFeedbackBinding.Table");
-                RequirePresent(hasSlot, "SampledFeedbackBinding.Slot");
-                RequirePresent(hasType, "SampledFeedbackBinding.Type");
-                return new ShaderBindingKey(table, slot, type);
+                    outputComponent);
             }
 
             private ShaderAttachmentAspect ReadAspect()

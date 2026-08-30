@@ -271,14 +271,6 @@ namespace SharpShader.Compilation.Internal
         [JsonPropertyOrder(8)]
         public string? LayerMode { get; set; }
 
-        [JsonPropertyOrder(9)]
-        public string? Ordering { get; set; }
-
-        [JsonPropertyOrder(10)]
-        public string? Feedback { get; set; }
-
-        [JsonPropertyOrder(11)]
-        public ShaderBindingKeyDocument? SampledFeedbackBinding { get; set; }
     }
 
     internal sealed class ShaderArtifactIdentityDocument

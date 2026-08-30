@@ -3,7 +3,7 @@
 
 // Stable author-facing syntax only. The authoritative attachment mapping is the
 // explicit ShaderAttachmentInterface compile input and is validated per artifact.
-#define SHARPSHADER_ATTACHMENT_ABI_REVISION 1
+#define SHARPSHADER_ATTACHMENT_ABI_REVISION 2
 #define SHARPSHADER_ATTACHMENT_PRIVATE_TABLE 65535
 #define SHARPSHADER_ATTACHMENT_PROVISIONAL_SPIRV_SET 65535
 
@@ -64,19 +64,41 @@
     name.SubpassLoad()
 #define SHARPSHADER_LOAD_LOCAL_INPUT_MS_ARRAY( \
     name, pixel_position, layer, sample_index) name.SubpassLoad(sample_index)
-#define SHARPSHADER_HAS_RASTER_ORDERED_TEXTURE_PATH 1
-#define SHARPSHADER_DECLARE_RASTER_ORDERED_ATTACHMENT_2D( \
+#define SHARPSHADER_HAS_FRAMEBUFFER_READ_WRITE_PATH 1
+#define SHARPSHADER_DECLARE_FRAMEBUFFER_READ_WRITE_2D( \
     value_type, name, logical_attachment_id, input_index) \
-    [[vk::binding(logical_attachment_id, SHARPSHADER_ATTACHMENT_PROVISIONAL_SPIRV_SET)]] \
-    RasterizerOrderedTexture2D<value_type> name : \
-        SHARPSHADER_DETAIL_REGISTER( \
-            u, logical_attachment_id, SHARPSHADER_ATTACHMENT_PRIVATE_TABLE)
-#define SHARPSHADER_DECLARE_RASTER_ORDERED_ATTACHMENT_2D_ARRAY( \
+    SHARPSHADER_INPUT_ATTACHMENT(input_index) \
+    [[vk::binding(input_index, SHARPSHADER_ATTACHMENT_PROVISIONAL_SPIRV_SET)]] \
+    SubpassInput<value_type> name
+#define SHARPSHADER_DECLARE_FRAMEBUFFER_READ_WRITE_2D_MS( \
     value_type, name, logical_attachment_id, input_index) \
-    [[vk::binding(logical_attachment_id, SHARPSHADER_ATTACHMENT_PROVISIONAL_SPIRV_SET)]] \
-    RasterizerOrderedTexture2DArray<value_type> name : \
-        SHARPSHADER_DETAIL_REGISTER( \
-            u, logical_attachment_id, SHARPSHADER_ATTACHMENT_PRIVATE_TABLE)
+    SHARPSHADER_INPUT_ATTACHMENT(input_index) \
+    [[vk::binding(input_index, SHARPSHADER_ATTACHMENT_PROVISIONAL_SPIRV_SET)]] \
+    SubpassInputMS<value_type> name
+#define SHARPSHADER_DECLARE_FRAMEBUFFER_READ_WRITE_2D_ARRAY( \
+    value_type, name, logical_attachment_id, input_index) \
+    SHARPSHADER_DECLARE_FRAMEBUFFER_READ_WRITE_2D( \
+        value_type, name, logical_attachment_id, input_index)
+#define SHARPSHADER_DECLARE_FRAMEBUFFER_READ_WRITE_2D_MS_ARRAY( \
+    value_type, name, logical_attachment_id, input_index) \
+    SHARPSHADER_DECLARE_FRAMEBUFFER_READ_WRITE_2D_MS( \
+        value_type, name, logical_attachment_id, input_index)
+#define SHARPSHADER_LOAD_FRAMEBUFFER_READ_WRITE( \
+    attachment_name, pixel_position) attachment_name.SubpassLoad()
+#define SHARPSHADER_LOAD_FRAMEBUFFER_READ_WRITE_MS( \
+    attachment_name, pixel_position, sample_index) \
+    attachment_name.SubpassLoad(sample_index)
+#define SHARPSHADER_LOAD_FRAMEBUFFER_READ_WRITE_ARRAY( \
+    attachment_name, pixel_position, layer) attachment_name.SubpassLoad()
+#define SHARPSHADER_LOAD_FRAMEBUFFER_READ_WRITE_MS_ARRAY( \
+    attachment_name, pixel_position, layer, sample_index) \
+    attachment_name.SubpassLoad(sample_index)
+#define SHARPSHADER_STORE_FRAMEBUFFER_READ_WRITE( \
+    attachment_name, output_lvalue, pixel_position, value) \
+    do { (output_lvalue) = (value); } while (false)
+#define SHARPSHADER_STORE_FRAMEBUFFER_READ_WRITE_ARRAY( \
+    attachment_name, output_lvalue, pixel_position, layer, value) \
+    do { (output_lvalue) = (value); } while (false)
 #else
 #define SHARPSHADER_ATTACHMENT_TARGET_SPIRV 0
 #define SHARPSHADER_ATTACHMENT_TARGET_DXIL 1
@@ -108,67 +130,34 @@
 #define SHARPSHADER_LOAD_LOCAL_INPUT_MS_ARRAY( \
     name, pixel_position, layer, sample_index) \
     name.Load(int3(pixel_position, layer), sample_index)
-#define SHARPSHADER_HAS_RASTER_ORDERED_TEXTURE_PATH 1
-#define SHARPSHADER_DECLARE_RASTER_ORDERED_ATTACHMENT_2D( \
+#define SHARPSHADER_HAS_FRAMEBUFFER_READ_WRITE_PATH 1
+#define SHARPSHADER_DECLARE_FRAMEBUFFER_READ_WRITE_2D( \
     value_type, name, logical_attachment_id, input_index) \
     RasterizerOrderedTexture2D<value_type> name : \
         SHARPSHADER_DETAIL_REGISTER( \
             u, logical_attachment_id, SHARPSHADER_ATTACHMENT_PRIVATE_TABLE)
-#define SHARPSHADER_DECLARE_RASTER_ORDERED_ATTACHMENT_2D_ARRAY( \
+#define SHARPSHADER_DECLARE_FRAMEBUFFER_READ_WRITE_2D_ARRAY( \
     value_type, name, logical_attachment_id, input_index) \
     RasterizerOrderedTexture2DArray<value_type> name : \
         SHARPSHADER_DETAIL_REGISTER( \
             u, logical_attachment_id, SHARPSHADER_ATTACHMENT_PRIVATE_TABLE)
+#define SHARPSHADER_LOAD_FRAMEBUFFER_READ_WRITE( \
+    attachment_name, pixel_position) attachment_name[pixel_position]
+#define SHARPSHADER_LOAD_FRAMEBUFFER_READ_WRITE_ARRAY( \
+    attachment_name, pixel_position, layer) \
+    attachment_name[int3(pixel_position, layer)]
+#define SHARPSHADER_STORE_FRAMEBUFFER_READ_WRITE( \
+    attachment_name, output_lvalue, pixel_position, value) \
+    do { \
+        (output_lvalue) = (value); \
+        attachment_name[pixel_position] = (output_lvalue); \
+    } while (false)
+#define SHARPSHADER_STORE_FRAMEBUFFER_READ_WRITE_ARRAY( \
+    attachment_name, output_lvalue, pixel_position, layer, value) \
+    do { \
+        (output_lvalue) = (value); \
+        attachment_name[int3(pixel_position, layer)] = (output_lvalue); \
+    } while (false)
 #endif
-
-#define SHARPSHADER_LOAD_RASTER_ORDERED_ATTACHMENT( \
-    texture_name, pixel_position) texture_name[pixel_position]
-#define SHARPSHADER_LOAD_RASTER_ORDERED_ATTACHMENT_ARRAY( \
-    texture_name, pixel_position, layer) \
-    texture_name[int3(pixel_position, layer)]
-#define SHARPSHADER_STORE_RASTER_ORDERED_ATTACHMENT( \
-    texture_name, output_lvalue, pixel_position, value) \
-    do { \
-        (output_lvalue) = (value); \
-        texture_name[pixel_position] = (output_lvalue); \
-    } while (false)
-#define SHARPSHADER_STORE_RASTER_ORDERED_ATTACHMENT_ARRAY( \
-    texture_name, output_lvalue, pixel_position, layer, value) \
-    do { \
-        (output_lvalue) = (value); \
-        texture_name[int3(pixel_position, layer)] = (output_lvalue); \
-    } while (false)
-
-#define SHARPSHADER_DECLARE_SAMPLED_FEEDBACK_TEXTURE_2D( \
-    value_type, name, table, slot) \
-    Texture2D<value_type> name : \
-        SHARPSHADER_DETAIL_REGISTER(t, slot, table)
-#define SHARPSHADER_DECLARE_SAMPLED_FEEDBACK_TEXTURE_2D_MS( \
-    value_type, name, table, slot) \
-    Texture2DMS<value_type> name : \
-        SHARPSHADER_DETAIL_REGISTER(t, slot, table)
-#define SHARPSHADER_DECLARE_SAMPLED_FEEDBACK_TEXTURE_2D_ARRAY( \
-    value_type, name, table, slot) \
-    Texture2DArray<value_type> name : \
-        SHARPSHADER_DETAIL_REGISTER(t, slot, table)
-#define SHARPSHADER_DECLARE_SAMPLED_FEEDBACK_TEXTURE_2D_MS_ARRAY( \
-    value_type, name, table, slot) \
-    Texture2DMSArray<value_type> name : \
-        SHARPSHADER_DETAIL_REGISTER(t, slot, table)
-#define SHARPSHADER_SAMPLE_FEEDBACK(texture_name, sampler_name, uv) \
-    texture_name.Sample(sampler_name, uv)
-#define SHARPSHADER_LOAD_SAMPLED_FEEDBACK(texture_name, pixel_position) \
-    texture_name.Load(int3(pixel_position, 0))
-#define SHARPSHADER_LOAD_SAMPLED_FEEDBACK_MS(texture_name, pixel_position, sample_index) \
-    texture_name.Load(pixel_position, sample_index)
-#define SHARPSHADER_SAMPLE_FEEDBACK_ARRAY( \
-    texture_name, sampler_name, uv, layer) \
-    texture_name.Sample(sampler_name, float3(uv, layer))
-#define SHARPSHADER_LOAD_SAMPLED_FEEDBACK_ARRAY( \
-    texture_name, pixel_position, layer) \
-    texture_name.Load(int4(pixel_position, layer, 0))
-#define SHARPSHADER_LOAD_SAMPLED_FEEDBACK_MS_ARRAY( \
-    texture_name, pixel_position, layer, sample_index) \
-    texture_name.Load(int3(pixel_position, layer), sample_index)
 
 #endif

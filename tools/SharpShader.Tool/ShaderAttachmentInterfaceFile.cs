@@ -8,7 +8,7 @@ namespace SharpShader.Tool
 {
     internal static class ShaderAttachmentInterfaceFile
     {
-        internal const uint CurrentSchemaRevision = 1;
+        internal const uint CurrentSchemaRevision = 2;
         private const long MaximumFileBytes = 16L * 1024 * 1024;
         private static readonly UTF8Encoding s_StrictUtf8 = new(false, true);
         private static readonly JsonSerializerOptions s_JsonOptions =
@@ -167,24 +167,6 @@ namespace SharpShader.Tool
                     $"{path}.outputLocation is required (use null when absent).");
             }
 
-            if (!document.HasSampledFeedbackBinding)
-            {
-                throw Invalid(
-                    $"{path}.sampledFeedbackBinding is required (use null when absent).");
-            }
-
-            ShaderBindingKey? sampledBinding = document.SampledFeedbackBinding is null
-                ? null
-                : new ShaderBindingKey(
-                    Require(
-                        document.SampledFeedbackBinding.Table,
-                        $"{path}.sampledFeedbackBinding.table"),
-                    Require(
-                        document.SampledFeedbackBinding.Slot,
-                        $"{path}.sampledFeedbackBinding.slot"),
-                    Require(
-                        document.SampledFeedbackBinding.Type,
-                        $"{path}.sampledFeedbackBinding.type"));
             try
             {
                 return new ShaderAttachmentDeclaration(
@@ -196,10 +178,7 @@ namespace SharpShader.Tool
                     Require(document.SampleMode, $"{path}.sampleMode"),
                     Require(document.LayerMode, $"{path}.layerMode"),
                     Require(document.OutputIndex, $"{path}.outputIndex"),
-                    Require(document.OutputComponent, $"{path}.outputComponent"),
-                    Require(document.Ordering, $"{path}.ordering"),
-                    Require(document.Feedback, $"{path}.feedback"),
-                    sampledBinding);
+                    Require(document.OutputComponent, $"{path}.outputComponent"));
             }
             catch (ArgumentException exception)
             {
@@ -371,7 +350,6 @@ namespace SharpShader.Tool
         {
             private uint? m_InputIndex;
             private uint? m_OutputLocation;
-            private ShaderBindingKeyDocument? m_SampledFeedbackBinding;
 
             public uint? LogicalAttachmentId { get; set; }
             [JsonIgnore]
@@ -402,26 +380,6 @@ namespace SharpShader.Tool
             public ShaderAttachmentNumericClass? NumericClass { get; set; }
             public ShaderAttachmentSampleMode? SampleMode { get; set; }
             public ShaderAttachmentLayerMode? LayerMode { get; set; }
-            public ShaderAttachmentOrdering? Ordering { get; set; }
-            public ShaderAttachmentFeedback? Feedback { get; set; }
-            [JsonIgnore]
-            public bool HasSampledFeedbackBinding { get; private set; }
-            public ShaderBindingKeyDocument? SampledFeedbackBinding
-            {
-                get => m_SampledFeedbackBinding;
-                set
-                {
-                    HasSampledFeedbackBinding = true;
-                    m_SampledFeedbackBinding = value;
-                }
-            }
-        }
-
-        private sealed class ShaderBindingKeyDocument
-        {
-            public uint? Table { get; set; }
-            public uint? Slot { get; set; }
-            public ShaderBindingClass? Type { get; set; }
         }
     }
 }

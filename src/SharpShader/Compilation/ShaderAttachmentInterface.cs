@@ -11,7 +11,7 @@ namespace SharpShader.Compilation
     /// </summary>
     public sealed class ShaderAttachmentInterface : IEquatable<ShaderAttachmentInterface>
     {
-        public const uint CurrentAbiRevision = 1;
+        public const uint CurrentAbiRevision = 2;
 
         public uint AbiRevision { get; }
         public string VariantKey { get; }

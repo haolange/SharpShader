@@ -7,7 +7,7 @@ namespace SharpShader.Compilation
 
     public sealed class ShaderArtifactReflection : IEquatable<ShaderArtifactReflection>
     {
-        public const uint CurrentSchemaVersion = 2;
+        public const uint CurrentSchemaVersion = 3;
 
         private readonly ReadOnlyCollection<ShaderEntryPointReflection> m_EntryPoints;
 

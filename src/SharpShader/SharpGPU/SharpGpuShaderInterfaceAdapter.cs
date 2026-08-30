@@ -51,6 +51,52 @@ namespace SharpShader.SharpGPU
                 attachmentFacts.ToArray());
         }
 
+        public static Rhi.RHIRasterAttachmentShaderAbi
+            QueryRasterAttachmentShaderAbi(
+                Rhi.RHIDevice device,
+                SharpGpuRasterCompatibilityPlan compatibilityPlan,
+                in Rhi.RHIRasterPipelineDescriptor descriptor)
+        {
+            ArgumentNullException.ThrowIfNull(device);
+            ArgumentNullException.ThrowIfNull(compatibilityPlan);
+            compatibilityPlan.ValidateRasterPipelineDescriptor(in descriptor);
+            Rhi.RHIPipelineLayout pipelineLayout = descriptor.PipelineLayout
+                ?? throw new ArgumentException(
+                    "A raster attachment shader ABI query requires a pipeline layout.",
+                    nameof(descriptor));
+            Rhi.RHIRasterAttachmentShaderAbiDescriptor abiDescriptor = new()
+            {
+                PipelineLayout = pipelineLayout,
+                SampleCount = descriptor.SampleCount,
+                ColorFormats = descriptor.ColorFormats,
+                AttachmentInterface = descriptor.AttachmentInterface,
+            };
+            return device.QueryRasterAttachmentShaderAbi(in abiDescriptor);
+        }
+
+        public static Rhi.RHIRasterPipelineDescriptor BindRasterAttachmentShaderAbi(
+            Rhi.RHIDevice device,
+            SharpGpuRasterCompatibilityPlan compatibilityPlan,
+            in Rhi.RHIRasterPipelineDescriptor descriptor)
+        {
+            Rhi.RHIRasterAttachmentShaderAbi abi =
+                QueryRasterAttachmentShaderAbi(
+                    device,
+                    compatibilityPlan,
+                    in descriptor);
+            Rhi.RHIRasterAttachmentShaderAbiClaim claim = abi.CreateClaim();
+            if (descriptor.AttachmentShaderAbiClaim.HasValue
+                && descriptor.AttachmentShaderAbiClaim.Value != claim)
+            {
+                throw new ArgumentException(
+                    "The raster pipeline already carries a different attachment shader ABI claim.",
+                    nameof(descriptor));
+            }
+            Rhi.RHIRasterPipelineDescriptor result = descriptor;
+            result.AttachmentShaderAbiClaim = claim;
+            return result;
+        }
+
         private static ShaderInterfaceEntry FindManifestEntry(
             ShaderInterfaceManifest manifest,
             string variantKey,
@@ -118,15 +164,12 @@ namespace SharpShader.SharpGPU
                 return new Rhi.RHIAttachmentInterfaceSignature(
                     0,
                     Rhi.RHIAttachmentIndexArray.Empty,
-                    Rhi.RHIAttachmentIndexArray.Empty,
                     Rhi.RHIAttachmentIndexArray.Empty);
             }
 
             int colorAttachmentCount = 0;
             int colorInputSlotCount = 0;
             int colorOutputLocationCount = 0;
-            HashSet<uint> sampledFeedbackLogicalIds = new();
-            byte rasterOrderedReadWriteMask = 0;
             byte layeredAccessMask = 0;
             bool usesDualSourceColor = false;
             foreach (ShaderAttachmentDeclaration attachment in phase.Attachments)
@@ -154,22 +197,7 @@ namespace SharpShader.SharpGPU
                     usesDualSourceColor |= attachment.OutputIndex == 1;
                 }
 
-                if (attachment.Feedback == ShaderAttachmentFeedback.Sampled)
-                {
-                    sampledFeedbackLogicalIds.Add(
-                        attachment.LogicalAttachmentId);
-                }
-
-                if (attachment.Ordering == ShaderAttachmentOrdering.RasterOrdered)
-                {
-                    rasterOrderedReadWriteMask |= checked((byte)(
-                        1u << checked((int)attachment.LogicalAttachmentId)));
-                }
-
-                bool usesSpecialAttachmentAccess = attachment.InputIndex.HasValue
-                    || attachment.Ordering
-                        == ShaderAttachmentOrdering.RasterOrdered
-                    || attachment.Feedback == ShaderAttachmentFeedback.Sampled;
+                bool usesSpecialAttachmentAccess = attachment.InputIndex.HasValue;
                 if (attachment.LayerMode == ShaderAttachmentLayerMode.Layered
                     && usesSpecialAttachmentAccess)
                 {
@@ -203,15 +231,6 @@ namespace SharpShader.SharpGPU
                 }
             }
 
-            List<uint> sampledLogicalIds = new(sampledFeedbackLogicalIds);
-            sampledLogicalIds.Sort();
-            Rhi.RHIAttachmentIndexArray sampledFeedback =
-                new(sampledLogicalIds.Count);
-            for (int index = 0; index < sampledLogicalIds.Count; ++index)
-            {
-                sampledFeedback[index] = checked((int)sampledLogicalIds[index]);
-            }
-
             Rhi.ERHISubPassFlags depthStencilFlags =
                 Rhi.ERHISubPassFlags.None;
             if (phase.DepthStencilAccess == ShaderDepthStencilAccess.ReadOnly)
@@ -239,8 +258,6 @@ namespace SharpShader.SharpGPU
                 colorAttachmentCount,
                 colorInputs,
                 colorOutputs,
-                sampledFeedback,
-                rasterOrderedReadWriteMask,
                 depthStencilFlags,
                 usesDualSourceColor,
                 layeredAccessMask: layeredAccessMask);

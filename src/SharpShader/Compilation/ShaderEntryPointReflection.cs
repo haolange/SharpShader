@@ -20,7 +20,7 @@ namespace SharpShader.Compilation
         public IReadOnlyList<ShaderStageIoReflection> StageOutputs => m_StageOutputs;
         public IReadOnlyList<ShaderInputAttachmentReflection> InputAttachments =>
             m_InputAttachments;
-        public ShaderAttachmentArtifactRequirement AttachmentRequirements { get; }
+        internal ShaderAttachmentArtifactRequirement AttachmentRequirements { get; }
 
         public ShaderEntryPointReflection(
             string name,
@@ -29,9 +29,28 @@ namespace SharpShader.Compilation
             ShaderThreadGroupSize? threadGroupSize = null,
             IEnumerable<ShaderStageIoReflection>? stageInputs = null,
             IEnumerable<ShaderStageIoReflection>? stageOutputs = null,
-            IEnumerable<ShaderInputAttachmentReflection>? inputAttachments = null,
-            ShaderAttachmentArtifactRequirement attachmentRequirements =
+            IEnumerable<ShaderInputAttachmentReflection>? inputAttachments = null)
+            : this(
+                name,
+                stage,
+                resources,
+                threadGroupSize,
+                stageInputs,
+                stageOutputs,
+                inputAttachments,
                 ShaderAttachmentArtifactRequirement.None)
+        {
+        }
+
+        internal ShaderEntryPointReflection(
+            string name,
+            ShaderExecutionStage stage,
+            IEnumerable<ShaderResourceBindingReflection>? resources,
+            ShaderThreadGroupSize? threadGroupSize,
+            IEnumerable<ShaderStageIoReflection>? stageInputs,
+            IEnumerable<ShaderStageIoReflection>? stageOutputs,
+            IEnumerable<ShaderInputAttachmentReflection>? inputAttachments,
+            ShaderAttachmentArtifactRequirement attachmentRequirements)
         {
             if (string.IsNullOrWhiteSpace(name))
             {

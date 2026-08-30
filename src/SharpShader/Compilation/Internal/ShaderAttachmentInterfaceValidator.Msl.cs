@@ -53,7 +53,11 @@ namespace SharpShader.Compilation.Internal
                     "A pixel attachment interface has no raster phase.");
             ValidateMslOutputs(reflection, bindingPlan);
             ValidateMslLocalInputs(phase, reflection, bindingPlan);
-            ValidateMslRasterOrderedTextures(phase, reflection, bindingPlan);
+            if (reflection.RasterOrderGroups.Count != 0)
+            {
+                throw MslFailure(
+                    "Compiler-generated attachment I/O must not lower to a private raster-order resource.");
+            }
 
             if (reflection.DepthExport != phase.DepthExport
                 || reflection.DepthExport != bindingPlan.DepthExport
@@ -78,14 +82,14 @@ namespace SharpShader.Compilation.Internal
                 (reflection.AttachmentRequirements
                     & ShaderAttachmentArtifactRequirement.StencilReferenceExport) != 0;
             if (reportsFramebufferFetch != bindingPlan.UsesFramebufferFetch
-                || reportsRasterOrdering != bindingPlan.UsesRasterOrderGroups
+                || reportsRasterOrdering
                 || reportsStencilExport
                     != (bindingPlan.StencilExport
                         == ShaderStencilExport.StencilReference))
             {
                 throw MslFailure(
                     "MSL attachment requirements do not match the frozen "
-                    + "framebuffer-fetch, raster-order, or stencil strategy.");
+                    + "framebuffer-fetch or stencil strategy.");
             }
         }
 
@@ -191,8 +195,18 @@ namespace SharpShader.Compilation.Internal
                 ShaderAttachmentDeclaration attachment =
                     FindLocalInputAttachment(
                         phase,
-                        resource.Binding,
-                        resource.MetalIndex);
+                        resource.Binding);
+                uint expectedColorLocation =
+                    attachment.OutputLocation ??
+                    attachment.InputIndex!.Value;
+                if (resource.MetalIndex != expectedColorLocation)
+                {
+                    throw MslFailure(
+                        $"MSL local input slot {resource.Binding} maps to "
+                        + $"color {resource.MetalIndex}, expected "
+                        + $"{expectedColorLocation} from the input/output "
+                        + "interface.");
+                }
                 if (input.NumericClass != attachment.NumericClass)
                 {
                     throw MslFailure(
@@ -209,111 +223,14 @@ namespace SharpShader.Compilation.Internal
             }
         }
 
-        private static void ValidateMslRasterOrderedTextures(
-            ShaderAttachmentPhase phase,
-            MslArtifactReflection reflection,
-            MslTranslationBindingPlan bindingPlan)
-        {
-            Dictionary<uint, MslTranslationResourceBinding> expected = new();
-            foreach (MslTranslationResourceBinding resource in
-                     bindingPlan.Resources)
-            {
-                if (!resource.IsPrivateAttachment
-                    || resource.DescriptorKind
-                        != VulkanDescriptorKind.StorageImage)
-                {
-                    continue;
-                }
-
-                if (resource.MetalNamespace
-                        != ShaderPhysicalBindingNamespace.Texture
-                    || resource.ResourceCount != 1
-                    || !expected.TryAdd(resource.MetalIndex, resource))
-                {
-                    throw MslFailure(
-                        "The frozen MSL raster-order plan is ambiguous or does "
-                        + "not target one Metal texture namespace element.");
-                }
-            }
-
-            if (reflection.RasterOrderGroups.Count != expected.Count)
-            {
-                throw MslFailure(
-                    $"MSL raster-order binding count "
-                    + $"{reflection.RasterOrderGroups.Count} does not match "
-                    + $"frozen plan count {expected.Count}.");
-            }
-
-            Dictionary<uint, MslTextureBindingReflection> textures = new();
-            foreach (MslTextureBindingReflection texture in
-                     reflection.TextureBindings)
-            {
-                if (!textures.TryAdd(texture.TextureIndex, texture))
-                {
-                    throw MslFailure(
-                        $"MSL contains duplicate texture index "
-                        + $"{texture.TextureIndex}.");
-                }
-            }
-
-            foreach (MslRasterOrderGroupReflection group in
-                     reflection.RasterOrderGroups)
-            {
-                if (group.BindingKind != MslResourceBindingKind.Texture
-                    || group.Group != 0
-                    || !expected.Remove(
-                        group.BindingIndex,
-                        out MslTranslationResourceBinding resource)
-                    || !textures.TryGetValue(
-                        group.BindingIndex,
-                        out MslTextureBindingReflection? texture)
-                    || texture.RasterOrderGroup != group.Group
-                    || !texture.IsReadWrite)
-                {
-                    throw MslFailure(
-                        $"MSL raster-order group at "
-                        + $"{group.BindingKind}/{group.BindingIndex}/"
-                        + $"{group.Group} does not match the frozen private "
-                        + "texture strategy.");
-                }
-
-                ShaderAttachmentDeclaration attachment =
-                    FindRasterOrderedAttachment(
-                        phase,
-                        resource.LogicalBinding.Slot);
-                if (texture.NumericClass != attachment.NumericClass
-                    || texture.SampleMode != attachment.SampleMode
-                    || texture.LayerMode != attachment.LayerMode)
-                {
-                    throw MslFailure(
-                        $"MSL raster-order texture {group.BindingIndex} shape "
-                        + $"{texture.NumericClass}/{texture.SampleMode}/"
-                        + $"{texture.LayerMode} does not match explicit "
-                        + $"attachment {attachment.LogicalAttachmentId} shape "
-                        + $"{attachment.NumericClass}/{attachment.SampleMode}/"
-                        + $"{attachment.LayerMode}.");
-                }
-            }
-
-            if (expected.Count != 0)
-            {
-                throw MslFailure(
-                    "MSL is missing one or more frozen raster-order textures.");
-            }
-        }
-
         private static ShaderAttachmentDeclaration FindLocalInputAttachment(
             ShaderAttachmentPhase phase,
-            uint inputIndex,
-            uint logicalAttachmentId)
+            uint inputIndex)
         {
             ShaderAttachmentDeclaration? match = null;
             foreach (ShaderAttachmentDeclaration attachment in phase.Attachments)
             {
-                if (attachment.InputIndex != inputIndex
-                    || attachment.LogicalAttachmentId != logicalAttachmentId
-                    || attachment.Ordering
-                        == ShaderAttachmentOrdering.RasterOrdered)
+                if (attachment.InputIndex != inputIndex)
                 {
                     continue;
                 }
@@ -322,8 +239,7 @@ namespace SharpShader.Compilation.Internal
                 {
                     throw MslFailure(
                         $"Attachment contract contains duplicate local input "
-                        + $"{inputIndex} for logical attachment "
-                        + $"{logicalAttachmentId}.");
+                        + $"{inputIndex}.");
                 }
 
                 match = attachment;
@@ -331,38 +247,8 @@ namespace SharpShader.Compilation.Internal
 
             return match
                 ?? throw MslFailure(
-                    $"Frozen MSL local input {inputIndex} -> "
-                    + $"{logicalAttachmentId} has no explicit attachment.");
-        }
-
-        private static ShaderAttachmentDeclaration FindRasterOrderedAttachment(
-            ShaderAttachmentPhase phase,
-            uint logicalAttachmentId)
-        {
-            ShaderAttachmentDeclaration? match = null;
-            foreach (ShaderAttachmentDeclaration attachment in phase.Attachments)
-            {
-                if (attachment.LogicalAttachmentId != logicalAttachmentId
-                    || attachment.Ordering
-                        != ShaderAttachmentOrdering.RasterOrdered)
-                {
-                    continue;
-                }
-
-                if (match is not null)
-                {
-                    throw MslFailure(
-                        $"Attachment contract contains duplicate raster-order "
-                        + $"logical attachment {logicalAttachmentId}.");
-                }
-
-                match = attachment;
-            }
-
-            return match
-                ?? throw MslFailure(
-                    $"Frozen MSL raster-order binding for logical attachment "
-                    + $"{logicalAttachmentId} has no explicit attachment.");
+                    $"Frozen MSL local input {inputIndex} has no explicit "
+                    + "attachment.");
         }
 
         private static ShaderCompilerException MslFailure(string message)

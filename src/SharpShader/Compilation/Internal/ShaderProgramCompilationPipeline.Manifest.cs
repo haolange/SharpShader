@@ -116,29 +116,6 @@ namespace SharpShader.Compilation.Internal
                 text);
         }
 
-        private static bool RequiresOrderedFragmentInterlock(
-            IReadOnlyList<EntryState> entries)
-        {
-            foreach (EntryState entry in entries)
-            {
-                ShaderAttachmentPhase? phase = entry.AttachmentInterface.Phase;
-                if (phase is null)
-                {
-                    continue;
-                }
-
-                foreach (ShaderAttachmentDeclaration attachment in phase.Attachments)
-                {
-                    if (attachment.Ordering == ShaderAttachmentOrdering.RasterOrdered)
-                    {
-                        return true;
-                    }
-                }
-            }
-
-            return false;
-        }
-
         private static bool RequiresStencilExport(
             IReadOnlyList<EntryState> entries)
         {
@@ -152,33 +129,6 @@ namespace SharpShader.Compilation.Internal
             }
 
             return false;
-        }
-        private static void ValidateOrderedFragmentInterlockTargetEnvironment(
-            SpirvCompileOptions options)
-        {
-            ArgumentNullException.ThrowIfNull(options);
-            string? environment = options.TargetEnvironment;
-            if (!string.IsNullOrWhiteSpace(environment)
-                && !environment.StartsWith("vulkan", StringComparison.OrdinalIgnoreCase))
-            {
-                throw InvalidRequest(
-                    $"Raster-ordered attachment compilation requires a Vulkan SPIR-V "
-                    + $"target environment, but '{environment}' was requested.");
-            }
-
-            foreach (string argument in options.AdditionalArguments)
-            {
-                if (!string.IsNullOrWhiteSpace(argument)
-                    && argument.StartsWith(
-                        "-fspv-target-env=",
-                        StringComparison.OrdinalIgnoreCase))
-                {
-                    throw InvalidRequest(
-                        "SPIR-V target environments must be supplied through "
-                        + "SpirvCompileOptions.TargetEnvironment so the attachment ABI "
-                        + "can validate ordered fragment-interlock support.");
-                }
-            }
         }
 }
 }

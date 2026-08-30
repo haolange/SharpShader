@@ -397,11 +397,6 @@ namespace SharpShader.Compilation.Internal
                 NumericClass = declaration.NumericClass.ToString(),
                 SampleMode = declaration.SampleMode.ToString(),
                 LayerMode = declaration.LayerMode.ToString(),
-                Ordering = declaration.Ordering.ToString(),
-                Feedback = declaration.Feedback.ToString(),
-                SampledFeedbackBinding = declaration.SampledFeedbackBinding.HasValue
-                    ? EncodeBindingKey(declaration.SampledFeedbackBinding.Value)
-                    : null,
             };
         }
 
@@ -427,16 +422,7 @@ namespace SharpShader.Compilation.Internal
                     document.LayerMode,
                     "attachmentDeclaration.layerMode"),
                 RequireValue(document.OutputIndex, "attachmentDeclaration.outputIndex"),
-                RequireValue(document.OutputComponent, "attachmentDeclaration.outputComponent"),
-                ParseEnum<ShaderAttachmentOrdering>(
-                    document.Ordering,
-                    "attachmentDeclaration.ordering"),
-                ParseEnum<ShaderAttachmentFeedback>(
-                    document.Feedback,
-                    "attachmentDeclaration.feedback"),
-                document.SampledFeedbackBinding is null
-                    ? null
-                    : DecodeBindingKey(document.SampledFeedbackBinding));
+                RequireValue(document.OutputComponent, "attachmentDeclaration.outputComponent"));
         }
 
         private static ShaderArtifactIdentityDocument EncodeArtifact(ShaderArtifactIdentity artifact)

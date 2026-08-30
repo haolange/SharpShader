@@ -12,8 +12,6 @@ namespace SharpShader.Compilation
     public sealed class ShaderAttachmentDeclaration : IEquatable<ShaderAttachmentDeclaration>
     {
         public const uint MaximumColorAttachments = 8;
-        public const uint ReservedAttachmentBindingTable = ushort.MaxValue;
-
         public uint LogicalAttachmentId { get; }
         public uint? InputIndex { get; }
         public uint? OutputLocation { get; }
@@ -23,9 +21,6 @@ namespace SharpShader.Compilation
         public ShaderAttachmentNumericClass NumericClass { get; }
         public ShaderAttachmentSampleMode SampleMode { get; }
         public ShaderAttachmentLayerMode LayerMode { get; }
-        public ShaderAttachmentOrdering Ordering { get; }
-        public ShaderAttachmentFeedback Feedback { get; }
-        public ShaderBindingKey? SampledFeedbackBinding { get; }
 
         public ShaderAttachmentDeclaration(
             uint logicalAttachmentId,
@@ -36,10 +31,7 @@ namespace SharpShader.Compilation
             ShaderAttachmentSampleMode sampleMode,
             ShaderAttachmentLayerMode layerMode,
             uint outputIndex = 0,
-            uint outputComponent = 0,
-            ShaderAttachmentOrdering ordering = ShaderAttachmentOrdering.None,
-            ShaderAttachmentFeedback feedback = ShaderAttachmentFeedback.None,
-            ShaderBindingKey? sampledFeedbackBinding = null)
+            uint outputComponent = 0)
         {
             const ShaderAttachmentAspect knownAspects =
                 ShaderAttachmentAspect.Color |
@@ -76,22 +68,6 @@ namespace SharpShader.Compilation
                     nameof(layerMode),
                     layerMode,
                     "Attachment layer mode is not defined.");
-            }
-
-            if (!Enum.IsDefined(ordering))
-            {
-                throw new ArgumentOutOfRangeException(
-                    nameof(ordering),
-                    ordering,
-                    "Attachment ordering requirement is not defined.");
-            }
-
-            if (!Enum.IsDefined(feedback))
-            {
-                throw new ArgumentOutOfRangeException(
-                    nameof(feedback),
-                    feedback,
-                    "Attachment feedback requirement is not defined.");
             }
 
             bool isColor = aspect == ShaderAttachmentAspect.Color;
@@ -140,66 +116,20 @@ namespace SharpShader.Compilation
 
             if (isColor
                 && !inputIndex.HasValue
-                && !outputLocation.HasValue
-                && feedback == ShaderAttachmentFeedback.None)
+                && !outputLocation.HasValue)
             {
                 throw new ArgumentException(
-                    "An attachment declaration must be a local input, an output, "
-                    + "or explicit sampled feedback.");
+                    "A color attachment declaration must be an input, an output, or both.");
             }
 
             if (isDepthStencil
                 && (inputIndex.HasValue
                     || outputLocation.HasValue
                     || outputIndex != 0
-                    || outputComponent != 0
-                    || ordering != ShaderAttachmentOrdering.None
-                    || feedback != ShaderAttachmentFeedback.None))
+                    || outputComponent != 0))
             {
                 throw new ArgumentException(
                     "Depth/stencil attachment access and exports are declared on the raster phase.");
-            }
-
-            if ((feedback == ShaderAttachmentFeedback.Sampled)
-                != sampledFeedbackBinding.HasValue)
-            {
-                throw new ArgumentException(
-                    "Sampled feedback and its canonical shader binding must be declared together.",
-                    nameof(sampledFeedbackBinding));
-            }
-
-            if (inputIndex.HasValue
-                && feedback == ShaderAttachmentFeedback.Sampled)
-            {
-                throw new ArgumentException(
-                    "One attachment declaration cannot be both a framebuffer-local "
-                    + "input and ordinary sampled feedback.",
-                    nameof(feedback));
-            }
-
-            if (sampledFeedbackBinding.HasValue
-                && sampledFeedbackBinding.Value.Type
-                    != ShaderBindingClass.ShaderResource)
-            {
-                throw new ArgumentException(
-                    "Sampled feedback requires a canonical ShaderResource binding.",
-                    nameof(sampledFeedbackBinding));
-            }
-
-            if (sampledFeedbackBinding.HasValue
-                && sampledFeedbackBinding.Value.Table
-                    == ReservedAttachmentBindingTable)
-            {
-                throw new ArgumentException(
-                    "Sampled feedback cannot use the backend-private attachment table.",
-                    nameof(sampledFeedbackBinding));
-            }
-
-            if (isDepthStencil && sampledFeedbackBinding.HasValue)
-            {
-                throw new ArgumentException(
-                    "Depth/stencil sampled feedback is not part of the color attachment ABI.",
-                    nameof(sampledFeedbackBinding));
             }
 
             if (!outputLocation.HasValue
@@ -225,14 +155,6 @@ namespace SharpShader.Compilation
                     "Output component must be in [0, 3].");
             }
 
-            if (ordering == ShaderAttachmentOrdering.RasterOrdered
-                && (!inputIndex.HasValue || !outputLocation.HasValue))
-            {
-                throw new ArgumentException(
-                    "Raster-ordered access requires the attachment to be both an input and an output.",
-                    nameof(ordering));
-            }
-
             LogicalAttachmentId = logicalAttachmentId;
             InputIndex = inputIndex;
             OutputLocation = outputLocation;
@@ -242,9 +164,6 @@ namespace SharpShader.Compilation
             NumericClass = numericClass;
             SampleMode = sampleMode;
             LayerMode = layerMode;
-            Ordering = ordering;
-            Feedback = feedback;
-            SampledFeedbackBinding = sampledFeedbackBinding;
         }
 
         public bool Equals(ShaderAttachmentDeclaration? other)
@@ -258,10 +177,7 @@ namespace SharpShader.Compilation
                 && Aspect == other.Aspect
                 && NumericClass == other.NumericClass
                 && SampleMode == other.SampleMode
-                && LayerMode == other.LayerMode
-                && Ordering == other.Ordering
-                && Feedback == other.Feedback
-                && SampledFeedbackBinding == other.SampledFeedbackBinding;
+                && LayerMode == other.LayerMode;
         }
 
         public override bool Equals(object? obj) =>
@@ -279,9 +195,6 @@ namespace SharpShader.Compilation
             hash.Add(NumericClass);
             hash.Add(SampleMode);
             hash.Add(LayerMode);
-            hash.Add(Ordering);
-            hash.Add(Feedback);
-            hash.Add(SampledFeedbackBinding);
             return hash.ToHashCode();
         }
     }

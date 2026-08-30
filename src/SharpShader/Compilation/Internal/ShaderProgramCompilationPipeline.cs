@@ -69,7 +69,6 @@ namespace SharpShader.Compilation.Internal
             ShaderTargetKind target,
             SpirvCompileOptions spirvOptions,
             CancellationToken cancellationToken,
-            bool requiresOrderedFragmentInterlock = false,
             bool requiresStencilExport = false)
         {
             bool library = entries.Count != 0 && IsLibraryStage(entries[0].Stage);
@@ -82,18 +81,6 @@ namespace SharpShader.Compilation.Internal
                 }
             }
 
-            if (requiresOrderedFragmentInterlock
-                && target != ShaderTargetKind.SpirV)
-            {
-                throw new InvalidOperationException(
-                    "Ordered fragment interlock can be requested only for a SPIR-V compile unit.");
-            }
-
-            if (requiresOrderedFragmentInterlock)
-            {
-                ValidateOrderedFragmentInterlockTargetEnvironment(spirvOptions);
-            }
-
             if (requiresStencilExport && target != ShaderTargetKind.SpirV)
             {
                 throw new InvalidOperationException(
@@ -104,12 +91,6 @@ namespace SharpShader.Compilation.Internal
             if (target == ShaderTargetKind.SpirV)
             {
                 extraArguments.Add("-fvk-auto-shift-bindings");
-                if (requiresOrderedFragmentInterlock)
-                {
-                    extraArguments.Add(
-                        "-fspv-extension=SPV_EXT_fragment_shader_interlock");
-                }
-
                 if (requiresStencilExport)
                 {
                     extraArguments.Add(

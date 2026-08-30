@@ -8,7 +8,7 @@ namespace SharpShader.Compilation
 
     public sealed class ShaderInterfaceManifest : IEquatable<ShaderInterfaceManifest>
     {
-        public const uint CurrentSchemaVersion = 2;
+        public const uint CurrentSchemaVersion = 3;
 
         private readonly ReadOnlyCollection<ShaderToolchainComponent> m_ToolchainComponents;
         private readonly ReadOnlyCollection<ShaderInterfaceLayout> m_LogicalLayouts;

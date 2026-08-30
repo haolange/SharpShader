@@ -165,7 +165,6 @@ namespace SharpShader.Compilation
             HashSet<uint> dualSourceAttachments = new();
             HashSet<uint> inputIndices = new();
             HashSet<(uint Location, uint Index)> outputs = new();
-            HashSet<ShaderBindingKey> sampledFeedbackBindings = new();
             ShaderAttachmentDeclaration? depthStencilAttachment = null;
             foreach (ShaderAttachmentDeclaration attachment in attachments)
             {
@@ -226,18 +225,6 @@ namespace SharpShader.Compilation
                         nameof(attachments));
                 }
 
-                if (attachment.SampledFeedbackBinding.HasValue
-                    && !sampledFeedbackBindings.Add(
-                        attachment.SampledFeedbackBinding.Value)
-                    && !(isDualSourceSecondary
-                        && primary!.SampledFeedbackBinding
-                            == attachment.SampledFeedbackBinding))
-                {
-                    throw new ArgumentException(
-                        $"Raster phase contains duplicate sampled-feedback binding "
-                        + $"{attachment.SampledFeedbackBinding.Value}.",
-                        nameof(attachments));
-                }
             }
 
             foreach (ShaderAttachmentDeclaration attachment in attachments)
@@ -315,14 +302,8 @@ namespace SharpShader.Compilation
                 return false;
             }
 
-            bool identicalAccess = primary.InputIndex == secondary.InputIndex
-                && primary.Ordering == secondary.Ordering
-                && primary.Feedback == secondary.Feedback
-                && primary.SampledFeedbackBinding == secondary.SampledFeedbackBinding;
-            bool secondaryIsPureOutput = !secondary.InputIndex.HasValue
-                && secondary.Ordering == ShaderAttachmentOrdering.None
-                && secondary.Feedback == ShaderAttachmentFeedback.None
-                && !secondary.SampledFeedbackBinding.HasValue;
+            bool identicalAccess = primary.InputIndex == secondary.InputIndex;
+            bool secondaryIsPureOutput = !secondary.InputIndex.HasValue;
             return identicalAccess || secondaryIsPureOutput;
         }
     }

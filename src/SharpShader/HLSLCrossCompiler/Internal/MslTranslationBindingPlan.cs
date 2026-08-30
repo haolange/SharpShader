@@ -92,7 +92,6 @@ namespace SharpShader.HLSLCrossCompiler.Internal
         public uint PrivateAttachmentDescriptorSet { get; }
         public bool HasPrivateAttachments { get; }
         public bool UsesFramebufferFetch { get; }
-        public bool UsesRasterOrderGroups { get; }
         public ShaderDepthExport DepthExport { get; }
         public ShaderStencilExport StencilExport { get; }
 
@@ -106,7 +105,6 @@ namespace SharpShader.HLSLCrossCompiler.Internal
             uint privateAttachmentDescriptorSet,
             bool hasPrivateAttachments,
             bool usesFramebufferFetch,
-            bool usesRasterOrderGroups,
             ShaderDepthExport depthExport,
             ShaderStencilExport stencilExport)
         {
@@ -119,7 +117,6 @@ namespace SharpShader.HLSLCrossCompiler.Internal
             PrivateAttachmentDescriptorSet = privateAttachmentDescriptorSet;
             HasPrivateAttachments = hasPrivateAttachments;
             UsesFramebufferFetch = usesFramebufferFetch;
-            UsesRasterOrderGroups = usesRasterOrderGroups;
             DepthExport = depthExport;
             StencilExport = stencilExport;
         }
@@ -131,8 +128,7 @@ namespace SharpShader.HLSLCrossCompiler.Internal
             MetalShaderBackendLayout metalLayout,
             ShaderAttachmentInterface attachmentInterface,
             ShaderEntryPointReflection postRemapSpirvReflection,
-            uint privateAttachmentDescriptorSet,
-            uint privateMetalTextureBase)
+            uint privateAttachmentDescriptorSet)
         {
             if (string.IsNullOrWhiteSpace(entryPoint))
             {
@@ -206,7 +202,6 @@ namespace SharpShader.HLSLCrossCompiler.Internal
             List<MslTranslationArgumentBufferBinding> argumentBuffers = new();
             List<MslTranslationShaderOutput> shaderOutputs = new();
             bool usesFramebufferFetch = false;
-            bool usesRasterOrderGroups = false;
             if (mode == MslTranslationBindingMode.Direct)
             {
                 AddDirectBindings(
@@ -236,12 +231,10 @@ namespace SharpShader.HLSLCrossCompiler.Internal
                 attachmentInterface,
                 postRemapSpirvReflection,
                 privateAttachmentDescriptorSet,
-                privateMetalTextureBase,
                 physicalVulkanBindings,
                 resources,
                 shaderOutputs,
-                out usesFramebufferFetch,
-                out usesRasterOrderGroups);
+                out usesFramebufferFetch);
 
             resources.Sort(static (left, right) =>
             {
@@ -265,7 +258,6 @@ namespace SharpShader.HLSLCrossCompiler.Internal
                 privateAttachmentDescriptorSet,
                 resources.Exists(static resource => resource.IsPrivateAttachment),
                 usesFramebufferFetch,
-                usesRasterOrderGroups,
                 attachmentInterface.Phase?.DepthExport
                     ?? ShaderDepthExport.None,
                 attachmentInterface.Phase?.StencilExport
@@ -276,15 +268,12 @@ namespace SharpShader.HLSLCrossCompiler.Internal
             ShaderAttachmentInterface attachmentInterface,
             ShaderEntryPointReflection reflection,
             uint privateDescriptorSet,
-            uint privateMetalTextureBase,
             HashSet<(uint Set, uint Binding)> physicalVulkanBindings,
             List<MslTranslationResourceBinding> resources,
             List<MslTranslationShaderOutput> shaderOutputs,
-            out bool usesFramebufferFetch,
-            out bool usesRasterOrderGroups)
+            out bool usesFramebufferFetch)
         {
             usesFramebufferFetch = false;
-            usesRasterOrderGroups = false;
             ShaderAttachmentPhase? phase = attachmentInterface.Phase;
             if (phase is null)
             {
@@ -310,7 +299,6 @@ namespace SharpShader.HLSLCrossCompiler.Internal
             Dictionary<uint, uint> primaryOutputs = new();
             HashSet<uint> outputLocations = new();
             HashSet<uint> localInputIndices = new();
-            HashSet<uint> rasterOrderedLogicalIds = new();
             foreach (ShaderAttachmentDeclaration attachment in phase.Attachments)
             {
                 if (attachment.OutputLocation.HasValue
@@ -343,42 +331,6 @@ namespace SharpShader.HLSLCrossCompiler.Internal
                     outputLocations.Add(location);
                 }
 
-                if (attachment.Ordering == ShaderAttachmentOrdering.RasterOrdered)
-                {
-                    if (!rasterOrderedLogicalIds.Add(attachment.LogicalAttachmentId))
-                    {
-                        continue;
-                    }
-
-                    uint binding = checked(
-                        SpirvBindingRemapper.RasterOrderedBindingBase
-                        + attachment.LogicalAttachmentId);
-                    if (!physicalVulkanBindings.Add((privateDescriptorSet, binding)))
-                    {
-                        throw Failure(
-                            $"Private raster-ordered attachment collides at Vulkan "
-                            + $"set={privateDescriptorSet}, binding={binding}.");
-                    }
-
-                    uint metalTextureIndex = checked(
-                        privateMetalTextureBase
-                        + attachment.LogicalAttachmentId);
-                    resources.Add(new MslTranslationResourceBinding(
-                        new ShaderBindingKey(
-                            ShaderAttachmentDeclaration.ReservedAttachmentBindingTable,
-                            attachment.LogicalAttachmentId,
-                            ShaderBindingClass.UnorderedAccess),
-                        privateDescriptorSet,
-                        binding,
-                        VulkanDescriptorKind.StorageImage,
-                        ShaderPhysicalBindingNamespace.Texture,
-                        metalTextureIndex,
-                        resourceCount: 1,
-                        isPrivateAttachment: true));
-                    usesRasterOrderGroups = true;
-                    continue;
-                }
-
                 if (!attachment.InputIndex.HasValue
                     || !localInputIndices.Add(attachment.InputIndex.Value))
                 {
@@ -386,6 +338,8 @@ namespace SharpShader.HLSLCrossCompiler.Internal
                 }
 
                 uint inputIndex = attachment.InputIndex.Value;
+                uint metalColorIndex =
+                    attachment.OutputLocation ?? inputIndex;
 
                 if (!physicalVulkanBindings.Add((privateDescriptorSet, inputIndex)))
                 {
@@ -396,14 +350,14 @@ namespace SharpShader.HLSLCrossCompiler.Internal
 
                 resources.Add(new MslTranslationResourceBinding(
                     new ShaderBindingKey(
-                        ShaderAttachmentDeclaration.ReservedAttachmentBindingTable,
+                        ushort.MaxValue,
                         inputIndex,
                         ShaderBindingClass.ShaderResource),
                     privateDescriptorSet,
                     inputIndex,
                     VulkanDescriptorKind.InputAttachment,
                     ShaderPhysicalBindingNamespace.Texture,
-                    attachment.LogicalAttachmentId,
+                    metalColorIndex,
                     resourceCount: 1,
                     isPrivateAttachment: true));
                 usesFramebufferFetch = true;

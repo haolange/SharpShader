@@ -27,8 +27,7 @@ namespace SharpShader.HLSLCrossCompiler.Internal
             MetalShaderBackendLayout metalLayout,
             ShaderAttachmentInterface attachmentInterface,
             ShaderEntryPointReflection postRemapSpirvReflection,
-            uint privateAttachmentDescriptorSet,
-            uint privateMetalTextureBase)
+            uint privateAttachmentDescriptorSet)
         {
             MslTranslationBindingPlan bindingPlan =
                 MslTranslationBindingPlan.Create(
@@ -38,8 +37,7 @@ namespace SharpShader.HLSLCrossCompiler.Internal
                     metalLayout,
                     attachmentInterface,
                     postRemapSpirvReflection,
-                    privateAttachmentDescriptorSet,
-                    privateMetalTextureBase);
+                    privateAttachmentDescriptorSet);
             return Translate(
                 request,
                 spirvResult,

@@ -821,16 +821,6 @@ namespace SharpShader.Compilation.Internal
                     AppendInt32(hash, (int)attachment.NumericClass);
                     AppendInt32(hash, (int)attachment.SampleMode);
                     AppendInt32(hash, (int)attachment.LayerMode);
-                    AppendInt32(hash, (int)attachment.Ordering);
-                    AppendInt32(hash, (int)attachment.Feedback);
-                    AppendBoolean(hash, attachment.SampledFeedbackBinding.HasValue);
-                    if (attachment.SampledFeedbackBinding.HasValue)
-                    {
-                        ShaderBindingKey key = attachment.SampledFeedbackBinding.Value;
-                        AppendUInt64(hash, key.Table);
-                        AppendUInt64(hash, key.Slot);
-                        AppendInt32(hash, (int)key.Type);
-                    }
                 }
             }
         }

@@ -19,9 +19,6 @@ namespace SharpShader.Compilation.Internal
         private const uint OpGroupMemberDecorate = 75;
         private const uint OpDecorateId = 332;
         private const int HeaderWordCount = 5;
-        internal const uint RasterOrderedBindingBase =
-            ShaderAttachmentDeclaration.MaximumColorAttachments;
-
         private static readonly UTF8Encoding s_StrictUtf8 = new(
             encoderShouldEmitUTF8Identifier: false,
             throwOnInvalidBytes: true);
@@ -59,14 +56,6 @@ namespace SharpShader.Compilation.Internal
                 MatchInputAttachments(intermediateReflection, module);
             HashSet<uint> privateDescriptorIds = CollectDescriptorIds(inputAttachments);
             ValidatePrivateAttachmentDescriptorSet(targetLayout, privateDescriptorSet);
-            IReadOnlyDictionary<RasterOrderedAttachmentIdentity, SpirvDescriptor>
-                rasterOrderedAttachments = MatchRasterOrderedAttachments(
-                    intermediateReflection,
-                    module,
-                    attachmentInterfaces,
-                    ShaderAttachmentDeclaration.ReservedAttachmentBindingTable,
-                    bindingBase: 0);
-            AddDescriptorIds(privateDescriptorIds, rasterOrderedAttachments);
             IReadOnlyDictionary<ShaderBindingKey, SpirvDescriptor> matches =
                 MatchLogicalResources(
                     logicalReflection,
@@ -91,14 +80,6 @@ namespace SharpShader.Compilation.Internal
                 remappedWords[descriptor.BindingValueWord] = identity.InputAttachmentIndex;
             }
 
-            foreach ((RasterOrderedAttachmentIdentity identity, SpirvDescriptor descriptor) in
-                     rasterOrderedAttachments)
-            {
-                remappedWords[descriptor.DescriptorSetValueWord] = privateDescriptorSet;
-                remappedWords[descriptor.BindingValueWord] =
-                    checked(RasterOrderedBindingBase + identity.LogicalAttachmentId);
-            }
-
             byte[] remapped = ToByteArray(remappedWords);
             SpirvModule verifiedModule = ParseModule(remapped);
             ShaderArtifactReflection verifiedReflection = Reflect(remapped);
@@ -107,16 +88,6 @@ namespace SharpShader.Compilation.Internal
                     MatchInputAttachments(verifiedReflection, verifiedModule);
             HashSet<uint> verifiedPrivateDescriptorIds =
                 CollectDescriptorIds(verifiedInputAttachments);
-            IReadOnlyDictionary<RasterOrderedAttachmentIdentity, SpirvDescriptor>
-                verifiedRasterOrderedAttachments = MatchRasterOrderedAttachments(
-                    verifiedReflection,
-                    verifiedModule,
-                    attachmentInterfaces,
-                    privateDescriptorSet,
-                    RasterOrderedBindingBase);
-            AddDescriptorIds(
-                verifiedPrivateDescriptorIds,
-                verifiedRasterOrderedAttachments);
             IReadOnlyDictionary<ShaderBindingKey, SpirvDescriptor> verifiedMatches =
                 MatchLogicalResources(
                     logicalReflection,
@@ -156,28 +127,6 @@ namespace SharpShader.Compilation.Internal
                         + $"{identity.EntryPoint} input {identity.InputAttachmentIndex}: "
                         + $"expected set={privateDescriptorSet}, "
                         + $"binding={identity.InputAttachmentIndex}.");
-                }
-            }
-
-            if (verifiedRasterOrderedAttachments.Count
-                != rasterOrderedAttachments.Count)
-            {
-                throw Failure(
-                    "SPIR-V raster-ordered attachment count changed during binding remap.");
-            }
-
-            foreach ((RasterOrderedAttachmentIdentity identity, SpirvDescriptor descriptor) in
-                     verifiedRasterOrderedAttachments)
-            {
-                if (!rasterOrderedAttachments.ContainsKey(identity)
-                    || descriptor.DescriptorSet != privateDescriptorSet
-                    || descriptor.Binding != checked(
-                        RasterOrderedBindingBase + identity.LogicalAttachmentId))
-                {
-                    throw Failure(
-                        $"SPIR-V raster-ordered attachment remap verification failed for "
-                        + $"{identity.EntryPoint} logical attachment "
-                        + $"{identity.LogicalAttachmentId}.");
                 }
             }
 
@@ -517,138 +466,6 @@ namespace SharpShader.Compilation.Internal
             return result;
         }
 
-        private static IReadOnlyDictionary<RasterOrderedAttachmentIdentity, SpirvDescriptor>
-            MatchRasterOrderedAttachments(
-                ShaderArtifactReflection reflection,
-                SpirvModule module,
-                IReadOnlyList<ShaderAttachmentInterface> attachmentInterfaces,
-                uint descriptorSet,
-                uint bindingBase)
-        {
-            Dictionary<(string Name, ShaderExecutionStage Stage), ShaderEntryPointReflection>
-                entries = CollectEntries(reflection, "SPIR-V");
-            Dictionary<RasterOrderedAttachmentIdentity, SpirvDescriptor> result = new();
-            foreach (ShaderAttachmentInterface attachmentInterface in attachmentInterfaces)
-            {
-                ArgumentNullException.ThrowIfNull(attachmentInterface);
-                ShaderAttachmentPhase? phase = attachmentInterface.Phase;
-                if (phase is null)
-                {
-                    continue;
-                }
-
-                if (!entries.TryGetValue(
-                        (attachmentInterface.EntryPoint, attachmentInterface.Stage),
-                        out ShaderEntryPointReflection? entryPoint))
-                {
-                    throw Failure(
-                        $"SPIR-V does not contain attachment entry point "
-                        + $"{attachmentInterface.EntryPoint} ({attachmentInterface.Stage}).");
-                }
-
-                HashSet<uint> logicalAttachments = new();
-                foreach (ShaderAttachmentDeclaration attachment in phase.Attachments)
-                {
-                    if (attachment.Ordering != ShaderAttachmentOrdering.RasterOrdered
-                        || !logicalAttachments.Add(attachment.LogicalAttachmentId))
-                    {
-                        continue;
-                    }
-
-                    uint expectedBinding = checked(bindingBase + attachment.LogicalAttachmentId);
-                    ShaderResourceBindingReflection? reflectedResource = null;
-                    foreach (ShaderResourceBindingReflection resource in entryPoint.Resources)
-                    {
-                        if (resource.PhysicalLocation.Backend != ShaderBackendKind.Vulkan
-                            || resource.PhysicalLocation.Namespace
-                                != ShaderPhysicalBindingNamespace.Unified
-                            || resource.PhysicalLocation.Group != descriptorSet
-                            || resource.PhysicalLocation.Binding != expectedBinding)
-                        {
-                            continue;
-                        }
-
-                        if (reflectedResource is not null)
-                        {
-                            throw Failure(
-                                $"SPIR-V entry point {entryPoint.Name} has multiple "
-                                + $"resources at private raster-ordered binding "
-                                + $"set={descriptorSet}, binding={expectedBinding}.");
-                        }
-
-                        reflectedResource = resource;
-                    }
-
-                    if (reflectedResource is null)
-                    {
-                        throw Failure(
-                            $"SPIR-V entry point {entryPoint.Name} is missing private "
-                            + $"raster-ordered attachment {attachment.LogicalAttachmentId} "
-                            + $"at set={descriptorSet}, binding={expectedBinding}.");
-                    }
-
-                    ShaderResourceDimension expectedDimension =
-                        ShaderAttachmentInterfaceValidator.GetExpectedTextureDimension(
-                            attachment);
-                    if (reflectedResource.Key.Type != ShaderBindingClass.UnorderedAccess
-                        || reflectedResource.Shape.Kind != ShaderResourceKind.Texture
-                        || reflectedResource.Shape.Dimension != expectedDimension
-                        || reflectedResource.Shape.Access != ShaderResourceAccess.ReadWrite
-                        || reflectedResource.Shape.Array.IsArray)
-                    {
-                        throw Failure(
-                            $"SPIR-V raster-ordered attachment {attachment.LogicalAttachmentId} "
-                            + $"has incompatible resource shape {reflectedResource.Shape.Kind}/"
-                            + $"{reflectedResource.Shape.Dimension}/{reflectedResource.Shape.Access}.");
-                    }
-
-                    (uint Set, uint Binding) location = (
-                        reflectedResource.PhysicalLocation.Group,
-                        reflectedResource.PhysicalLocation.Binding);
-                    if (!module.Locations.TryGetValue(location, out SpirvDescriptor? descriptor))
-                    {
-                        throw Failure(
-                            $"SPIR-V raster-ordered attachment {reflectedResource.Name} "
-                            + "has no direct descriptor decoration record.");
-                    }
-
-                    if (!string.Equals(
-                            descriptor.Name,
-                            GetStableSpirvResourceName(reflectedResource),
-                            StringComparison.Ordinal))
-                    {
-                        throw Failure(
-                            $"SPIR-V raster-ordered descriptor ID {descriptor.Id} OpName "
-                            + $"{descriptor.Name} does not match reflected name "
-                            + $"{reflectedResource.Name}.");
-                    }
-
-                    RasterOrderedAttachmentIdentity identity = new(
-                        attachmentInterface.EntryPoint,
-                        attachmentInterface.Stage,
-                        attachment.LogicalAttachmentId);
-                    if (!result.TryAdd(identity, descriptor))
-                    {
-                        throw Failure(
-                            $"SPIR-V entry point {entryPoint.Name} declares logical "
-                            + $"raster-ordered attachment {attachment.LogicalAttachmentId} "
-                            + "more than once.");
-                    }
-                }
-            }
-
-            return result;
-        }
-
-        private static void AddDescriptorIds(
-            HashSet<uint> destination,
-            IReadOnlyDictionary<RasterOrderedAttachmentIdentity, SpirvDescriptor> descriptors)
-        {
-            foreach (SpirvDescriptor descriptor in descriptors.Values)
-            {
-                destination.Add(descriptor.Id);
-            }
-        }
         internal static uint GetPrivateAttachmentDescriptorSet(
             VulkanShaderBackendLayout targetLayout)
         {
@@ -1250,10 +1067,6 @@ namespace SharpShader.Compilation.Internal
             ShaderExecutionStage Stage,
             uint InputAttachmentIndex);
 
-        private readonly record struct RasterOrderedAttachmentIdentity(
-            string EntryPoint,
-            ShaderExecutionStage Stage,
-            uint LogicalAttachmentId);
 
         private sealed class DecorationRecord
         {

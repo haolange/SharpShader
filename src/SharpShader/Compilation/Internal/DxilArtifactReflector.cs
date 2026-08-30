@@ -188,6 +188,7 @@ namespace SharpShader.Compilation.Internal
                 threadGroupSize,
                 stageInputs,
                 stageOutputs,
+                inputAttachments: null,
                 attachmentRequirements: attachmentRequirements);
 
             return new ShaderArtifactReflection(

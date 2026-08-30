@@ -6,6 +6,8 @@ namespace SharpShader.Compilation.Internal
 {
     internal static partial class ShaderAttachmentInterfaceValidator
     {
+        private const uint PrivateAttachmentBindingTable = ushort.MaxValue;
+
         internal static void ValidateDxil(
             ShaderAttachmentInterface attachmentInterface,
             ShaderEntryPointReflection reflection)
@@ -19,7 +21,6 @@ namespace SharpShader.Compilation.Internal
             ShaderAttachmentPhase phase = attachmentInterface.Phase
                 ?? throw Failure("A pixel attachment interface has no raster phase.");
             ValidateDxilPrivateResources(phase, reflection);
-            ValidateSampledFeedbackBindings(phase, reflection, "DXIL");
             List<ShaderAttachmentDeclaration> expectedOutputs = new();
             bool requiresRasterOrdering = false;
             foreach (ShaderAttachmentDeclaration attachment in phase.Attachments)
@@ -29,8 +30,7 @@ namespace SharpShader.Compilation.Internal
                     expectedOutputs.Add(attachment);
                 }
 
-                requiresRasterOrdering |=
-                    attachment.Ordering == ShaderAttachmentOrdering.RasterOrdered;
+                requiresRasterOrdering |= IsFramebufferReadWrite(attachment);
             }
 
             List<ShaderStageIoReflection> reflectedColorOutputs = new();
@@ -113,7 +113,7 @@ namespace SharpShader.Compilation.Internal
             {
                 if (attachmentInterface.Stage != ShaderExecutionStage.Pixel
                     && resource.Key.Table
-                        == ShaderAttachmentDeclaration.ReservedAttachmentBindingTable)
+                        == PrivateAttachmentBindingTable)
                 {
                     throw Failure(
                         $"Non-pixel entry {reflection.Name} uses the reserved attachment "
@@ -121,7 +121,7 @@ namespace SharpShader.Compilation.Internal
                 }
 
                 if (resource.Key.Table
-                    != ShaderAttachmentDeclaration.ReservedAttachmentBindingTable)
+                    != PrivateAttachmentBindingTable)
                 {
                     resources.Add(resource);
                 }
@@ -153,13 +153,11 @@ namespace SharpShader.Compilation.Internal
             ShaderAttachmentPhase phase = attachmentInterface.Phase
                 ?? throw Failure("A pixel attachment interface has no raster phase.");
             Dictionary<uint, ShaderAttachmentDeclaration> expectedInputs = new();
-            Dictionary<uint, ShaderAttachmentDeclaration> expectedRasterOrdered = new();
             Dictionary<(uint Location, uint Index), ShaderAttachmentDeclaration>
                 expectedOutputs = new();
             foreach (ShaderAttachmentDeclaration attachment in phase.Attachments)
             {
-                if (attachment.InputIndex.HasValue
-                    && attachment.Ordering != ShaderAttachmentOrdering.RasterOrdered)
+                if (attachment.InputIndex.HasValue)
                 {
                     if (!expectedInputs.TryAdd(attachment.InputIndex.Value, attachment)
                         && expectedInputs[attachment.InputIndex.Value].LogicalAttachmentId
@@ -169,13 +167,6 @@ namespace SharpShader.Compilation.Internal
                             $"Attachment input index {attachment.InputIndex.Value} maps "
                             + "to multiple logical attachments.");
                     }
-                }
-
-                if (attachment.Ordering == ShaderAttachmentOrdering.RasterOrdered)
-                {
-                    expectedRasterOrdered.TryAdd(
-                        attachment.LogicalAttachmentId,
-                        attachment);
                 }
 
                 if (attachment.OutputLocation.HasValue)
@@ -209,12 +200,6 @@ namespace SharpShader.Compilation.Internal
                         + "descriptor mapping.");
                 }
             }
-
-            ValidateSpirvRasterOrderedResources(
-                expectedRasterOrdered, reflection, privateDescriptorSet);
-
-            ValidateSampledFeedbackBindings(
-                phase, reflection, "SPIR-V", vulkanLayout.Bindings);
 
             List<ShaderStageIoReflection> colorOutputs = new();
             foreach (ShaderStageIoReflection output in reflection.StageOutputs)
@@ -262,8 +247,7 @@ namespace SharpShader.Compilation.Internal
             bool requiresRasterOrdering = false;
             foreach (ShaderAttachmentDeclaration attachment in phase.Attachments)
             {
-                requiresRasterOrdering |=
-                    attachment.Ordering == ShaderAttachmentOrdering.RasterOrdered;
+                requiresRasterOrdering |= IsFramebufferReadWrite(attachment);
             }
 
             bool reportsRasterOrdering =
@@ -279,72 +263,17 @@ namespace SharpShader.Compilation.Internal
                             .ShadingRateOrderedFragmentInterlock)) != 0;
             if (reportsUnorderedInterlock
                 || reportsNonPixelOrderedInterlock
-                || reportsRasterOrdering != requiresRasterOrdering)
+                || reportsRasterOrdering)
             {
                 throw Failure(
-                    $"SPIR-V ordered fragment-interlock requirement "
-                    + $"({reportsRasterOrdering}) does not match explicit raster "
-                    + $"ordering ({requiresRasterOrdering}); unordered interlock="
+                    $"SPIR-V attachment lowering must not emit fragment interlock; "
+                    + $"framebuffer read/write is ordered by the Vulkan pipeline. "
+                    + $"Logical read/write={requiresRasterOrdering}, reflected ordered="
+                    + $"{reportsRasterOrdering}, unordered interlock="
                     + $"{reportsUnorderedInterlock}.");
             }
         }
 
-        private static void ValidateSpirvRasterOrderedResources(
-            IReadOnlyDictionary<uint, ShaderAttachmentDeclaration> expected,
-            ShaderEntryPointReflection reflection,
-            uint privateDescriptorSet)
-        {
-            HashSet<uint> matched = new();
-            foreach (ShaderResourceBindingReflection resource in reflection.Resources)
-            {
-                if (resource.PhysicalLocation.Backend != ShaderBackendKind.Vulkan
-                    || resource.PhysicalLocation.Namespace
-                        != ShaderPhysicalBindingNamespace.Unified
-                    || resource.PhysicalLocation.Group != privateDescriptorSet
-                    || resource.PhysicalLocation.Binding
-                        < SpirvBindingRemapper.RasterOrderedBindingBase
-                    || resource.PhysicalLocation.Binding >= checked(
-                        SpirvBindingRemapper.RasterOrderedBindingBase
-                        + ShaderAttachmentDeclaration.MaximumColorAttachments))
-                {
-                    continue;
-                }
-
-                uint logicalAttachmentId = checked(
-                    resource.PhysicalLocation.Binding
-                    - SpirvBindingRemapper.RasterOrderedBindingBase);
-                if (!expected.TryGetValue(
-                        logicalAttachmentId,
-                        out ShaderAttachmentDeclaration? attachment)
-                    || resource.Key.Type != ShaderBindingClass.UnorderedAccess
-                    || resource.Shape.Kind != ShaderResourceKind.Texture
-                    || resource.Shape.Dimension
-                        != GetExpectedTextureDimension(attachment)
-                    || resource.Shape.Access != ShaderResourceAccess.ReadWrite
-                    || resource.Shape.Array.IsArray
-                    || !matched.Add(logicalAttachmentId))
-                {
-                    throw Failure(
-                        $"SPIR-V private raster-ordered resource {resource.Name} at "
-                        + $"set={resource.PhysicalLocation.Group}, binding="
-                        + $"{resource.PhysicalLocation.Binding} does not match the "
-                        + "explicit attachment contract.");
-                }
-            }
-
-            if (matched.Count != expected.Count)
-            {
-                foreach (uint logicalAttachmentId in expected.Keys)
-                {
-                    if (!matched.Contains(logicalAttachmentId))
-                    {
-                        throw Failure(
-                            $"SPIR-V is missing private raster-ordered resource for "
-                            + $"logical attachment {logicalAttachmentId}.");
-                    }
-                }
-            }
-        }
         internal static void ValidateMetalStrategy(
             ShaderAttachmentInterface attachmentInterface,
             ShaderEntryPointReflection postRemapSpirvReflection,
@@ -359,7 +288,6 @@ namespace SharpShader.Compilation.Internal
             ShaderAttachmentPhase phase = attachmentInterface.Phase
                 ?? throw Failure("A pixel attachment interface has no raster phase.");
             Dictionary<uint, uint> inputLogicalIds = new();
-            bool requiresRasterOrderGroups = false;
             foreach (ShaderAttachmentDeclaration attachment in phase.Attachments)
             {
                 if (attachment.OutputLocation.HasValue
@@ -380,8 +308,7 @@ namespace SharpShader.Compilation.Internal
                         + "mapping is therefore unavailable on this toolchain.");
                 }
 
-                if (attachment.InputIndex.HasValue
-                    && attachment.Ordering != ShaderAttachmentOrdering.RasterOrdered)
+                if (attachment.InputIndex.HasValue)
                 {
                     if (inputLogicalIds.TryGetValue(
                             attachment.InputIndex.Value,
@@ -397,16 +324,7 @@ namespace SharpShader.Compilation.Internal
                         attachment.LogicalAttachmentId;
                 }
 
-
-                requiresRasterOrderGroups |=
-                    attachment.Ordering == ShaderAttachmentOrdering.RasterOrdered;
             }
-
-            ValidateSampledFeedbackBindings(
-                phase,
-                postRemapSpirvReflection,
-                "Metal SPIR-V input",
-                vulkanLayout.Bindings);
             bool reportsRasterOrderGroups =
                 (postRemapSpirvReflection.AttachmentRequirements
                     & ShaderAttachmentArtifactRequirement.OrderedPixelFragmentInterlock) != 0;
@@ -420,12 +338,12 @@ namespace SharpShader.Compilation.Internal
                             .ShadingRateOrderedFragmentInterlock)) != 0;
             if (reportsUnorderedInterlock
                 || reportsNonPixelOrderedInterlock
-                || reportsRasterOrderGroups != requiresRasterOrderGroups)
+                || reportsRasterOrderGroups)
             {
                 throw Failure(
-                    $"Metal ROG strategy requires ordered SPIR-V interlock="
-                    + $"{requiresRasterOrderGroups}, reflected ordered="
-                    + $"{reportsRasterOrderGroups}, unordered="
+                    "Compiler-generated Metal attachment lowering must not contain "
+                    + "raster-order or fragment-interlock requirements. "
+                    + $"Reflected ordered={reportsRasterOrderGroups}, unordered="
                     + $"{reportsUnorderedInterlock}.");
             }
 
@@ -447,17 +365,17 @@ namespace SharpShader.Compilation.Internal
             foreach (ShaderAttachmentDeclaration attachment in phase.Attachments)
             {
                 ShaderBindingKey? key = null;
-                if (attachment.Ordering == ShaderAttachmentOrdering.RasterOrdered)
+                if (IsFramebufferReadWrite(attachment))
                 {
                     key = new ShaderBindingKey(
-                        ShaderAttachmentDeclaration.ReservedAttachmentBindingTable,
+                        PrivateAttachmentBindingTable,
                         attachment.LogicalAttachmentId,
                         ShaderBindingClass.UnorderedAccess);
                 }
                 else if (attachment.InputIndex.HasValue)
                 {
                     key = new ShaderBindingKey(
-                        ShaderAttachmentDeclaration.ReservedAttachmentBindingTable,
+                        PrivateAttachmentBindingTable,
                         attachment.InputIndex.Value,
                         ShaderBindingClass.ShaderResource);
                 }
@@ -476,7 +394,7 @@ namespace SharpShader.Compilation.Internal
             foreach (ShaderResourceBindingReflection resource in reflection.Resources)
             {
                 if (resource.Key.Table
-                    != ShaderAttachmentDeclaration.ReservedAttachmentBindingTable)
+                    != PrivateAttachmentBindingTable)
                 {
                     continue;
                 }
@@ -520,79 +438,12 @@ namespace SharpShader.Compilation.Internal
             }
         }
 
-        private static void ValidateSampledFeedbackBindings(
-            ShaderAttachmentPhase phase,
-            ShaderEntryPointReflection reflection,
-            string artifact,
-            IReadOnlyList<VulkanShaderBindingMapping>? vulkanBindings = null)
+        internal static bool IsFramebufferReadWrite(
+            ShaderAttachmentDeclaration attachment)
         {
-            HashSet<ShaderBindingKey> validated = new();
-            foreach (ShaderAttachmentDeclaration attachment in phase.Attachments)
-            {
-                if (attachment.Feedback != ShaderAttachmentFeedback.Sampled)
-                {
-                    continue;
-                }
-
-                ShaderBindingKey logicalKey = attachment.SampledFeedbackBinding
-                    ?? throw Failure(
-                        $"Sampled-feedback attachment {attachment.LogicalAttachmentId} "
-                        + "has no canonical binding.");
-                if (!validated.Add(logicalKey))
-                {
-                    continue;
-                }
-
-                ShaderBindingKey artifactKey = logicalKey;
-                if (vulkanBindings is not null)
-                {
-                    bool foundMapping = false;
-                    foreach (VulkanShaderBindingMapping mapping in vulkanBindings)
-                    {
-                        if (mapping.LogicalBinding != logicalKey)
-                        {
-                            continue;
-                        }
-
-                        artifactKey = new ShaderBindingKey(
-                            mapping.DescriptorSet,
-                            mapping.Binding,
-                            logicalKey.Type);
-                        foundMapping = true;
-                        break;
-                    }
-
-                    if (!foundMapping)
-                    {
-                        throw Failure(
-                            $"Sampled-feedback binding {logicalKey} has no Vulkan "
-                            + "physical mapping.");
-                    }
-                }
-
-                ShaderResourceBindingReflection? match = null;
-                foreach (ShaderResourceBindingReflection resource in reflection.Resources)
-                {
-                    if (resource.Key == artifactKey)
-                    {
-                        match = resource;
-                        break;
-                    }
-                }
-
-                ShaderResourceDimension expectedDimension =
-                    GetExpectedTextureDimension(attachment);
-                if (match is null
-                    || match.Shape.Kind != ShaderResourceKind.Texture
-                    || match.Shape.Dimension != expectedDimension
-                    || match.Shape.Access != ShaderResourceAccess.ReadOnly
-                    || match.Shape.Array.IsArray)
-                {
-                    throw Failure(
-                        $"Sampled-feedback binding {logicalKey} is missing from {artifact} or is "
-                        + $"not a read-only {expectedDimension} texture.");
-                }
-            }
+            ArgumentNullException.ThrowIfNull(attachment);
+            return attachment.InputIndex.HasValue
+                && attachment.OutputLocation.HasValue;
         }
 
         internal static ShaderResourceDimension GetExpectedTextureDimension(

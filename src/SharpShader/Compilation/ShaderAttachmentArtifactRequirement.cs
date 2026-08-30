@@ -4,7 +4,7 @@ namespace SharpShader.Compilation
 {
 
     [Flags]
-    public enum ShaderAttachmentArtifactRequirement : byte
+    internal enum ShaderAttachmentArtifactRequirement : byte
     {
         None = 0,
         RasterOrderedViews = 1 << 0,

@@ -19,9 +19,6 @@ namespace SharpShader.SharpGPU
         public ShaderAttachmentNumericClass NumericClass { get; }
         public ShaderAttachmentSampleMode SampleMode { get; }
         public ShaderAttachmentLayerMode LayerMode { get; }
-        public ShaderAttachmentOrdering Ordering { get; }
-        public ShaderAttachmentFeedback Feedback { get; }
-        public ShaderBindingKey? SampledFeedbackBinding { get; }
 
         internal SharpGpuAttachmentCompatibilityFact(
             ShaderAttachmentDeclaration declaration)
@@ -36,9 +33,6 @@ namespace SharpShader.SharpGPU
             NumericClass = declaration.NumericClass;
             SampleMode = declaration.SampleMode;
             LayerMode = declaration.LayerMode;
-            Ordering = declaration.Ordering;
-            Feedback = declaration.Feedback;
-            SampledFeedbackBinding = declaration.SampledFeedbackBinding;
         }
 
         public bool Equals(SharpGpuAttachmentCompatibilityFact other)
@@ -51,10 +45,7 @@ namespace SharpShader.SharpGPU
                 && Aspect == other.Aspect
                 && NumericClass == other.NumericClass
                 && SampleMode == other.SampleMode
-                && LayerMode == other.LayerMode
-                && Ordering == other.Ordering
-                && Feedback == other.Feedback
-                && SampledFeedbackBinding == other.SampledFeedbackBinding;
+                && LayerMode == other.LayerMode;
         }
 
         public override bool Equals(object? obj) =>
@@ -72,9 +63,6 @@ namespace SharpShader.SharpGPU
             hash.Add(NumericClass);
             hash.Add(SampleMode);
             hash.Add(LayerMode);
-            hash.Add(Ordering);
-            hash.Add(Feedback);
-            hash.Add(SampledFeedbackBinding);
             return hash.ToHashCode();
         }
 

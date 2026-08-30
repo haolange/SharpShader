@@ -60,8 +60,6 @@ namespace SharpShader.Compilation.Internal
                         ShaderTargetKind.SpirV,
                         options,
                         cancellationToken,
-                        requiresOrderedFragmentInterlock:
-                            RequiresOrderedFragmentInterlock(unit.Entries),
                         requiresStencilExport:
                             RequiresStencilExport(unit.Entries));
                     request = FreezeCompileRequest(
@@ -172,9 +170,6 @@ namespace SharpShader.Compilation.Internal
                 entry.AttachmentInterface,
                 entry.SpirvEntry!,
                 vulkanSubset);
-            uint privateMetalTextureBase = GetPrivateMetalTextureBase(
-                variant.BackendLayouts.Metal!,
-                variant.Layout);
             MslTranslationBindingPlan bindingPlan =
                 MslTranslationBindingPlan.Create(
                     entry.Definition.Name,
@@ -183,8 +178,7 @@ namespace SharpShader.Compilation.Internal
                     metalSubset,
                     entry.AttachmentInterface,
                     entry.SpirvEntry!,
-                    privateDescriptorSet,
-                    privateMetalTextureBase);
+                    privateDescriptorSet);
             ShaderCompileRequest request = CreateCompileRequest(
                 snapshot,
                 variant.Defines,
@@ -219,62 +213,5 @@ namespace SharpShader.Compilation.Internal
                 text));
         }
 
-        private static uint GetPrivateMetalTextureBase(
-            MetalShaderBackendLayout layout,
-            ShaderInterfaceLayout logicalLayout)
-        {
-            ArgumentNullException.ThrowIfNull(layout);
-            ArgumentNullException.ThrowIfNull(logicalLayout);
-
-            Dictionary<ShaderBindingKey, ShaderLogicalBinding> logicalBindings = new();
-            foreach (ShaderLogicalBinding binding in logicalLayout.Bindings)
-            {
-                logicalBindings.Add(binding.Key, binding);
-            }
-
-            uint nextIndex = 0;
-            foreach (MetalDirectBindingMapping mapping in layout.DirectBindings)
-            {
-                if (mapping.Namespace != ShaderPhysicalBindingNamespace.Texture)
-                {
-                    continue;
-                }
-
-                ShaderLogicalBinding logicalBinding =
-                    logicalBindings.TryGetValue(
-                        mapping.LogicalBinding,
-                        out ShaderLogicalBinding? value)
-                    ? value
-                    : throw InvalidRequest(
-                        $"Metal layout contains unknown logical binding "
-                        + $"{mapping.LogicalBinding}.");
-                uint resourceCount = logicalBinding.Shape.Array.BoundedElementCount
-                    ?? throw InvalidRequest(
-                        $"Metal logical texture binding {mapping.LogicalBinding} "
-                        + "is unbounded and leaves no stable private attachment "
-                        + "texture range.");
-                nextIndex = Math.Max(
-                    nextIndex,
-                    checked(mapping.Index + resourceCount));
-            }
-
-            foreach (MetalReferenceBufferBindingMapping mapping in
-                     layout.ReferenceBufferBindings)
-            {
-                if (mapping.ResourceNamespace != ShaderPhysicalBindingNamespace.Texture)
-                {
-                    continue;
-                }
-
-                uint firstResource = checked((uint)(
-                    mapping.ByteOffset /
-                    MetalReferenceBufferBindingMapping.ReferenceByteSize));
-                nextIndex = Math.Max(
-                    nextIndex,
-                    checked(firstResource + mapping.ReferenceCount));
-            }
-
-            return nextIndex;
-        }
 }
 }
