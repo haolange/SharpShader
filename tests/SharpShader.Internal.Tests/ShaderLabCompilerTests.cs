@@ -650,15 +650,13 @@ void RayGen()
 
             (uint Location, ShaderAttachmentNumericClass NumericClass)[]
                 expectedInputs = phase.Attachments
-                .Where(static attachment =>
-                    attachment.InputIndex.HasValue
-                    && attachment.Ordering
-                        != ShaderAttachmentOrdering.RasterOrdered)
+                .Where(static attachment => attachment.InputIndex.HasValue)
                 .Select(static attachment => (
-                    attachment.LogicalAttachmentId,
+                    Location: attachment.OutputLocation
+                        ?? attachment.InputIndex!.Value,
                     attachment.NumericClass))
                 .Distinct()
-                .OrderBy(static input => input.LogicalAttachmentId)
+                .OrderBy(static input => input.Location)
                 .ToArray();
             (uint Location, ShaderAttachmentNumericClass NumericClass)[]
                 actualInputs = reflection.ColorInputs
@@ -670,23 +668,7 @@ void RayGen()
             Assert.Equal(phase.DepthExport, reflection.DepthExport);
             Assert.Equal(phase.StencilExport, reflection.StencilExport);
 
-            int expectedRasterOrderGroups = phase.Attachments
-                .Where(static attachment =>
-                    attachment.Ordering
-                        == ShaderAttachmentOrdering.RasterOrdered)
-                .Select(static attachment => attachment.LogicalAttachmentId)
-                .Distinct()
-                .Count();
-            Assert.Equal(
-                expectedRasterOrderGroups,
-                reflection.RasterOrderGroups.Count);
-            Assert.All(
-                reflection.RasterOrderGroups,
-                static group =>
-                {
-                    Assert.Equal(MslResourceBindingKind.Texture, group.BindingKind);
-                    Assert.Equal(0u, group.Group);
-                });
+            Assert.Empty(reflection.RasterOrderGroups);
         }
 
         private static ShaderLabCompiler CreateCapturingCompiler(
@@ -743,7 +725,7 @@ void RayGen()
                     {
                         AttachmentInterface
                         {
-                            AbiRevision 1
+                            AbiRevision 2
                             Phase 0
                             DepthStencilAccess None
                             DepthExport None
@@ -759,9 +741,6 @@ void RayGen()
                                 NumericClass FloatingPoint
                                 SampleMode SingleSample
                                 LayerMode SingleLayer
-                                Ordering None
-                                Feedback None
-                                SampledFeedbackBinding None
                             }
                         }
                         HLSLPROGRAM

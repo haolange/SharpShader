@@ -707,10 +707,10 @@ namespace Infinity.Rendering.Tests
             string cachePath = Directory
                 .EnumerateFiles(
                     directory.Path,
-                    "*.sharpshader-cache-r2.json",
+                    "*.sharpshader-cache-r3.json",
                     SearchOption.TopDirectoryOnly)
                 .Single();
-            File.WriteAllText(cachePath, "{\"schemaVersion\":2,\"broken\":true}");
+            File.WriteAllText(cachePath, "{\"schemaVersion\":3,\"broken\":true}");
 
             int rebuildCount = 0;
             ShaderProgramCompilation rebuilt = CreateCountingCompiler(
@@ -758,7 +758,7 @@ namespace Infinity.Rendering.Tests
             Assert.Single(
                 Directory.EnumerateFiles(
                     directory.Path,
-                    "*.sharpshader-cache-r2.json",
+                    "*.sharpshader-cache-r3.json",
                     SearchOption.TopDirectoryOnly));
             Assert.Empty(
                 Directory.EnumerateFiles(
@@ -1160,7 +1160,7 @@ namespace Infinity.Rendering.Tests
                 "*.sharpshader-dependencies.json"));
             Assert.Empty(Directory.EnumerateFiles(
                 cacheDirectory.Path,
-                "*.sharpshader-cache-r2.json"));
+                "*.sharpshader-cache-r3.json"));
 
             File.Delete(shadowInclude);
             Assert.NotEmpty(compiler.Compile(request).Artifacts);

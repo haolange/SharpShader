@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Linq;
+using SharpShader.Compilation;
 using SharpShader.Tool;
 using Xunit;
 
@@ -72,7 +73,9 @@ namespace Infinity.Rendering.Tests
 
                 Assert.Equal(0, inspectExit);
                 Assert.Equal(string.Empty, inspectError.ToString());
-                Assert.Contains("schema: 2", inspectOutput.ToString());
+                Assert.Contains(
+                    $"schema: {ShaderInterfaceManifest.CurrentSchemaVersion}",
+                    inspectOutput.ToString());
                 Assert.Contains(
                     "dx12",
                     inspectOutput.ToString(),
@@ -187,16 +190,16 @@ namespace Infinity.Rendering.Tests
                 json = mutation switch
                 {
                     "unknown" => json.Replace(
-                        "{\"schemaRevision\":1,",
-                        "{\"schemaRevision\":1,\"unexpected\":true,",
+                        "{\"schemaRevision\":2,",
+                        "{\"schemaRevision\":2,\"unexpected\":true,",
                         StringComparison.Ordinal),
                     "duplicate" => json.Replace(
-                        "{\"schemaRevision\":1,",
-                        "{\"schemaRevision\":1,\"schemaRevision\":1,",
+                        "{\"schemaRevision\":2,",
+                        "{\"schemaRevision\":2,\"schemaRevision\":2,",
                         StringComparison.Ordinal),
                     "oldAbi" => json.Replace(
+                        "\"abiRevision\":2",
                         "\"abiRevision\":1",
-                        "\"abiRevision\":0",
                         StringComparison.Ordinal),
                     _ => throw new ArgumentOutOfRangeException(nameof(mutation)),
                 };
@@ -304,7 +307,7 @@ namespace Infinity.Rendering.Tests
         private static string CreateAttachmentInterfaceJson()
         {
             return """
-                {"schemaRevision":1,"interfaces":[{"abiRevision":1,"variantKey":"default","entryPoint":"Main","stage":"pixel","phase":{"phase":0,"depthStencilAccess":"none","depthExport":"none","stencilExport":"none","attachments":[{"logicalAttachmentId":0,"inputIndex":null,"outputLocation":0,"outputIndex":0,"outputComponent":0,"aspect":"color","numericClass":"floatingPoint","sampleMode":"singleSample","layerMode":"singleLayer","ordering":"none","feedback":"none","sampledFeedbackBinding":null}]}}]}
+                {"schemaRevision":2,"interfaces":[{"abiRevision":2,"variantKey":"default","entryPoint":"Main","stage":"pixel","phase":{"phase":0,"depthStencilAccess":"none","depthExport":"none","stencilExport":"none","attachments":[{"logicalAttachmentId":0,"inputIndex":null,"outputLocation":0,"outputIndex":0,"outputComponent":0,"aspect":"color","numericClass":"floatingPoint","sampleMode":"singleSample","layerMode":"singleLayer"}]}}]}
                 """;
         }
     }

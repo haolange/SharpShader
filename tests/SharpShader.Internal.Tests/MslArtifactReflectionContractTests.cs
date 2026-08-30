@@ -154,8 +154,7 @@ namespace Infinity.Rendering.Tests
                     Color(
                         logicalAttachmentId: 3,
                         inputIndex: 0,
-                        outputLocation: 0,
-                        ordering: ShaderAttachmentOrdering.RasterOrdered),
+                        outputLocation: 0),
                 });
             ShaderStageIoReflection rasterOutput = new(
                 "Color",
@@ -171,8 +170,7 @@ namespace Infinity.Rendering.Tests
                 MslTranslationBindingPlan RasterPlan) =
                 CreatePlan(
                     rasterOrderedPhase,
-                    new[] { rasterOutput },
-                    privateMetalTextureBase: 0);
+                    new[] { rasterOutput });
             AssertValidationFailure(
                 RasterContract,
                 RasterPlan,
@@ -292,8 +290,7 @@ namespace Infinity.Rendering.Tests
             ShaderAttachmentInterface Contract,
             MslTranslationBindingPlan Plan) CreatePlan(
                 ShaderAttachmentPhase phase,
-                IReadOnlyList<ShaderStageIoReflection>? stageOutputs = null,
-                uint privateMetalTextureBase = 0)
+                IReadOnlyList<ShaderStageIoReflection>? stageOutputs = null)
         {
             ShaderAttachmentInterface contract = new(
                 "default",
@@ -312,17 +309,14 @@ namespace Infinity.Rendering.Tests
                     new MetalShaderBackendLayout(),
                     contract,
                     reflection,
-                    privateAttachmentDescriptorSet: 31,
-                    privateMetalTextureBase);
+                    privateAttachmentDescriptorSet: 31);
             return (contract, plan);
         }
 
         private static ShaderAttachmentDeclaration Color(
             uint logicalAttachmentId,
             uint? inputIndex,
-            uint? outputLocation,
-            ShaderAttachmentOrdering ordering =
-                ShaderAttachmentOrdering.None)
+            uint? outputLocation)
         {
             return new ShaderAttachmentDeclaration(
                 logicalAttachmentId,
@@ -331,8 +325,7 @@ namespace Infinity.Rendering.Tests
                 ShaderAttachmentAspect.Color,
                 ShaderAttachmentNumericClass.FloatingPoint,
                 ShaderAttachmentSampleMode.SingleSample,
-                ShaderAttachmentLayerMode.SingleLayer,
-                ordering: ordering);
+                ShaderAttachmentLayerMode.SingleLayer);
         }
     }
 }

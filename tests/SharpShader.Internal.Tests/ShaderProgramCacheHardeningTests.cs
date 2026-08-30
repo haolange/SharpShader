@@ -94,7 +94,7 @@ namespace Infinity.Rendering.Tests
             ShaderProgramCompilation initial =
                 CreateCompiler(cache.Path).Compile(request);
             string livePath = GetLivePath(cache.Path, initial.CacheKey);
-            File.WriteAllText(livePath, "{\"schemaVersion\":2,\"broken\":true}");
+            File.WriteAllText(livePath, "{\"schemaVersion\":3,\"broken\":true}");
 
             using CountdownEvent readersEntered = new(2);
             using ManualResetEventSlim releaseReaders = new(false);
@@ -126,7 +126,7 @@ namespace Infinity.Rendering.Tests
                 result => Assert.Equal(republished.CacheKey, result.CacheKey));
             Assert.Single(Directory.EnumerateFiles(
                 cache.Path,
-                "*.sharpshader-cache-r2.json",
+                "*.sharpshader-cache-r3.json",
                 SearchOption.TopDirectoryOnly));
             Assert.Single(Directory.EnumerateFiles(
                 cache.Path,
@@ -226,10 +226,10 @@ namespace Infinity.Rendering.Tests
                     SearchOption.TopDirectoryOnly)
                 .Where(path =>
                     path.EndsWith(
-                        ".sharpshader-cache-r2.json",
+                        ".sharpshader-cache-r3.json",
                         StringComparison.Ordinal)
                     || path.Contains(
-                        ".sharpshader-cache-r2.json.corrupt-",
+                        ".sharpshader-cache-r3.json.corrupt-",
                         StringComparison.Ordinal))
                 .Sum(path => new FileInfo(path).Length);
             Assert.InRange(retainedBytes, 1, limits.MaximumPersistentCacheBytes);
@@ -260,7 +260,7 @@ namespace Infinity.Rendering.Tests
             Assert.Contains("512-byte limit", exception.Message);
             Assert.Empty(Directory.EnumerateFiles(
                 cache.Path,
-                "*.sharpshader-cache-r2.json",
+                "*.sharpshader-cache-r3.json",
                 SearchOption.TopDirectoryOnly));
             Assert.Empty(Directory.EnumerateFiles(
                 cache.Path,
@@ -270,7 +270,7 @@ namespace Infinity.Rendering.Tests
 
         [Fact]
         [Trait("Category", "SharpShaderAttachment")]
-        public void RetiredNamespaceIsNeverReadAndOldCurrentSchemaIsQuarantined()
+        public void Revision2NamespaceIsNeverReadAndRevision2SchemaIsQuarantined()
         {
             using TemporaryDirectory cache = new();
             (ShaderProgramCompilation compilation,
@@ -286,15 +286,15 @@ namespace Infinity.Rendering.Tests
                 compilation.CacheKey);
             string canonical = File.ReadAllText(livePath);
             string oldSchema = canonical.Replace(
+                "\"schemaVersion\":3",
                 "\"schemaVersion\":2",
-                "\"schemaVersion\":1",
                 StringComparison.Ordinal);
             Assert.NotEqual(canonical, oldSchema);
             File.WriteAllText(livePath, oldSchema);
 
             string retiredPath = Path.Combine(
                 cache.Path,
-                compilation.CacheKey + ".sharpshader-cache.json");
+                compilation.CacheKey + ".sharpshader-cache-r2.json");
             const string retiredSentinel =
                 "retired cache namespace must never be read";
             File.WriteAllText(retiredPath, retiredSentinel);
@@ -309,13 +309,13 @@ namespace Infinity.Rendering.Tests
             Assert.False(File.Exists(livePath));
             Assert.Single(Directory.EnumerateFiles(
                 cache.Path,
-                "*.sharpshader-cache-r2.json.corrupt-*",
+                "*.sharpshader-cache-r3.json.corrupt-*",
                 SearchOption.TopDirectoryOnly));
 
             persistent.Store(compilation, dependencies);
             Assert.True(File.Exists(livePath));
             Assert.Contains(
-                "\"schemaVersion\":2",
+                "\"schemaVersion\":3",
                 File.ReadAllText(livePath),
                 StringComparison.Ordinal);
             Assert.Empty(Directory.EnumerateFiles(
@@ -397,7 +397,7 @@ namespace Infinity.Rendering.Tests
         {
             return Directory.EnumerateFiles(
                     directory,
-                    "*.sharpshader-cache-r2.json",
+                    "*.sharpshader-cache-r3.json",
                     SearchOption.TopDirectoryOnly)
                 .Count();
         }
@@ -408,7 +408,7 @@ namespace Infinity.Rendering.Tests
         {
             return Path.Combine(
                 directory,
-                cacheKey + ".sharpshader-cache-r2.json");
+                cacheKey + ".sharpshader-cache-r3.json");
         }
 
         private static ShaderProgramCompileRequest CreateRequest(

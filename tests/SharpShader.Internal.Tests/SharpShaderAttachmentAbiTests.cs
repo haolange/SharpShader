@@ -13,12 +13,12 @@ namespace Infinity.Rendering.Tests
     {
         [Fact]
         [Trait("Category", "SharpShaderAttachment")]
-        public void RasterOrderedStore_AssignsDeclaredOutput_AndUsesLogicalMetalSlot()
+        public void FramebufferReadWriteStore_AssignsDeclaredOutput_AndUsesProgrammableBlend()
         {
             const string source = """
                 #include "AttachmentABI.hlsl"
 
-                SHARPSHADER_DECLARE_RASTER_ORDERED_ATTACHMENT_2D(
+                SHARPSHADER_DECLARE_FRAMEBUFFER_READ_WRITE_2D(
                     float4, OrderedColor, 3, 0);
 
                 struct PixelOutput
@@ -29,10 +29,10 @@ namespace Infinity.Rendering.Tests
                 PixelOutput PSMain(float4 position : SV_Position)
                 {
                     int2 pixel = int2(position.xy);
-                    float4 previous = SHARPSHADER_LOAD_RASTER_ORDERED_ATTACHMENT(
+                    float4 previous = SHARPSHADER_LOAD_FRAMEBUFFER_READ_WRITE(
                         OrderedColor, pixel);
                     PixelOutput output;
-                    SHARPSHADER_STORE_RASTER_ORDERED_ATTACHMENT(
+                    SHARPSHADER_STORE_FRAMEBUFFER_READ_WRITE(
                         OrderedColor, output.Color, pixel, previous + 1.0);
                     return output;
                 }
@@ -40,8 +40,7 @@ namespace Infinity.Rendering.Tests
             ShaderAttachmentDeclaration declaration = Color(
                 logicalAttachmentId: 3,
                 inputIndex: 0,
-                outputLocation: 0,
-                ordering: ShaderAttachmentOrdering.RasterOrdered);
+                outputLocation: 0);
 
             ShaderProgramCompilation compilation = Compile(
                 source,
@@ -51,9 +50,10 @@ namespace Infinity.Rendering.Tests
 
             ShaderInterfaceEntry entry = Assert.Single(
                 Assert.Single(compilation.Manifest.Variants).Entries);
-            Assert.Equal(
-                ShaderAttachmentOrdering.RasterOrdered,
-                entry.AttachmentInterface.Phase!.Attachments[0].Ordering);
+            ShaderAttachmentDeclaration frozen =
+                entry.AttachmentInterface.Phase!.Attachments[0];
+            Assert.Equal(0u, frozen.InputIndex);
+            Assert.Equal(0u, frozen.OutputLocation);
 
             ShaderEntryPointReflection dxilEntry = Assert.Single(
                 CompileDxilAndReflect(source, "attachment-rov.hlsl")
@@ -68,6 +68,9 @@ namespace Infinity.Rendering.Tests
                     "attachment-rov.hlsl").EntryPoints);
             Assert.True((spirvEntry.AttachmentRequirements
                 & ShaderAttachmentArtifactRequirement
+                    .FramebufferLocalRead) != 0);
+            Assert.False((spirvEntry.AttachmentRequirements
+                & ShaderAttachmentArtifactRequirement
                     .OrderedPixelFragmentInterlock) != 0);
 
             ShaderBackendLayouts backends = Assert.Single(
@@ -81,35 +84,30 @@ namespace Infinity.Rendering.Tests
                     entry.AttachmentInterface,
                     spirvEntry,
                     SpirvBindingRemapper.GetPrivateAttachmentDescriptorSet(
-                        backends.Vulkan),
-                    privateMetalTextureBase: 0);
-            Assert.True(metalPlan.UsesRasterOrderGroups);
+                        backends.Vulkan));
+            Assert.True(metalPlan.UsesFramebufferFetch);
+            Assert.True(metalPlan.HasPrivateAttachments);
 
             MslArtifactReflection msl = ReflectMsl(compilation);
             MslColorAttachmentIoReflection output =
                 Assert.Single(msl.ColorOutputs);
             Assert.Equal(0u, output.Location);
             Assert.Equal(0u, output.Index);
-            MslTextureBindingReflection texture =
-                Assert.Single(msl.TextureBindings);
-            Assert.Equal(3u, texture.TextureIndex);
-            Assert.True(texture.IsReadWrite);
-            Assert.Equal(0u, texture.RasterOrderGroup);
-            MslRasterOrderGroupReflection group =
-                Assert.Single(msl.RasterOrderGroups);
-            Assert.Equal(MslResourceBindingKind.Texture, group.BindingKind);
-            Assert.Equal(3u, group.BindingIndex);
-            Assert.Equal(0u, group.Group);
+            MslColorAttachmentIoReflection input =
+                Assert.Single(msl.ColorInputs);
+            Assert.Equal(0u, input.Location);
+            Assert.Empty(msl.TextureBindings);
+            Assert.Empty(msl.RasterOrderGroups);
         }
         [Fact]
         [Trait("Category", "SharpShaderAttachment")]
-        public void LayeredLocalInput_CompilesAsArrayShapeAcrossAllArtifacts()
+        public void LayeredFramebufferReadWrite_CompilesAsArrayShapeAcrossAllArtifacts()
         {
             const string source = """
                 #include "AttachmentABI.hlsl"
 
-                SHARPSHADER_DECLARE_LOCAL_INPUT_2D_ARRAY(
-                    float4, PreviousColor, 0);
+                SHARPSHADER_DECLARE_FRAMEBUFFER_READ_WRITE_2D_ARRAY(
+                    float4, PreviousColor, 0, 0);
 
                 struct PixelOutput
                 {
@@ -118,9 +116,13 @@ namespace Infinity.Rendering.Tests
 
                 PixelOutput PSMain(float4 position : SV_Position)
                 {
+                    int2 pixel = int2(position.xy);
+                    float4 previous =
+                        SHARPSHADER_LOAD_FRAMEBUFFER_READ_WRITE_ARRAY(
+                            PreviousColor, pixel, 0);
                     PixelOutput output;
-                    output.Color = SHARPSHADER_LOAD_LOCAL_INPUT_ARRAY(
-                        PreviousColor, int2(position.xy), 0);
+                    SHARPSHADER_STORE_FRAMEBUFFER_READ_WRITE_ARRAY(
+                        PreviousColor, output.Color, pixel, 0, previous);
                     return output;
                 }
                 """;
@@ -154,7 +156,7 @@ namespace Infinity.Rendering.Tests
         [InlineData(0u)]
         [InlineData(3u)]
         [Trait("Category", "SharpShaderAttachment")]
-        public void MetalLocalInput_MapsLogicalInputIndependentlyFromOutput(
+        public void MetalLocalInput_MapsInputSlotIndependentlyFromLogicalId(
             uint inputLogicalAttachmentId)
         {
             const string source = """
@@ -194,7 +196,7 @@ namespace Infinity.Rendering.Tests
             MslArtifactReflection msl = ReflectMsl(compilation);
             MslColorAttachmentIoReflection reflectedInput =
                 Assert.Single(msl.ColorInputs);
-            Assert.Equal(inputLogicalAttachmentId, reflectedInput.Location);
+            Assert.Equal(0u, reflectedInput.Location);
             Assert.Equal(0u, reflectedInput.Index);
             MslColorAttachmentIoReflection reflectedOutput =
                 Assert.Single(msl.ColorOutputs);
@@ -204,7 +206,7 @@ namespace Infinity.Rendering.Tests
 
         [Fact]
         [Trait("Category", "SharpShaderAttachment")]
-        public void MetalBindingPlan_RecordsFramebufferFetchAndLogicalInputSlot()
+        public void MetalBindingPlan_UsesInputSlotForInputOnlyFetch()
         {
             ShaderAttachmentDeclaration input = Color(
                 logicalAttachmentId: 3,
@@ -226,24 +228,23 @@ namespace Infinity.Rendering.Tests
                 new MetalShaderBackendLayout(),
                 attachmentInterface,
                 reflection,
-                privateAttachmentDescriptorSet: 31,
-                privateMetalTextureBase: 16);
+                privateAttachmentDescriptorSet: 31);
 
             Assert.True(plan.UsesFramebufferFetch);
             MslTranslationResourceBinding resource = Assert.Single(plan.Resources);
             Assert.True(resource.IsPrivateAttachment);
             Assert.Equal(0u, resource.Binding);
-            Assert.Equal(3u, resource.MetalIndex);
+            Assert.Equal(0u, resource.MetalIndex);
         }
 
         [Fact]
         [Trait("Category", "SharpShaderAttachment")]
-        public void LayeredRasterOrderedAttachment_RemapsArrayShape()
+        public void LayeredFramebufferReadWriteAttachment_RemapsArrayShape()
         {
             const string source = """
                 #include "AttachmentABI.hlsl"
 
-                SHARPSHADER_DECLARE_RASTER_ORDERED_ATTACHMENT_2D_ARRAY(
+                SHARPSHADER_DECLARE_FRAMEBUFFER_READ_WRITE_2D_ARRAY(
                     float4, OrderedColor, 3, 0);
 
                 struct PixelOutput
@@ -254,10 +255,10 @@ namespace Infinity.Rendering.Tests
                 PixelOutput PSMain(float4 position : SV_Position)
                 {
                     int2 pixel = int2(position.xy);
-                    float4 previous = SHARPSHADER_LOAD_RASTER_ORDERED_ATTACHMENT_ARRAY(
+                    float4 previous = SHARPSHADER_LOAD_FRAMEBUFFER_READ_WRITE_ARRAY(
                         OrderedColor, pixel, 0);
                     PixelOutput output;
-                    SHARPSHADER_STORE_RASTER_ORDERED_ATTACHMENT_ARRAY(
+                    SHARPSHADER_STORE_FRAMEBUFFER_READ_WRITE_ARRAY(
                         OrderedColor, output.Color, pixel, 0, previous + 1.0);
                     return output;
                 }
@@ -266,8 +267,7 @@ namespace Infinity.Rendering.Tests
                 logicalAttachmentId: 3,
                 inputIndex: 0,
                 outputLocation: 0,
-                layerMode: ShaderAttachmentLayerMode.Layered,
-                ordering: ShaderAttachmentOrdering.RasterOrdered);
+                layerMode: ShaderAttachmentLayerMode.Layered);
 
             ShaderProgramCompilation compilation = Compile(
                 source,
@@ -282,58 +282,6 @@ namespace Infinity.Rendering.Tests
                 compilation,
                 ShaderArtifactKind.SpirV).Content.IsEmpty);
         }
-        [Fact]
-        [Trait("Category", "SharpShaderAttachment")]
-        public void SampledFeedback_RemainsOrdinaryShaderResourceBinding()
-        {
-            const string source = """
-                #include "AttachmentABI.hlsl"
-
-                SHARPSHADER_DECLARE_SAMPLED_FEEDBACK_TEXTURE_2D(
-                    float4, History, 2, 5);
-                SamplerState HistorySampler : register(s0, space2);
-
-                struct PixelOutput
-                {
-                    SHARPSHADER_DECLARE_COLOR_OUTPUT(float4, Color, 0);
-                };
-
-                PixelOutput PSMain(float4 position : SV_Position)
-                {
-                    PixelOutput output;
-                    output.Color = SHARPSHADER_LOAD_SAMPLED_FEEDBACK(
-                        History, int2(position.xy));
-                    return output;
-                }
-                """;
-            ShaderBindingKey sampledBinding = new(
-                table: 2,
-                slot: 5,
-                ShaderBindingClass.ShaderResource);
-            ShaderAttachmentDeclaration declaration = Color(
-                logicalAttachmentId: 0,
-                inputIndex: null,
-                outputLocation: 0,
-                feedback: ShaderAttachmentFeedback.Sampled,
-                sampledFeedbackBinding: sampledBinding);
-
-            ShaderProgramCompilation compilation = Compile(
-                source,
-                ShaderProgramTarget.All,
-                new ShaderAttachmentPhase(0, new[] { declaration }),
-                "attachment-sampled-feedback.hlsl");
-
-            ShaderInterfaceEntry entry = Assert.Single(
-                Assert.Single(compilation.Manifest.Variants).Entries);
-            Assert.Contains(
-                compilation.Manifest.LogicalLayouts.Single().Bindings,
-                binding => binding.Key == sampledBinding);
-            Assert.Equal(
-                sampledBinding,
-                Assert.Single(entry.AttachmentInterface.Phase!.Attachments)
-                    .SampledFeedbackBinding);
-        }
-
         [Fact]
         [Trait("Category", "SharpShaderAttachment")]
         public void SparseLogicalOutputs_DoNotRequireSyntheticShaderOutputs()
@@ -584,18 +532,19 @@ namespace Infinity.Rendering.Tests
 
         [Fact]
         [Trait("Category", "SharpShaderAttachment")]
-        public void AttachmentContract_RejectsInputAndSampledFeedbackDualPath()
+        public void AttachmentContract_AcceptsInputAndOutputOverlapAsReadWrite()
         {
-            ShaderBindingKey sampledBinding = new(
-                table: 1,
-                slot: 2,
-                ShaderBindingClass.ShaderResource);
-            Assert.Throws<ArgumentException>(() => Color(
+            ShaderAttachmentDeclaration declaration = Color(
                 logicalAttachmentId: 0,
                 inputIndex: 0,
-                outputLocation: 0,
-                feedback: ShaderAttachmentFeedback.Sampled,
-                sampledFeedbackBinding: sampledBinding));
+                outputLocation: 0);
+            ShaderAttachmentPhase phase =
+                new(0, new[] { declaration });
+
+            ShaderAttachmentDeclaration frozen =
+                Assert.Single(phase.Attachments);
+            Assert.Equal(0u, frozen.InputIndex);
+            Assert.Equal(0u, frozen.OutputLocation);
         }
 
         [Fact]
@@ -725,10 +674,7 @@ namespace Infinity.Rendering.Tests
             ShaderAttachmentLayerMode layerMode =
                 ShaderAttachmentLayerMode.SingleLayer,
             uint outputIndex = 0,
-            uint outputComponent = 0,
-            ShaderAttachmentOrdering ordering = ShaderAttachmentOrdering.None,
-            ShaderAttachmentFeedback feedback = ShaderAttachmentFeedback.None,
-            ShaderBindingKey? sampledFeedbackBinding = null)
+            uint outputComponent = 0)
         {
             return new ShaderAttachmentDeclaration(
                 logicalAttachmentId,
@@ -739,10 +685,7 @@ namespace Infinity.Rendering.Tests
                 sampleMode,
                 layerMode,
                 outputIndex,
-                outputComponent,
-                ordering,
-                feedback,
-                sampledFeedbackBinding);
+                outputComponent);
         }
 
         private static ShaderProgramCompilation Compile(

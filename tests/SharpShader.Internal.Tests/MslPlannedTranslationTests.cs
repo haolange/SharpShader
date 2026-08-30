@@ -587,8 +587,7 @@ namespace Infinity.Rendering.Tests
                         ? new ShaderAttachmentPhase(0)
                         : null),
                 reflectedEntry,
-                privateAttachmentDescriptorSet: 31,
-                privateMetalTextureBase: 16);
+                privateAttachmentDescriptorSet: 31);
         }
         private static ShaderCompileResult Translate(
             ShaderCompileRequest request,
