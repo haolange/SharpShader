@@ -88,7 +88,7 @@ namespace Infinity.Rendering.Tests
             Assert.Equal(
                 canonicalJson,
                 ShaderInterfaceManifestSerializer.Serialize(roundTrip));
-            Assert.Contains("\"schemaVersion\":2", canonicalJson, StringComparison.Ordinal);
+            Assert.Contains("\"schemaVersion\":3", canonicalJson, StringComparison.Ordinal);
             Assert.Contains("\"logicalLayoutSignature\"", canonicalJson, StringComparison.Ordinal);
             Assert.Contains("\"referenceBufferBindings\":[]", canonicalJson, StringComparison.Ordinal);
         }
@@ -110,20 +110,20 @@ namespace Infinity.Rendering.Tests
             string mutated = mutation switch
             {
                 "unknown" => json.Replace(
-                    "{\"schemaVersion\":2,",
-                    "{\"schemaVersion\":2,\"unexpected\":true,",
+                    "{\"schemaVersion\":3,",
+                    "{\"schemaVersion\":3,\"unexpected\":true,",
                     StringComparison.Ordinal),
                 "duplicate" => json.Replace(
-                    "{\"schemaVersion\":2,",
-                    "{\"schemaVersion\":2,\"schemaVersion\":2,",
+                    "{\"schemaVersion\":3,",
+                    "{\"schemaVersion\":3,\"schemaVersion\":3,",
                     StringComparison.Ordinal),
                 "missing" => json.Replace(
                     $"\"sourceDigest\":\"{SourceDigest}\",",
                     string.Empty,
                     StringComparison.Ordinal),
                 "schema" => json.Replace(
+                    "\"schemaVersion\":3",
                     "\"schemaVersion\":2",
-                    "\"schemaVersion\":1",
                     StringComparison.Ordinal),
                 "numericEnum" => json.Replace(
                     "\"stage\":\"Pixel\"",

@@ -98,24 +98,10 @@ namespace Infinity.Rendering.Tests
 
         [Fact]
         [Trait("Category", "SharpShaderAttachment")]
-        public void RasterPlan_ShouldPreserveSparseLayeredAndSpecialAccessFacts()
+        public void RasterPlan_ShouldPreserveSparseLayeredInputOutputFacts()
         {
-            ShaderBindingKey sampledBinding = new(
-                1,
-                4,
-                ShaderBindingClass.ShaderResource);
-            ShaderInterfaceLayout layout = new(new[]
-            {
-                new ShaderLogicalBinding(
-                    sampledBinding,
-                    "History",
-                    aliases: null,
-                    new ShaderResourceShape(
-                        ShaderResourceKind.Texture,
-                        ShaderResourceDimension.Texture2DArray,
-                        ShaderResourceAccess.ReadOnly),
-                    ShaderStageMask.Pixel),
-            });
+            ShaderInterfaceLayout layout =
+                new(Array.Empty<ShaderLogicalBinding>());
             ShaderAttachmentPhase phase = new(
                 0,
                 new[]
@@ -129,15 +115,7 @@ namespace Infinity.Rendering.Tests
                         2,
                         inputIndex: 1,
                         outputLocation: 0,
-                        layerMode: ShaderAttachmentLayerMode.Layered,
-                        ordering: ShaderAttachmentOrdering.RasterOrdered),
-                    ColorAttachment(
-                        5,
-                        inputIndex: null,
-                        outputLocation: null,
-                        layerMode: ShaderAttachmentLayerMode.Layered,
-                        feedback: ShaderAttachmentFeedback.Sampled,
-                        sampledFeedbackBinding: sampledBinding),
+                        layerMode: ShaderAttachmentLayerMode.Layered),
                     ColorAttachment(
                         7,
                         inputIndex: null,
@@ -161,9 +139,8 @@ namespace Infinity.Rendering.Tests
                 RHIAttachmentInterfaceSignature.UnboundLogicalAttachment,
                 signature.GetColorOutputLogicalAttachment(1));
             Assert.Equal(7, signature.GetColorOutputLogicalAttachment(2));
-            Assert.Equal(5, signature.GetSampledFeedbackLogicalAttachment(0));
-            Assert.Equal((byte)0x04, signature.RasterOrderedReadWriteMask);
-            Assert.Equal((byte)0x2c, signature.LayeredAccessMask);
+            Assert.Equal((byte)0x04, signature.FramebufferReadWriteMask);
+            Assert.Equal((byte)0x0c, signature.LayeredAccessMask);
             Assert.All(plan.Attachments, fact =>
                 Assert.Equal(ShaderAttachmentLayerMode.Layered, fact.LayerMode));
         }
@@ -392,10 +369,7 @@ namespace Infinity.Rendering.Tests
                 ShaderAttachmentSampleMode.SingleSample,
             ShaderAttachmentLayerMode layerMode =
                 ShaderAttachmentLayerMode.SingleLayer,
-            uint outputIndex = 0,
-            ShaderAttachmentOrdering ordering = ShaderAttachmentOrdering.None,
-            ShaderAttachmentFeedback feedback = ShaderAttachmentFeedback.None,
-            ShaderBindingKey? sampledFeedbackBinding = null)
+            uint outputIndex = 0)
         {
             return new ShaderAttachmentDeclaration(
                 logicalAttachmentId,
@@ -406,10 +380,7 @@ namespace Infinity.Rendering.Tests
                 sampleMode,
                 layerMode,
                 outputIndex,
-                outputComponent: 0,
-                ordering,
-                feedback,
-                sampledFeedbackBinding);
+                outputComponent: 0);
         }
         private static ShaderInterfaceManifest CreateManifest(
             ShaderInterfaceLayout layout,
