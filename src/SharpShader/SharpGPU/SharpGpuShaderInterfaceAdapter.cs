@@ -778,12 +778,14 @@ namespace SharpShader.SharpGPU
                 table,
                 slot,
                 count,
-                ConvertBindType(logical),
+                ConvertBindType(logical, backend),
                 ConvertShaderStages(logical.StageMask, backend),
                 order);
         }
 
-        private static Rhi.ERHIBindType ConvertBindType(ShaderLogicalBinding binding)
+        private static Rhi.ERHIBindType ConvertBindType(
+            ShaderLogicalBinding binding,
+            Rhi.ERHIBackend backend)
         {
             ShaderResourceShape shape = binding.Shape;
             return shape.Kind switch
@@ -808,10 +810,26 @@ namespace SharpShader.SharpGPU
                 ShaderResourceKind.InputAttachment => throw UnsupportedBinding(
                     binding,
                     "SharpGPU does not expose input-attachment descriptors"),
-                ShaderResourceKind.FeedbackTexture => throw UnsupportedBinding(
-                    binding,
-                    "SharpGPU does not expose sampler-feedback texture descriptors"),
+                ShaderResourceKind.FeedbackTexture => backend == Rhi.ERHIBackend.DirectX12
+                    ? ConvertFeedbackTextureBindType(binding)
+                    : throw UnsupportedBinding(
+                        binding,
+                        "SharpGPU does not expose sampler-feedback texture descriptors"),
                 _ => throw UnsupportedBinding(binding, "resource kind"),
+            };
+        }
+
+        private static Rhi.ERHIBindType ConvertFeedbackTextureBindType(
+            ShaderLogicalBinding binding)
+        {
+            return binding.Shape.Dimension switch
+            {
+                ShaderResourceDimension.Texture2D => Rhi.ERHIBindType.StorageTexture2D,
+                ShaderResourceDimension.Texture2DArray =>
+                    Rhi.ERHIBindType.StorageTexture2DArray,
+                _ => throw UnsupportedBinding(
+                    binding,
+                    "DX12 sampler-feedback bindings require Texture2D or Texture2DArray"),
             };
         }
 

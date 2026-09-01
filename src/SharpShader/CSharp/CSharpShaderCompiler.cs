@@ -75,12 +75,17 @@ namespace SharpShader.CSharp
 
                 ShaderProgramTarget targets = effective.Targets;
                 bool usesRayQuery = false;
+                bool usesWaveOperations = false;
                 for (int entryIndex = 0; entryIndex < translation.Entries.Count; ++entryIndex)
                 {
                     if (translation.Entries[entryIndex].UsesRayQuery)
                     {
                         usesRayQuery = true;
-                        break;
+                    }
+
+                    if (translation.Entries[entryIndex].UsesWaveOperations)
+                    {
+                        usesWaveOperations = true;
                     }
                 }
 
@@ -93,6 +98,17 @@ namespace SharpShader.CSharp
                 {
                     throw new InvalidOperationException(
                         "RayQuery is not supported on Metal; no remaining shader targets were requested.");
+                }
+
+                if (usesWaveOperations
+                    && !ShaderBackendWaveContract.AllRequestedTargetsSupportWaveOperations(
+                        targets,
+                        effective.ShaderModel))
+                {
+                    throw new InvalidOperationException(
+                        "Wave operations cannot be lowered for a requested target that would "
+                        + "report WaveOperations Unavailable. Compile-time contract: DXIL SM 6.0+, "
+                        + "SPIR-V subgroup, and MSL simdgroup only.");
                 }
 
                 List<ShaderProgramEntry> entries = new List<ShaderProgramEntry>();

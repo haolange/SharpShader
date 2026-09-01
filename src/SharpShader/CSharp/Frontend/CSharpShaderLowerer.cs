@@ -24,6 +24,7 @@ namespace SharpShader.CSharp.Frontend
         private readonly HashSet<IMethodSymbol> m_Visiting =
             new HashSet<IMethodSymbol>(SymbolEqualityComparer.Default);
         private bool m_UsesRayQuery;
+        private bool m_UsesWaveOperations;
 
         private CSharpShaderLowerer(Compilation compilation, CancellationToken cancellationToken)
         {
@@ -83,7 +84,8 @@ namespace SharpShader.CSharp.Frontend
                     entry.Stage,
                     entry.ThreadGroup,
                     entry.ColorTargetCount,
-                    m_UsesRayQuery && entry.Stage == CSharpShaderStage.Compute));
+                    m_UsesRayQuery && entry.Stage == CSharpShaderStage.Compute,
+                    m_UsesWaveOperations));
             }
 
             List<CSharpShaderResourceBinding> resources = new List<CSharpShaderResourceBinding>();
@@ -1373,6 +1375,7 @@ namespace SharpShader.CSharp.Frontend
                 case "DDY":
                     return "ddy(" + args + ")";
                 case "WAVE_ACTIVE_SUM":
+                    m_UsesWaveOperations = true;
                     return "WaveActiveSum(" + args + ")";
                 default:
                     AddError(

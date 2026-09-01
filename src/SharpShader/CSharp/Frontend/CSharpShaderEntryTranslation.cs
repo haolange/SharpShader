@@ -9,7 +9,8 @@ namespace SharpShader.CSharp.Frontend
             CSharpShaderStage stage,
             CSharpShaderThreadGroup? threadGroup,
             int colorTargetCount,
-            bool usesRayQuery)
+            bool usesRayQuery,
+            bool usesWaveOperations = false)
         {
             if (string.IsNullOrWhiteSpace(name))
             {
@@ -34,6 +35,7 @@ namespace SharpShader.CSharp.Frontend
             ThreadGroup = threadGroup;
             ColorTargetCount = colorTargetCount;
             UsesRayQuery = usesRayQuery;
+            UsesWaveOperations = usesWaveOperations;
         }
 
         public string Name { get; }
@@ -41,5 +43,6 @@ namespace SharpShader.CSharp.Frontend
         public CSharpShaderThreadGroup? ThreadGroup { get; }
         public int ColorTargetCount { get; }
         public bool UsesRayQuery { get; }
+        public bool UsesWaveOperations { get; }
     }
 }
