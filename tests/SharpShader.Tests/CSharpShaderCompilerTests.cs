@@ -11,6 +11,23 @@ namespace Infinity.Rendering.Tests
     public sealed class CSharpShaderCompilerTests
     {
         [Fact]
+        public void Compile_WaveActiveSum_ProducesDxilAndKeepsExistingWaveLowering()
+        {
+            CSharpShaderCompilation compilation = CSharpShaderCompiler.Shared.Compile(
+                CSharpShaderSources.WaveActiveSum,
+                "WaveActiveSum.cs",
+                new CSharpShaderCompilerOptions(ShaderProgramTarget.DirectX12));
+
+            Assert.True(compilation.Primary.Translation.Entries[0].UsesWaveOperations);
+            Assert.Contains("WaveActiveSum(", compilation.Primary.Translation.Hlsl);
+            Assert.DoesNotContain("WaveMMA", compilation.Primary.Translation.Hlsl);
+            ShaderProgramCompilation program = compilation.Primary.Program;
+            Assert.Contains(
+                program.Artifacts,
+                static artifact => artifact.Identity.ArtifactKind == ShaderArtifactKind.Dxil);
+        }
+
+        [Fact]
         public void Compile_WriteConstant_ProducesDxilAndManifest()
         {
             CSharpShaderCompilation compilation = CSharpShaderCompiler.Shared.Compile(

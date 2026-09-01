@@ -39,6 +39,18 @@ namespace Infinity.Rendering.Tests
         }
 
         [Fact]
+        public void Translate_WaveActiveSum_EmitsHlslWaveIntrinsic()
+        {
+            CSharpShaderTranslation translation = Translate(CSharpShaderSources.WaveActiveSum);
+            Assert.False(translation.HasErrors, Format(translation));
+            Assert.Contains("WaveActiveSum(", translation.Hlsl);
+            Assert.DoesNotContain("WaveMMA", translation.Hlsl);
+            Assert.DoesNotContain("CooperativeMatrix", translation.Hlsl);
+            Assert.True(translation.Entries[0].UsesWaveOperations);
+            Assert.False(translation.Entries[0].UsesRayQuery);
+        }
+
+        [Fact]
         public void Translate_RayQuery_EmitsInlineQuery()
         {
             CSharpShaderTranslation translation = Translate(CSharpShaderSources.RayQuery);

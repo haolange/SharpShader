@@ -167,6 +167,25 @@ public static class RayQueryShader
 }
 ";
 
+        internal const string WaveActiveSum = @"
+using Infinity.Mathmatics;
+using SharpShader.CSharp.ShaderLib;
+
+public static class WaveActiveSumShader
+{
+    [Binding(0, 0)]
+    public static RWStructuredBuffer<float> Output;
+
+    [NumThreads(32, 1, 1)]
+    [ComputeShader]
+    public static void CSMain([SV.DispatchThreadID] uint3 tid)
+    {
+        float value = (float)tid.x;
+        Output.Store(tid.x, Hlsl.WaveActiveSum(value));
+    }
+}
+";
+
         internal const string WriteConstant = @"
 using Infinity.Mathmatics;
 using SharpShader.CSharp.ShaderLib;
