@@ -1,0 +1,17 @@
+{
+  "product": "SharpShader",
+  "version": "0.4.0-preview.1",
+  "sample": "samples/CompileAndReflect",
+  "packages": [
+    "SharpShader"
+  ],
+  "runs": [
+    {
+      "arguments": [],
+      "requiredOutput": [
+        "target=DXIL bytes=",
+        "sha256="
+      ]
+    }
+  ]
+}

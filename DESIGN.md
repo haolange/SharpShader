@@ -13,3 +13,8 @@ Native compilation resolves standard NuGet RID assets by default. Hosts with a c
 The C# source generator translates reachable Shader declarations in the host compilation. Ordinary host diagnostics remain Roslyn-owned, including references resolved by generation. Standalone translation requests retain full input diagnostics. A source analyzer ProjectReference returns the generator plus Frontend and ShaderLib dependency paths; NuGet distributes the same three assemblies under analyzers/dotnet/cs. The generator is a build-time asset, not an application runtime dependency.
 
 Product assemblies grant no friend access to Infinity Engine tests. Internal compiler seams and collision injection are verified in the source-linked internal harness; public consumers and IE use the published translation, manifest, adapter and artifact contracts. Internal tests are not shipped as product dependencies.
+
+Product CI owns its explicit project/test inventory and dependency-only pins
+in eng/ci.json. Hosted build and real-device qualification are distinct
+results. Source CI cannot stand in for package consumption or another target
+platform. The consuming workspace continues to own its stack revision manifest.
