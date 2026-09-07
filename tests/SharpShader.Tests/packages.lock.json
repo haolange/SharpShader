@@ -22,6 +22,40 @@
           "Microsoft.TestPlatform.TestHost": "17.12.0"
         }
       },
+      "SharpShader": {
+        "type": "Direct",
+        "requested": "[0.4.0-preview.1, )",
+        "resolved": "0.4.0-preview.1",
+        "contentHash": "c8DwB+03mJTjCYbb7g6yhd55vEUeY0wQVJCo8/WOzHv6pyvrWmJHwoAoPMzx+xhqoPxCa7R8HVUr4Ouhqmz9BA==",
+        "dependencies": {
+          "Antlr4.Runtime.Standard": "4.13.1",
+          "Silk.NET.Direct3D.Compilers": "2.23.0",
+          "Silk.NET.Direct3D12": "2.23.0",
+          "Silk.NET.SPIRV.Cross": "2.23.0"
+        }
+      },
+      "SharpShader.CSharp": {
+        "type": "Direct",
+        "requested": "[0.4.0-preview.1, )",
+        "resolved": "0.4.0-preview.1",
+        "contentHash": "WWseitPaepxMvVeAQwS8ubHG+aoNO9qJMQwglC8I23YULN/URIWm/IwAWZ1GG/ZYBVqWoJnM1OsqEalKTezjSw==",
+        "dependencies": {
+          "SharpMath": "0.4.0-preview.1",
+          "SharpShader": "0.4.0-preview.1",
+          "SharpShader.CSharp.Frontend": "0.4.0-preview.1",
+          "SharpShader.CSharp.ShaderLib": "0.4.0-preview.1"
+        }
+      },
+      "SharpShader.SharpGPU": {
+        "type": "Direct",
+        "requested": "[0.4.0-preview.1, )",
+        "resolved": "0.4.0-preview.1",
+        "contentHash": "1pV4hx1zvc1eWHza3iaUbzn9Bh84NbEuY3Wfks6cMA/oF/8wuT6CaDY3DGMuDCFreDs/rPacoYu/5+44SMRVgA==",
+        "dependencies": {
+          "SharpGPU": "0.4.0-preview.1",
+          "SharpShader": "0.4.0-preview.1"
+        }
+      },
       "xunit": {
         "type": "Direct",
         "requested": "[2.9.2, )",
@@ -103,6 +137,92 @@
         "dependencies": {
           "SharpGen.Runtime": "2.4.2-beta"
         }
+      },
+      "SharpGPU": {
+        "type": "Transitive",
+        "resolved": "0.4.0-preview.1",
+        "contentHash": "8ALVN7CdBcvPRaDJdKbnleuCRhTEopeGjhioAoKmzcXSHZIrR5fVHnIyn7Ez4DJXB5Q5YN/89t4iFgaGUfttLQ==",
+        "dependencies": {
+          "SharpGPU.Vortice.Direct3D12": "3.8.3-sharpgpu.1",
+          "SharpGPU.Vortice.DirectML": "3.8.3-sharpgpu.1",
+          "SharpGPU.Vortice.DirectStorage": "3.8.3-sharpgpu.1",
+          "SharpGen.Runtime": "2.4.2-beta",
+          "SharpMath": "0.4.0-preview.1",
+          "SharpMetal": "0.4.0-preview.1",
+          "Vortice.Vulkan": "3.2.1"
+        }
+      },
+      "SharpGPU.Vortice.Direct3D12": {
+        "type": "Transitive",
+        "resolved": "3.8.3-sharpgpu.1",
+        "contentHash": "NXLzpcLe7lpkjlrQHw7bvnMddhSm//+SIjmLnvq/bXUqa1+VrjJ8A8cgG7T0YCI3IVt92ThHLmITG6Eje0X21g==",
+        "dependencies": {
+          "SharpGPU.Vortice.DXGI": "3.8.3-sharpgpu.1",
+          "SharpGen.Runtime": "2.4.2-beta"
+        }
+      },
+      "SharpGPU.Vortice.DirectML": {
+        "type": "Transitive",
+        "resolved": "3.8.3-sharpgpu.1",
+        "contentHash": "JzbcVzWQ/qAg8mMf+lnOLT1jrC0VijDNYc2HXQgA4tH6oA1jsG5+B6a3bRMeeiet882ncPgYJ+2Z4n66zi3juA==",
+        "dependencies": {
+          "SharpGPU.Vortice.DXGI": "3.8.3-sharpgpu.1",
+          "SharpGPU.Vortice.Direct3D12": "3.8.3-sharpgpu.1",
+          "SharpGPU.Vortice.DirectX": "3.8.3-sharpgpu.1",
+          "SharpGen.Runtime": "2.4.2-beta"
+        }
+      },
+      "SharpGPU.Vortice.DirectStorage": {
+        "type": "Transitive",
+        "resolved": "3.8.3-sharpgpu.1",
+        "contentHash": "4hOC7uhcT2j1vw0NdxY01WyE9N43mzIdDo8cLhUj/P4h+qGgWUsOVoUPKQ7bKwxMabS7t310nyDoOTe/7eQEPw==",
+        "dependencies": {
+          "SharpGPU.Vortice.Direct3D12": "3.8.3-sharpgpu.1",
+          "SharpGen.Runtime": "2.4.2-beta"
+        }
+      },
+      "SharpGPU.Vortice.DirectX": {
+        "type": "Transitive",
+        "resolved": "3.8.3-sharpgpu.1",
+        "contentHash": "zaIhyw1VzzVvxPo+LGepHmHcIsylV+6DzuFQaVSNpf1jyghYJvjUg42yEiC2zCvhlgwj6KJLZ9660irF6/fEuA==",
+        "dependencies": {
+          "SharpGen.Runtime": "2.4.2-beta",
+          "SharpGen.Runtime.COM": "2.4.2-beta",
+          "Vortice.Mathematics": "2.1.0"
+        }
+      },
+      "SharpGPU.Vortice.DXGI": {
+        "type": "Transitive",
+        "resolved": "3.8.3-sharpgpu.1",
+        "contentHash": "aPeJaXbS7Vwg9yZrsEHfNcQgkPiglENg9D1Gz20n4EC326IHZCRFZW+8i4/+vPurX1l+UFZbYTgiP7sTvyP8XA==",
+        "dependencies": {
+          "SharpGPU.Vortice.DirectX": "3.8.3-sharpgpu.1",
+          "SharpGen.Runtime": "2.4.2-beta"
+        }
+      },
+      "SharpMath": {
+        "type": "Transitive",
+        "resolved": "0.4.0-preview.1",
+        "contentHash": "CetKGI4JHnxSU+mGMx0IqjaPqDQJU119V+Y7xvE8iFbUNo7ndbw/c62LjfW1mcQvhEe75cIsBXBaU4naDd9iuw=="
+      },
+      "SharpMetal": {
+        "type": "Transitive",
+        "resolved": "0.4.0-preview.1",
+        "contentHash": "JwBmqDShKykwWvauhMr/tn0yI8vTBA+9Qweg7IuzRLyaCv4aiTa7W37GQ3s5uIMmfScX0Dj+6pFiOebcE62Dlg=="
+      },
+      "SharpShader.CSharp.Frontend": {
+        "type": "Transitive",
+        "resolved": "0.4.0-preview.1",
+        "contentHash": "QfcLuuE6LyHfs1YSgLWFeA41Qkmam52vV9e9l8QB0LU5UHjb2iY6FcH9DC3GKPgM8SP8LlgWvpWkSITAEuINTQ==",
+        "dependencies": {
+          "Microsoft.CodeAnalysis.CSharp": "5.6.0",
+          "SharpShader.CSharp.ShaderLib": "0.4.0-preview.1"
+        }
+      },
+      "SharpShader.CSharp.ShaderLib": {
+        "type": "Transitive",
+        "resolved": "0.4.0-preview.1",
+        "contentHash": "YlH56gpGWSztTTNvFhq1GIZEYF5y91q3xMvTy9cguk9Lcx4hWK67gDlC4+CMIfgwa7NOKoTSRxsEUv0mtEUSGQ=="
       },
       "Silk.NET.Core": {
         "type": "Transitive",
@@ -215,100 +335,6 @@
         "contentHash": "rKMpq4GsIUIJibXuZoZ8lYp5EpROlnYaRpwu9Zr0sRZXE7JqJfEEbCsUriZqB+ByXCLFBJyjkTRULMdC+U566g==",
         "dependencies": {
           "xunit.extensibility.core": "[2.9.2]"
-        }
-      },
-      "sharpgpu": {
-        "type": "Project",
-        "dependencies": {
-          "SharpGPU.Vortice.Direct3D12": "[3.8.3-sharpgpu.1, )",
-          "SharpGPU.Vortice.DirectML": "[3.8.3-sharpgpu.1, )",
-          "SharpGPU.Vortice.DirectStorage": "[3.8.3-sharpgpu.1, )",
-          "SharpGen.Runtime": "[2.4.2-beta, )",
-          "SharpMath": "[0.4.0-preview.1, )",
-          "SharpMetal": "[0.4.0-preview.1, )",
-          "Vortice.Vulkan": "[3.2.1, )"
-        }
-      },
-      "SharpGPU.Vortice.Direct3D12": {
-        "type": "Project",
-        "dependencies": {
-          "SharpGPU.Vortice.DXGI": "[3.8.3-sharpgpu.1, )",
-          "SharpGen.Runtime": "[2.4.2-beta, )"
-        }
-      },
-      "SharpGPU.Vortice.DirectML": {
-        "type": "Project",
-        "dependencies": {
-          "SharpGPU.Vortice.DXGI": "[3.8.3-sharpgpu.1, )",
-          "SharpGPU.Vortice.Direct3D12": "[3.8.3-sharpgpu.1, )",
-          "SharpGPU.Vortice.DirectX": "[3.8.3-sharpgpu.1, )",
-          "SharpGen.Runtime": "[2.4.2-beta, )"
-        }
-      },
-      "SharpGPU.Vortice.DirectStorage": {
-        "type": "Project",
-        "dependencies": {
-          "SharpGPU.Vortice.Direct3D12": "[3.8.3-sharpgpu.1, )",
-          "SharpGen.Runtime": "[2.4.2-beta, )"
-        }
-      },
-      "SharpGPU.Vortice.DirectX": {
-        "type": "Project",
-        "dependencies": {
-          "SharpGen.Runtime": "[2.4.2-beta, )",
-          "SharpGen.Runtime.COM": "[2.4.2-beta, )",
-          "Vortice.Mathematics": "[2.1.0, )"
-        }
-      },
-      "SharpGPU.Vortice.DXGI": {
-        "type": "Project",
-        "dependencies": {
-          "SharpGPU.Vortice.DirectX": "[3.8.3-sharpgpu.1, )",
-          "SharpGen.Runtime": "[2.4.2-beta, )"
-        }
-      },
-      "sharpmath": {
-        "type": "Project"
-      },
-      "sharpmetal": {
-        "type": "Project"
-      },
-      "sharpshader": {
-        "type": "Project",
-        "dependencies": {
-          "Antlr4.Runtime.Standard": "[4.13.1, )",
-          "Silk.NET.Direct3D.Compilers": "[2.23.0, )",
-          "Silk.NET.Direct3D12": "[2.23.0, )",
-          "Silk.NET.SPIRV.Cross": "[2.23.0, )"
-        }
-      },
-      "sharpshader.csharp": {
-        "type": "Project",
-        "dependencies": {
-          "SharpMath": "[0.4.0-preview.1, )",
-          "SharpShader": "[0.4.0-preview.1, )",
-          "SharpShader.CSharp.Frontend": "[0.4.0-preview.1, )",
-          "SharpShader.CSharp.ShaderLib": "[0.4.0-preview.1, )"
-        }
-      },
-      "sharpshader.csharp.frontend": {
-        "type": "Project",
-        "dependencies": {
-          "Microsoft.CodeAnalysis.CSharp": "[5.6.0, )",
-          "SharpShader.CSharp.ShaderLib": "[0.4.0-preview.1, )"
-        }
-      },
-      "sharpshader.csharp.generators": {
-        "type": "Project"
-      },
-      "sharpshader.csharp.shaderlib": {
-        "type": "Project"
-      },
-      "sharpshader.sharpgpu": {
-        "type": "Project",
-        "dependencies": {
-          "SharpGPU": "[0.4.0-preview.1, )",
-          "SharpShader": "[0.4.0-preview.1, )"
         }
       }
     }

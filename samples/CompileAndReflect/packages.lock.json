@@ -2,6 +2,18 @@
   "version": 1,
   "dependencies": {
     "net10.0": {
+      "SharpShader": {
+        "type": "Direct",
+        "requested": "[0.4.0-preview.1, )",
+        "resolved": "0.4.0-preview.1",
+        "contentHash": "c8DwB+03mJTjCYbb7g6yhd55vEUeY0wQVJCo8/WOzHv6pyvrWmJHwoAoPMzx+xhqoPxCa7R8HVUr4Ouhqmz9BA==",
+        "dependencies": {
+          "Antlr4.Runtime.Standard": "4.13.1",
+          "Silk.NET.Direct3D.Compilers": "2.23.0",
+          "Silk.NET.Direct3D12": "2.23.0",
+          "Silk.NET.SPIRV.Cross": "2.23.0"
+        }
+      },
       "Antlr4.Runtime.Standard": {
         "type": "Transitive",
         "resolved": "4.13.1",
@@ -79,15 +91,6 @@
         "type": "Transitive",
         "resolved": "2.23.0",
         "contentHash": "pY4LmIE8nYXkfCgExxksYlnYZZ4D3/AW13XNcpyp0jJDTkCpDsXL0nLOX7CM7tPS6xvkiERRd+Do2zegbl7Xtw=="
-      },
-      "sharpshader": {
-        "type": "Project",
-        "dependencies": {
-          "Antlr4.Runtime.Standard": "[4.13.1, )",
-          "Silk.NET.Direct3D.Compilers": "[2.23.0, )",
-          "Silk.NET.Direct3D12": "[2.23.0, )",
-          "Silk.NET.SPIRV.Cross": "[2.23.0, )"
-        }
       }
     }
   }

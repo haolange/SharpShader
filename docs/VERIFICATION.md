@@ -1,17 +1,15 @@
-# Verification
+# SharpShader verification
 
-Run these commands from the SharpShader repository with the .NET 10 SDK. The
+This file is the authority for the independent SharpShader repository. The
 public and internal harnesses are separate: public tests exercise the supported
 surface, while the internal harness keeps compiler lifetime and native seams
-source linked without shipping those test-only APIs.
-
-Configure `stack.local.props` from the InfinityStack handoff first. The commands
-below keep every output and intermediate file in one disposable product root;
-they also make the source graph explicit so an ignored local package setting
-cannot silently switch this run to a mixed graph.
+source linked without shipping test-only APIs. All commands use the .NET 10 SDK
+and select `Source` or `Package` for the complete graph. `stack.local.props` is
+an ignored machine path mapping and `stack.lock.json` is the shareable revision
+set.
 
 ```powershell
-$productRoot = Join-Path $PWD "artifacts/verification"
+$productRoot = Join-Path $PWD "artifacts/verification-r12"
 $sourceProps = @(
     "-p:StackReferenceMode=Source",
     "-p:StackProductRoot=$productRoot",
@@ -31,15 +29,35 @@ dotnet run --project samples/CompileAndReflect/CompileAndReflect.csproj -c Relea
 dotnet pack src/SharpShader/SharpShader.csproj -c Release -p:Platform=x64 -o artifacts/packages @sourceProps
 ```
 
-The current Windows x64 source gates are public Debug 118/118, public Release
-118/118, and internal Debug/Release 113/113. The package validation test packs
-the current source, restores it into an isolated cache, and compiles a fresh
-consumer that resolves `AttachmentABI.hlsl`. Native asset hashes are checked
-against `native/assets.json` before build and pack. macOS and Linux native
-runtime qualification requires a matching host and remains `BLOCKED_PLATFORM`
-until those commands are run there.
+The current Windows x64 source gates are green: public Debug and Release are
+**118/118**, and internal Debug and Release are **113/113**. The Release
+`CompileAndReflect` sample was run from `C:\Windows`; it produced a 3028-byte
+DXIL target (`sha256=286A23CF...`) and resolved the generated attachment ABI.
+The seven source packages are `SharpShader`, `SharpShader.CSharp`,
+`SharpShader.CSharp.Frontend`, `SharpShader.CSharp.Generators`,
+`SharpShader.CSharp.ShaderLib`, `SharpShader.SharpGPU`, and
+`SharpShader.Tool`.
+
+Package validation restores a fresh Release/x64 assets file into an isolated
+cache using the local SharpShader, SharpGPU, SharpMath, SharpMetal and IE feeds.
+The public package graph passed **117/117** and the package
+`CompileAndReflect` sample passed with the same DXIL output. The matching logs
+are under `artifacts/verification-r12/test-public-package-release.log` and
+`sample-package-release.log`. Always pass `Configuration`, `Platform`,
+`StackReferenceMode` and `RestorePackagesPath` together; a global-cache or
+different-configuration assets file is not package evidence.
+
+Native asset hashes are checked against `native/assets.json` before build and
+pack. The `SharpShader.SharpGPU` adapter depends on the independent SharpGPU
+package; compiler core does not reverse-reference SharpGPU.
+
+macOS and Linux native runtime qualification requires matching hosts and
+remains `BLOCKED_PLATFORM` / `TODO(UNVERIFIED)` until those commands run there.
 
 On Windows, the Metal Shader Converter boundary validates the PE image before
 launching a configured executable. A malformed or non executable file therefore
 fails quickly with `ToolLaunchFailed`; a valid installed converter is exercised
-by the Metal compiler tests.
+by the Metal compiler tests. Before accepting a revision, run `git diff --check`,
+inspect generated package dependencies and native paths, and update
+`stack.lock.json` after the final commit. Any source or package change
+invalidates the corresponding evidence.
