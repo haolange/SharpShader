@@ -1,8 +1,8 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using Silk.NET.Core.Contexts;
 using Silk.NET.SPIRV.Cross;
-using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using SharpShader.Compilation;
 
@@ -10,9 +10,8 @@ namespace SharpShader.HLSLCrossCompiler.Internal
 {
     internal static class SpirvCrossNativeLibraryBootstrap
     {
-        private const string ThirdPartyVendorRootName = "Khronos";
-        private const string ThirdPartyLibraryRootName = "SPIRV-Cross";
-
+        private const string ThirdPartyNativeRootEnvironmentVariableName =
+            "INFINITY_THIRDPARTY_NATIVE_ROOT";
         private static readonly object s_Sync = new();
         private static SharpShaderNativeLibraryResolver.LockedNativeFile?
             s_ToolchainFile;
@@ -48,13 +47,9 @@ namespace SharpShader.HLSLCrossCompiler.Internal
                 s_ToolchainFile ??=
                     SharpShaderNativeLibraryResolver.LockedNativeFile.Open(
                         "SPIRV-Cross",
-                        ResolveCanonicalLibraryPath(
-                            Environment.GetEnvironmentVariable(
-                                SharpShaderNativeLibraryLayout
-                                    .ThirdPartyNativeRootEnvironmentVariableName),
-                            AppContext.BaseDirectory,
-                            typeof(SpirvCrossNativeLibraryBootstrap)
-                                .Assembly.Location));
+                        SharpShaderNativeLibraries.Resolve(false,
+                            ResolvePlatformNativeFileName()
+                            ?? throw new PlatformNotSupportedException("SPIRV-Cross is unavailable for this operating system.")));
                 return s_ToolchainFile;
             }
         }
@@ -99,7 +94,10 @@ namespace SharpShader.HLSLCrossCompiler.Internal
             string baseDirectory,
             string assemblyLocation)
         {
-            return ResolveCanonicalLibraryPath(configuredThirdPartyRoot, baseDirectory, assemblyLocation);
+            return ResolveCanonicalLibraryPath(
+                configuredThirdPartyRoot,
+                baseDirectory,
+                assemblyLocation);
         }
 
         private static string ResolveCanonicalLibraryPath(
@@ -126,7 +124,8 @@ namespace SharpShader.HLSLCrossCompiler.Internal
                 {
                     thirdPartyRoot = Path.GetFullPath(configuredThirdPartyRoot.Trim());
                 }
-                catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException)
+                catch (Exception ex) when (
+                    ex is ArgumentException or NotSupportedException or PathTooLongException)
                 {
                     throw BuildLoadFailureException(configuredThirdPartyRoot, ex);
                 }
@@ -135,23 +134,26 @@ namespace SharpShader.HLSLCrossCompiler.Internal
             {
                 HashSet<string> binariesRoots = new(StringComparer.OrdinalIgnoreCase);
                 AddCanonicalBinariesRoot(baseDirectory, binariesRoots);
-                AddCanonicalBinariesRoot(Path.GetDirectoryName(assemblyLocation), binariesRoots);
+                AddCanonicalBinariesRoot(
+                    Path.GetDirectoryName(assemblyLocation),
+                    binariesRoots);
 
                 if (binariesRoots.Count == 0)
                 {
                     throw new ShaderCompilerException(
                         ShaderCompilerErrorCode.BackendUnavailable,
-                        $"SPIRV-Cross native backend cannot resolve the canonical Binaries root from AppContext.BaseDirectory or the SharpShader assembly location. Set {SharpShaderNativeLibraryLayout.ThirdPartyNativeRootEnvironmentVariableName} to the exact ThirdParty root.");
+                        $"SPIRV-Cross native backend cannot resolve the canonical Binaries root from AppContext.BaseDirectory or the SharpShader assembly location. Set {ThirdPartyNativeRootEnvironmentVariableName} to the exact ThirdParty root.");
                 }
 
                 if (binariesRoots.Count != 1)
                 {
                     throw new ShaderCompilerException(
                         ShaderCompilerErrorCode.BackendUnavailable,
-                        $"SPIRV-Cross native backend resolved multiple canonical Binaries roots. Set {SharpShaderNativeLibraryLayout.ThirdPartyNativeRootEnvironmentVariableName} to select one exact ThirdParty root.");
+                        $"SPIRV-Cross native backend resolved multiple canonical Binaries roots. Set {ThirdPartyNativeRootEnvironmentVariableName} to select one exact ThirdParty root.");
                 }
 
-                using HashSet<string>.Enumerator enumerator = binariesRoots.GetEnumerator();
+                using HashSet<string>.Enumerator enumerator =
+                    binariesRoots.GetEnumerator();
                 enumerator.MoveNext();
                 thirdPartyRoot = Path.Combine(enumerator.Current, "ThirdParty");
             }
@@ -159,14 +161,16 @@ namespace SharpShader.HLSLCrossCompiler.Internal
             return Path.GetFullPath(
                 Path.Combine(
                     thirdPartyRoot,
-                    ThirdPartyVendorRootName,
-                    ThirdPartyLibraryRootName,
+                    "Khronos",
+                    "SPIRV-Cross",
                     osFolder,
                     archFolder,
                     nativeFileName));
         }
 
-        private static void AddCanonicalBinariesRoot(string? location, HashSet<string> destination)
+        private static void AddCanonicalBinariesRoot(
+            string? location,
+            HashSet<string> destination)
         {
             if (string.IsNullOrWhiteSpace(location))
             {
@@ -178,21 +182,28 @@ namespace SharpShader.HLSLCrossCompiler.Internal
             {
                 fullPath = Path.GetFullPath(location);
             }
-            catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException)
+            catch (Exception ex) when (
+                ex is ArgumentException or NotSupportedException or PathTooLongException)
             {
                 return;
             }
 
             string marker = $"{Path.DirectorySeparatorChar}Binaries{Path.DirectorySeparatorChar}";
-            string normalized = fullPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
+            string normalized = fullPath.TrimEnd(
+                    Path.DirectorySeparatorChar,
+                    Path.AltDirectorySeparatorChar)
                 + Path.DirectorySeparatorChar;
-            int markerIndex = normalized.IndexOf(marker, StringComparison.OrdinalIgnoreCase);
+            int markerIndex = normalized.IndexOf(
+                marker,
+                StringComparison.OrdinalIgnoreCase);
             if (markerIndex < 0)
             {
                 return;
             }
 
-            destination.Add(normalized.Substring(0, markerIndex + marker.Length - 1));
+            destination.Add(normalized.Substring(
+                0,
+                markerIndex + marker.Length - 1));
         }
 
         private static ShaderCompilerException BuildLoadFailureException(string exactPath, Exception? innerException = null)

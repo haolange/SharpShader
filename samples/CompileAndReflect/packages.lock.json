@@ -1,0 +1,94 @@
+{
+  "version": 1,
+  "dependencies": {
+    "net10.0": {
+      "Antlr4.Runtime.Standard": {
+        "type": "Transitive",
+        "resolved": "4.13.1",
+        "contentHash": "Da5+i4kFHUseJRZGcBG5fmZGpA/Ns180ibrQMxgZzjpQOnENVvSL5gi5HZ8Ncz8/AR2WsKbOg2lMBzjz0HUQcA=="
+      },
+      "Microsoft.DotNet.PlatformAbstractions": {
+        "type": "Transitive",
+        "resolved": "3.1.6",
+        "contentHash": "jek4XYaQ/PGUwDKKhwR8K47Uh1189PFzMeLqO83mXrXQVIpARZCcfuDedH50YDTepBkfijCZN5U/vZi++erxtg=="
+      },
+      "Microsoft.Extensions.DependencyModel": {
+        "type": "Transitive",
+        "resolved": "9.0.9",
+        "contentHash": "fNGvKct2De8ghm0Bpfq0iWthtzIWabgOTi+gJhNOPhNJIowXNEUE2eZNW/zNCzrHVA3PXg2yZ+3cWZndC2IqYA=="
+      },
+      "Silk.NET.Core": {
+        "type": "Transitive",
+        "resolved": "2.23.0",
+        "contentHash": "D7AT/nnwlB+4RZ84XY8QNGBZMJI5z9l4CSSETIJ1wCfRJzRt/341y3MRZ4HbnFz4r/IGaWOEZr86iE+0/65yyQ==",
+        "dependencies": {
+          "Microsoft.DotNet.PlatformAbstractions": "3.1.6",
+          "Microsoft.Extensions.DependencyModel": "9.0.9"
+        }
+      },
+      "Silk.NET.Direct3D.Compilers": {
+        "type": "Transitive",
+        "resolved": "2.23.0",
+        "contentHash": "isYP0t48TNiVH7xUu5rRrvzBuYkVmE/2R0jLyGNzGwfnPchkP4KTkzDm+tubgRzLjZRpR21pz3Aw75EIOUijCw==",
+        "dependencies": {
+          "Silk.NET.Core": "2.23.0"
+        }
+      },
+      "Silk.NET.Direct3D12": {
+        "type": "Transitive",
+        "resolved": "2.23.0",
+        "contentHash": "XKDJPNYRvLD0nrw8UM4jfx1ddMLgs1J/T1CaEPCIZq0iVJiS9ZNPRHkkiFcMSg3PTCBVYZj1wXjwPx2Fpk1PEA==",
+        "dependencies": {
+          "Silk.NET.Core": "2.23.0",
+          "Silk.NET.DXGI": "2.23.0"
+        }
+      },
+      "Silk.NET.DXGI": {
+        "type": "Transitive",
+        "resolved": "2.23.0",
+        "contentHash": "UBzimKRqdsLQ9EirkpwpLRHiSIZoEg0Ytczh0fUnox72yP51hr4sYhGqd16a3+v8jqmZqpJofc68eZW4KYAs5Q==",
+        "dependencies": {
+          "Silk.NET.Core": "2.23.0",
+          "Silk.NET.Maths": "2.23.0"
+        }
+      },
+      "Silk.NET.Maths": {
+        "type": "Transitive",
+        "resolved": "2.23.0",
+        "contentHash": "r8PdIVzME8EH0qAgbmRPO87I4GfgR2j8TofT7EMuRJDf1QluoQwnVypDoFJjQ2ZBSRsGYk5unYxxogI05Ogsmw=="
+      },
+      "Silk.NET.SPIRV": {
+        "type": "Transitive",
+        "resolved": "2.23.0",
+        "contentHash": "3IBvO+7bwrhhYlHZvXGcSr4xLy+ENOAK4YaL0Vm4o9CKxrkzOoO1cHEkG/8O+kWD1Mw9RSMhw1ixWgeVrm0Kmw==",
+        "dependencies": {
+          "Silk.NET.Core": "2.23.0"
+        }
+      },
+      "Silk.NET.SPIRV.Cross": {
+        "type": "Transitive",
+        "resolved": "2.23.0",
+        "contentHash": "XSFDtiHY8hsPB3BVJkrhPBu5RX6cHAeg6mBEYREL+EB2WfK4bPEX34DoUkEJResbqvVnmdSRWDr3bIo1TjQONQ==",
+        "dependencies": {
+          "Silk.NET.Core": "2.23.0",
+          "Silk.NET.SPIRV": "2.23.0",
+          "Silk.NET.SPIRV.Cross.Native": "2.23.0"
+        }
+      },
+      "Silk.NET.SPIRV.Cross.Native": {
+        "type": "Transitive",
+        "resolved": "2.23.0",
+        "contentHash": "pY4LmIE8nYXkfCgExxksYlnYZZ4D3/AW13XNcpyp0jJDTkCpDsXL0nLOX7CM7tPS6xvkiERRd+Do2zegbl7Xtw=="
+      },
+      "sharpshader": {
+        "type": "Project",
+        "dependencies": {
+          "Antlr4.Runtime.Standard": "[4.13.1, )",
+          "Silk.NET.Direct3D.Compilers": "[2.23.0, )",
+          "Silk.NET.Direct3D12": "[2.23.0, )",
+          "Silk.NET.SPIRV.Cross": "[2.23.0, )"
+        }
+      }
+    }
+  }
+}

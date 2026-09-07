@@ -9,14 +9,16 @@
     <ImplicitUsings>disable</ImplicitUsings>
     <LangVersion>latest</LangVersion>
     <IncludeBuildOutput>false</IncludeBuildOutput>
+    <IsPackable>true</IsPackable>
     <IsRoslynComponent>true</IsRoslynComponent>
     <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
+    <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
     <WarningLevel>5</WarningLevel>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <EnableNETAnalyzers>true</EnableNETAnalyzers>
     <AnalysisLevel>latest</AnalysisLevel>
     <AnalysisMode>Recommended</AnalysisMode>
-    <NoWarn>$(NoWarn);RS2008</NoWarn>
+    <NoWarn>$(NoWarn);RS2008;NU5128</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
@@ -24,8 +26,10 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\..\Runtime\Graphics\SharpShader\CSharp\Frontend\SharpShader.CSharp.Frontend.csproj" PrivateAssets="all" />
-    <ProjectReference Include="..\..\..\Runtime\Graphics\SharpShader\CSharp\ShaderLib\SharpShader.CSharp.ShaderLib.csproj" PrivateAssets="all" />
+    <ProjectReference Include="../../src/SharpShader/CSharp/Frontend/SharpShader.CSharp.Frontend.csproj" PrivateAssets="all" Condition="'$(StackReferenceMode)' == 'Source'" />
+    <ProjectReference Include="../../src/SharpShader/CSharp/ShaderLib/SharpShader.CSharp.ShaderLib.csproj" PrivateAssets="all" Condition="'$(StackReferenceMode)' == 'Source'" />
+    <PackageReference Include="SharpShader.CSharp.Frontend" Version="$(StackPackageVersion)" PrivateAssets="all" Condition="'$(StackReferenceMode)' == 'Package'" />
+    <PackageReference Include="SharpShader.CSharp.ShaderLib" Version="$(StackPackageVersion)" PrivateAssets="all" Condition="'$(StackReferenceMode)' == 'Package'" />
   </ItemGroup>
 
   <ItemGroup>
@@ -34,4 +38,14 @@
     <None Include="$(OutputPath)SharpShader.CSharp.ShaderLib.dll" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" />
   </ItemGroup>
 
+
+  <PropertyGroup><Version>$(StackPackageVersion)</Version><RepositoryUrl>https://github.com/haolange/SharpShader</RepositoryUrl></PropertyGroup>
+  <PropertyGroup>
+    <PackageLicenseExpression>MPL-2.0</PackageLicenseExpression>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+  </PropertyGroup>
+  <ItemGroup>
+    <None Include="../../README.md" Pack="true" PackagePath="README.md" Visible="false" />
+    <None Include="../../LICENSE" Pack="true" PackagePath="/" Visible="false" />
+  </ItemGroup>
 </Project>

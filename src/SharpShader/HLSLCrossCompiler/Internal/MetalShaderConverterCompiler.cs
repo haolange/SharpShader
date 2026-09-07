@@ -176,6 +176,7 @@ namespace SharpShader.HLSLCrossCompiler.Internal
             ShaderCompileRequest request)
         {
             request.CancellationToken.ThrowIfCancellationRequested();
+            ValidateExecutableImage(converterPath);
             ProcessStartInfo startInfo = BuildProcessStartInfo(
                 converterPath,
                 dxilPath,
@@ -496,6 +497,72 @@ namespace SharpShader.HLSLCrossCompiler.Internal
             }
 
             return normalizedPath;
+        }
+
+        private static void ValidateExecutableImage(string converterPath)
+        {
+            if (!OperatingSystem.IsWindows())
+            {
+                return;
+            }
+
+            try
+            {
+                using FileStream stream = new(
+                    converterPath,
+                    FileMode.Open,
+                    FileAccess.Read,
+                    FileShare.Read,
+                    bufferSize: 64,
+                    FileOptions.SequentialScan);
+                Span<byte> dosHeader = stackalloc byte[64];
+                if (stream.Read(dosHeader) != dosHeader.Length
+                    || dosHeader[0] != (byte)'M'
+                    || dosHeader[1] != (byte)'Z')
+                {
+                    throw new InvalidDataException(
+                        "the file does not contain a valid DOS executable header");
+                }
+
+                int peOffset = dosHeader[0x3c]
+                    | (dosHeader[0x3d] << 8)
+                    | (dosHeader[0x3e] << 16)
+                    | (dosHeader[0x3f] << 24);
+                if (peOffset < dosHeader.Length
+                    || peOffset > 16 * 1024 * 1024)
+                {
+                    throw new InvalidDataException(
+                        "the executable header points outside the supported PE range");
+                }
+
+                stream.Position = peOffset;
+                Span<byte> peSignature = stackalloc byte[4];
+                if (stream.Read(peSignature) != peSignature.Length
+                    || peSignature[0] != (byte)'P'
+                    || peSignature[1] != (byte)'E'
+                    || peSignature[2] != 0
+                    || peSignature[3] != 0)
+                {
+                    throw new InvalidDataException(
+                        "the file does not contain a valid PE signature");
+                }
+            }
+            catch (ShaderCompilerException)
+            {
+                throw;
+            }
+            catch (Exception ex) when (
+                ex is InvalidDataException
+                    or IOException
+                    or UnauthorizedAccessException
+                    or NotSupportedException
+                    or System.Security.SecurityException)
+            {
+                throw new ShaderCompilerException(
+                    ShaderCompilerErrorCode.ToolLaunchFailed,
+                    $"Metal Shader Converter executable '{converterPath}' is not a valid Windows executable.",
+                    innerException: ex);
+            }
         }
 
         private static string? ResolveCanonicalInstallPath()

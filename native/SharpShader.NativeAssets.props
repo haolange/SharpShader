@@ -1,0 +1,124 @@
+<Project>
+  <PropertyGroup>
+    <SharpShaderNativeAssetRoot Condition="'$(SharpShaderNativeAssetRoot)' == ''">$(MSBuildThisFileDirectory)</SharpShaderNativeAssetRoot>
+  </PropertyGroup>
+  <ItemGroup>
+    <SharpShaderNativeAsset Include="$(SharpShaderNativeAssetRoot)/runtimes/linux-x64/native/libdxcompiler.so">
+      <Link>runtimes/linux-x64/native/libdxcompiler.so</Link>
+      <ExpectedHash>f64b6a9cf32ecb6b456e3f492d736ce41c250845e2dba282f4fc1c4cbeaa0f04</ExpectedHash>
+      <Deployment>Microsoft/DXC/Linux/AMD64/libdxcompiler.so</Deployment>
+      <RuntimeIdentifier>linux-x64</RuntimeIdentifier>
+      <PackagePath>runtimes/linux-x64/native/libdxcompiler.so</PackagePath>
+    </SharpShaderNativeAsset>
+    <SharpShaderNativeAsset Include="$(SharpShaderNativeAssetRoot)/runtimes/linux-x64/native/libdxil.so">
+      <Link>runtimes/linux-x64/native/libdxil.so</Link>
+      <ExpectedHash>4a6a3e77b37b75e4d8cf44e430cc15e4e1ef96961c7cba35a0d6f14d7c1afda7</ExpectedHash>
+      <Deployment>Microsoft/DXC/Linux/AMD64/libdxil.so</Deployment>
+      <RuntimeIdentifier>linux-x64</RuntimeIdentifier>
+      <PackagePath>runtimes/linux-x64/native/libdxil.so</PackagePath>
+    </SharpShaderNativeAsset>
+    <SharpShaderNativeAsset Include="$(SharpShaderNativeAssetRoot)/runtimes/osx-x64/native/libdxcompiler.dylib">
+      <Link>runtimes/osx-x64/native/libdxcompiler.dylib</Link>
+      <ExpectedHash>eedfd358597f8b33bdb076d545f5db37641007da127f6465e9485c1e1f3c1ba1</ExpectedHash>
+      <Deployment>Microsoft/DXC/macOS/AMD64/libdxcompiler.dylib</Deployment>
+      <RuntimeIdentifier>osx-x64</RuntimeIdentifier>
+      <PackagePath>runtimes/osx-x64/native/libdxcompiler.dylib</PackagePath>
+    </SharpShaderNativeAsset>
+    <SharpShaderNativeAsset Include="$(SharpShaderNativeAssetRoot)/runtimes/osx-arm64/native/libdxcompiler.dylib">
+      <Link>runtimes/osx-arm64/native/libdxcompiler.dylib</Link>
+      <ExpectedHash>eedfd358597f8b33bdb076d545f5db37641007da127f6465e9485c1e1f3c1ba1</ExpectedHash>
+      <Deployment>Microsoft/DXC/macOS/ARM64/libdxcompiler.dylib</Deployment>
+      <RuntimeIdentifier>osx-arm64</RuntimeIdentifier>
+      <PackagePath>runtimes/osx-arm64/native/libdxcompiler.dylib</PackagePath>
+    </SharpShaderNativeAsset>
+    <SharpShaderNativeAsset Include="$(SharpShaderNativeAssetRoot)/runtimes/win-x64/native/dxcompiler.dll">
+      <Link>runtimes/win-x64/native/dxcompiler.dll</Link>
+      <ExpectedHash>b86a738ece4c05dbe2d9bbb29668a2ccb28a0740773c9b027cdc61e8d07b4d75</ExpectedHash>
+      <Deployment>Microsoft/DXC/Win/AMD64/dxcompiler.dll</Deployment>
+      <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+      <PackagePath>runtimes/win-x64/native/dxcompiler.dll</PackagePath>
+    </SharpShaderNativeAsset>
+    <SharpShaderNativeAsset Include="$(SharpShaderNativeAssetRoot)/runtimes/win-x64/native/dxil.dll">
+      <Link>runtimes/win-x64/native/dxil.dll</Link>
+      <ExpectedHash>058f2f52a680c38b223a5615b7df969def21f77e577562e5099d971dede992de</ExpectedHash>
+      <Deployment>Microsoft/DXC/Win/AMD64/dxil.dll</Deployment>
+      <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+      <PackagePath>runtimes/win-x64/native/dxil.dll</PackagePath>
+    </SharpShaderNativeAsset>
+    <SharpShaderNativeAsset Include="$(SharpShaderNativeAssetRoot)/runtimes/win-arm64/native/dxcompiler.dll">
+      <Link>runtimes/win-arm64/native/dxcompiler.dll</Link>
+      <ExpectedHash>7bce55ceb9438e5d8d3d147cc5b2cd0327908070ec67c428a71622a41d7a99a6</ExpectedHash>
+      <Deployment>Microsoft/DXC/Win/ARM64/dxcompiler.dll</Deployment>
+      <RuntimeIdentifier>win-arm64</RuntimeIdentifier>
+      <PackagePath>runtimes/win-arm64/native/dxcompiler.dll</PackagePath>
+    </SharpShaderNativeAsset>
+    <SharpShaderNativeAsset Include="$(SharpShaderNativeAssetRoot)/runtimes/win-arm64/native/dxil.dll">
+      <Link>runtimes/win-arm64/native/dxil.dll</Link>
+      <ExpectedHash>1716db89daa2c0e7acfd7dccbde368de7d8d5e6de45279155a4ce68e3cfc6ca5</ExpectedHash>
+      <Deployment>Microsoft/DXC/Win/ARM64/dxil.dll</Deployment>
+      <RuntimeIdentifier>win-arm64</RuntimeIdentifier>
+      <PackagePath>runtimes/win-arm64/native/dxil.dll</PackagePath>
+    </SharpShaderNativeAsset>
+    <SharpShaderNativeAsset Include="$(SharpShaderNativeAssetRoot)/runtimes/linux-x64/native/libspirv-cross.so">
+      <Link>runtimes/linux-x64/native/libspirv-cross.so</Link>
+      <ExpectedHash>513de25783914c2193577e36c5623543eaf970b4e8c5abb1ed97e002aa5f874c</ExpectedHash>
+      <Deployment>Khronos/SPIRV-Cross/Linux/AMD64/libspirv-cross.so</Deployment>
+      <RuntimeIdentifier>linux-x64</RuntimeIdentifier>
+      <PackagePath>runtimes/linux-x64/native/libspirv-cross.so</PackagePath>
+    </SharpShaderNativeAsset>
+    <SharpShaderNativeAsset Include="$(SharpShaderNativeAssetRoot)/runtimes/linux-arm64/native/libspirv-cross.so">
+      <Link>runtimes/linux-arm64/native/libspirv-cross.so</Link>
+      <ExpectedHash>7c78355e34d3953364770652818cb8bd76ea8dd6621c00dbda55994a6f79e9e4</ExpectedHash>
+      <Deployment>Khronos/SPIRV-Cross/Linux/ARM64/libspirv-cross.so</Deployment>
+      <RuntimeIdentifier>linux-arm64</RuntimeIdentifier>
+      <PackagePath>runtimes/linux-arm64/native/libspirv-cross.so</PackagePath>
+    </SharpShaderNativeAsset>
+    <SharpShaderNativeAsset Include="$(SharpShaderNativeAssetRoot)/runtimes/osx-x64/native/libspirv-cross.dylib">
+      <Link>runtimes/osx-x64/native/libspirv-cross.dylib</Link>
+      <ExpectedHash>b8a6ce9bc707d15b7bbbee139fb2363cec116bf8aad58e181642a39ef4fed189</ExpectedHash>
+      <Deployment>Khronos/SPIRV-Cross/macOS/AMD64/libspirv-cross.dylib</Deployment>
+      <RuntimeIdentifier>osx-x64</RuntimeIdentifier>
+      <PackagePath>runtimes/osx-x64/native/libspirv-cross.dylib</PackagePath>
+    </SharpShaderNativeAsset>
+    <SharpShaderNativeAsset Include="$(SharpShaderNativeAssetRoot)/runtimes/osx-arm64/native/libspirv-cross.dylib">
+      <Link>runtimes/osx-arm64/native/libspirv-cross.dylib</Link>
+      <ExpectedHash>071c4ef2a38c5fd78ccdda419cb79ec4fded6f85ed3bdeeae5bb09c3401eb093</ExpectedHash>
+      <Deployment>Khronos/SPIRV-Cross/macOS/ARM64/libspirv-cross.dylib</Deployment>
+      <RuntimeIdentifier>osx-arm64</RuntimeIdentifier>
+      <PackagePath>runtimes/osx-arm64/native/libspirv-cross.dylib</PackagePath>
+    </SharpShaderNativeAsset>
+    <SharpShaderNativeAsset Include="$(SharpShaderNativeAssetRoot)/runtimes/win-x64/native/spirv-cross.dll">
+      <Link>runtimes/win-x64/native/spirv-cross.dll</Link>
+      <ExpectedHash>1b00f8c042d4eb4060b1f4b2c1ee1ef2f0935c7857efe60c62d9cea236ea834e</ExpectedHash>
+      <Deployment>Khronos/SPIRV-Cross/Win/AMD64/spirv-cross.dll</Deployment>
+      <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+      <PackagePath>runtimes/win-x64/native/spirv-cross.dll</PackagePath>
+    </SharpShaderNativeAsset>
+    <SharpShaderNativeAsset Include="$(SharpShaderNativeAssetRoot)/runtimes/win-arm64/native/spirv-cross.dll">
+      <Link>runtimes/win-arm64/native/spirv-cross.dll</Link>
+      <ExpectedHash>4d6143fd7ae2dd75edf22ddcc8085749614ca36cbdc968af3d2f073c8272b9f1</ExpectedHash>
+      <Deployment>Khronos/SPIRV-Cross/Win/ARM64/spirv-cross.dll</Deployment>
+      <RuntimeIdentifier>win-arm64</RuntimeIdentifier>
+      <PackagePath>runtimes/win-arm64/native/spirv-cross.dll</PackagePath>
+    </SharpShaderNativeAsset>
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="@(SharpShaderNativeAsset-&gt;Exists())" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Pack="true" />
+    <None Include="$(MSBuildThisFileDirectory)licenses/**/*" Pack="true" PackagePath="licenses/%(RecursiveDir)%(Filename)%(Extension)" />
+  </ItemGroup>
+  <Target Name="VerifySharpShaderBuildNativeAssets" BeforeTargets="PrepareForBuild">
+    <Error Condition="('%(SharpShaderNativeAsset.RuntimeIdentifier)' == '$(NETCoreSdkRuntimeIdentifier)' or '%(SharpShaderNativeAsset.RuntimeIdentifier)' == '$(RuntimeIdentifier)') and !Exists('%(SharpShaderNativeAsset.Identity)')" Text="Missing native asset %(SharpShaderNativeAsset.Identity). Run build/Restore-NativeAssets.ps1 for the host and target RID." />
+  </Target>
+  <Target Name="VerifySharpShaderPresentNativeAssets" BeforeTargets="PrepareForBuild;_GetPackageFiles">
+    <ItemGroup>
+      <_SharpShaderPresentNativeAsset Include="@(SharpShaderNativeAsset-&gt;Exists())" />
+    </ItemGroup>
+    <GetFileHash Files="@(_SharpShaderPresentNativeAsset)" Algorithm="SHA256" HashEncoding="hex">
+      <Output TaskParameter="Items" ItemName="_VerifiedSharpShaderNativeAsset" />
+    </GetFileHash>
+    <Error Condition="'%(_VerifiedSharpShaderNativeAsset.FileHash)' != '%(_VerifiedSharpShaderNativeAsset.ExpectedHash)'" Text="Native asset hash mismatch: %(_VerifiedSharpShaderNativeAsset.Identity). Existing inputs are not silently replaced." />
+  </Target>
+  <Target Name="VerifySharpShaderPackageNativeAssets" BeforeTargets="_GetPackageFiles">
+    <Error Condition="!Exists('%(SharpShaderNativeAsset.Identity)')" Text="Package requires the complete native asset manifest: missing %(SharpShaderNativeAsset.Identity). Restore every declared RID before packing." />
+  </Target>
+</Project>

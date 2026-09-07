@@ -1,7 +1,7 @@
 using SharpShader.CSharp.ShaderLib;
 using Xunit;
 
-namespace Infinity.Rendering.Tests
+namespace SharpShader.Tests
 {
     public sealed class CSharpShaderLibLayoutTests
     {
@@ -55,11 +55,29 @@ namespace Infinity.Rendering.Tests
         }
 
         [Fact]
-        public void MathFunctionMap_ContainsFrozenIntrinsics()
+        public void MathIntrinsics_ShouldTranslateThroughThePublicFrontend()
         {
-            Assert.Contains("dot", SharpShader.CSharp.Frontend.CSharpShaderNameMap.MathFunctions.Keys);
-            Assert.Contains("saturate", SharpShader.CSharp.Frontend.CSharpShaderNameMap.MathFunctions.Keys);
-            Assert.Contains("mul", SharpShader.CSharp.Frontend.CSharpShaderNameMap.MathFunctions.Keys);
+            const string source = """
+using SharpMath;
+using SharpShader.CSharp.ShaderLib;
+public static class Intrinsics
+{
+    [Binding(0, 0)] public static RWStructuredBuffer<float4> Output;
+    [NumThreads(1, 1, 1)] [ComputeShader]
+    public static void CSMain([SV.DispatchThreadID] uint3 tid)
+    {
+        float value = math.saturate(math.dot(new float2(1f, 2f), new float2(3f, 4f)));
+        Output.Store(tid.x, math.mul(new float4x4(1f), new float4(value)));
+    }
+}
+""";
+            var translation = new global::SharpShader.CSharp.Frontend.CSharpShaderTranslator().Translate(
+                new global::SharpShader.CSharp.Frontend.CSharpShaderTranslateRequest(
+                    source, "intrinsics.cs", global::SharpShader.CSharp.CSharpShaderReferenceResolver.ResolveDefaultReferences()));
+            Assert.False(translation.HasErrors, string.Join("\n", translation.Diagnostics.Select(item => item.Message)));
+            Assert.Contains("dot(", translation.Hlsl);
+            Assert.Contains("saturate(", translation.Hlsl);
+            Assert.Contains("mul(", translation.Hlsl);
         }
     }
 }

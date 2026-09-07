@@ -1,0 +1,25 @@
+{
+  "sourceCommit": "7689191334cf562bd34d4a420149bde12e8b66b6",
+  "sourcePaths": [
+    "Engine/Source/Developer/Tests/Infinity.Rendering.Tests/DxcArgumentBuilderSpirvBindingShiftTests.cs",
+    "Engine/Source/Developer/Tests/Infinity.Rendering.Tests/DxilArtifactReflectionTests.cs",
+    "Engine/Source/Developer/Tests/Infinity.Rendering.Tests/HLSLCrossCompilerTests.cs",
+    "Engine/Source/Developer/Tests/Infinity.Rendering.Tests/MetalShaderConverterCompilerTests.cs",
+    "Engine/Source/Developer/Tests/Infinity.Rendering.Tests/MslArtifactReflectionContractTests.cs",
+    "Engine/Source/Developer/Tests/Infinity.Rendering.Tests/MslPlannedTranslationTests.cs",
+    "Engine/Source/Developer/Tests/Infinity.Rendering.Tests/ShaderLabCompilerTests.cs",
+    "Engine/Source/Developer/Tests/Infinity.Rendering.Tests/ShaderProgramCacheHardeningTests.cs",
+    "Engine/Source/Developer/Tests/Infinity.Rendering.Tests/ShaderProgramCompilerTests.cs",
+    "Engine/Source/Developer/Tests/Infinity.Rendering.Tests/SharpShaderAttachmentAbiTests.cs",
+    "Engine/Source/Developer/Tests/Infinity.Rendering.Tests/SharpShaderNativeLibraryResolverConcurrencyTests.cs",
+    "Engine/Source/Developer/Tests/Infinity.Rendering.Tests/SharpShaderCliTests.cs",
+    "Engine/Source/Developer/Tests/Infinity.Rendering.Tests/SharpShaderPackageValidationTests.cs",
+    "Engine/Source/Developer/Tests/Infinity.Rendering.Tests/SpirvArtifactReflectionTests.cs",
+    "Engine/Source/Developer/Tests/Infinity.Rendering.Tests/SpirvBindingRemapperTests.cs"
+  ],
+  "destination": "tests/SharpShader.Internal.Tests/",
+  "previousHead": "cd615ad8230edf81c34f07bcd4fbfbe4da4a8a01",
+  "extractedCommit": "7c81fc766bcc449efc837b3f0d3421235b96f18c",
+  "mergeCommit": "41e55d045ca3c245af1f733a80ec3e5d5fe3984e",
+  "verifiedCurrentFiles": 15
+}

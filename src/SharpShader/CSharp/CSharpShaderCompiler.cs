@@ -35,6 +35,7 @@ namespace SharpShader.CSharp
             string source,
             string sourceName,
             CSharpShaderCompilerOptions? options = null,
+            string? sourceIdentity = null,
             CancellationToken cancellationToken = default)
         {
             ArgumentNullException.ThrowIfNull(source);
@@ -135,7 +136,8 @@ namespace SharpShader.CSharp
                         enableDebugInfo: effective.EnableDebugInfo,
                         disableOptimizations: effective.DisableOptimizations,
                         optimizationLevel: effective.OptimizationLevel,
-                        attachmentInterfaces: attachments),
+                        attachmentInterfaces: attachments,
+                        sourceIdentity: sourceIdentity),
                     cancellationToken);
                 variants.Add(new CSharpShaderVariantCompilation(variant.Key, translation, program));
             }

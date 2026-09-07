@@ -35,6 +35,7 @@ namespace SharpShader.ShaderLab
         public ShaderLabCompilation Compile(
             ShaderLab shaderLab,
             ShaderLabCompilerOptions? options = null,
+            string? sourceIdentity = null,
             CancellationToken cancellationToken = default)
         {
             ArgumentNullException.ThrowIfNull(shaderLab);
@@ -63,6 +64,7 @@ namespace SharpShader.ShaderLab
                     programSourceName,
                     sourcePath,
                     effectiveOptions,
+                    sourceIdentity is null ? null : $"{sourceIdentity}/pass/{passIndex}/{passName}",
                     cancellationToken);
                 passes.Add(new ShaderLabPassCompilation(
                     passIndex,
@@ -76,6 +78,7 @@ namespace SharpShader.ShaderLab
         public ShaderProgramCompilation CompileStandalone(
             StandaloneShaderProgram program,
             ShaderLabCompilerOptions? options = null,
+            string? sourceIdentity = null,
             CancellationToken cancellationToken = default)
         {
             ArgumentNullException.ThrowIfNull(program);
@@ -89,7 +92,8 @@ namespace SharpShader.ShaderLab
                 program.EnumerateVariantKeys(),
                 attachmentPhase: null,
                 sourcePath,
-                effectiveOptions);
+                effectiveOptions,
+                sourceIdentity);
             return m_ProgramCompiler.Compile(request, cancellationToken);
         }
 
@@ -98,6 +102,7 @@ namespace SharpShader.ShaderLab
             string sourceName,
             string sourcePath,
             ShaderLabCompilerOptions? options = null,
+            string? sourceIdentity = null,
             CancellationToken cancellationToken = default)
         {
             ArgumentNullException.ThrowIfNull(program);
@@ -110,7 +115,8 @@ namespace SharpShader.ShaderLab
                 program.EnumerateVariantKeys(),
                 program.AttachmentPhase,
                 NormalizeSourcePath(sourcePath),
-                effectiveOptions);
+                effectiveOptions,
+                sourceIdentity);
             return m_ProgramCompiler.Compile(request, cancellationToken);
         }
 
@@ -121,7 +127,8 @@ namespace SharpShader.ShaderLab
             IReadOnlyList<ShaderVariantKey> variants,
             ShaderAttachmentPhase? attachmentPhase,
             string sourcePath,
-            ShaderLabCompilerOptions options)
+            ShaderLabCompilerOptions options,
+            string? sourceIdentity)
         {
             List<string> includeDirectories = BuildIncludeDirectories(
                 sourcePath,
@@ -156,7 +163,8 @@ namespace SharpShader.ShaderLab
                 options.OptimizationLevel,
                 options.SkipValidation,
                 options.TreatWarningsAsErrors,
-                attachmentInterfaces);
+                attachmentInterfaces,
+                sourceIdentity);
         }
 
         private static ShaderAttachmentInterface[] BuildAttachmentInterfaces(

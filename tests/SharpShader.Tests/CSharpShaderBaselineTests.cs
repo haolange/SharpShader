@@ -2,7 +2,7 @@ using SharpShader.Compilation;
 using SharpShader.CSharp;
 using Xunit;
 
-namespace Infinity.Rendering.Tests
+namespace SharpShader.Tests
 {
     public sealed class CSharpShaderBaselineTests
     {

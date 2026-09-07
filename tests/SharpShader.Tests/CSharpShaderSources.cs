@@ -1,9 +1,9 @@
-namespace Infinity.Rendering.Tests
+namespace SharpShader.Tests
 {
     internal static class CSharpShaderSources
     {
         internal const string Mandelbrot = @"
-using Infinity.Mathmatics;
+using SharpMath;
 using SharpShader.CSharp.ShaderLib;
 
 public static class MandelbrotShader
@@ -43,7 +43,7 @@ public static class MandelbrotShader
 ";
 
         internal const string TextureCard = @"
-using Infinity.Mathmatics;
+using SharpMath;
 using SharpShader.CSharp.ShaderLib;
 
 public struct Root
@@ -132,7 +132,7 @@ public static class TextureCardShader
 ";
 
         internal const string RayQuery = @"
-using Infinity.Mathmatics;
+using SharpMath;
 using SharpShader.CSharp.ShaderLib;
 
 public static class RayQueryShader
@@ -168,7 +168,7 @@ public static class RayQueryShader
 ";
 
         internal const string WaveActiveSum = @"
-using Infinity.Mathmatics;
+using SharpMath;
 using SharpShader.CSharp.ShaderLib;
 
 public static class WaveActiveSumShader
@@ -187,7 +187,7 @@ public static class WaveActiveSumShader
 ";
 
         internal const string WriteConstant = @"
-using Infinity.Mathmatics;
+using SharpMath;
 using SharpShader.CSharp.ShaderLib;
 
 public static class WriteConstantShader

@@ -8,7 +8,7 @@ using SharpShader.HLSLCrossCompiler;
 using SharpShader.SharpGPU;
 using Xunit;
 
-namespace Infinity.Rendering.Tests
+namespace SharpShader.Tests
 {
     public sealed class SharpGpuWaveAndCooperativeMatrixAdapterTests
     {

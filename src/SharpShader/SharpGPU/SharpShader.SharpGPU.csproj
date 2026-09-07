@@ -40,8 +40,22 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\SharpGPU\SharpGPU.csproj" />
-    <ProjectReference Include="..\SharpShader.csproj" />
+    <ProjectReference Include="$(SharpGPURoot)/src/SharpGPU/SharpGPU.csproj"  Condition="'$(StackReferenceMode)' == 'Source'" StackProduct="SharpGPU" StackRoot="$(SharpGPURoot)" />
+    <ProjectReference Include="../SharpShader.csproj" Condition="'$(StackReferenceMode)' == 'Source'" />
   </ItemGroup>
 
+
+  <PropertyGroup><Version>$(StackPackageVersion)</Version><RepositoryUrl>https://github.com/haolange/SharpShader</RepositoryUrl></PropertyGroup>
+  <PropertyGroup>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageLicenseExpression>MPL-2.0</PackageLicenseExpression>
+  </PropertyGroup>
+  <ItemGroup>
+    <None Include="../../../README.md" Pack="true" PackagePath="README.md" Visible="false" />
+    <None Include="../../../LICENSE" Pack="true" PackagePath="/" Visible="false" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="SharpShader" Version="$(StackPackageVersion)" Condition="'$(StackReferenceMode)' == 'Package'" />
+    <PackageReference Include="SharpGPU" Version="$(StackPackageVersion)" Condition="'$(StackReferenceMode)' == 'Package'" />
+  </ItemGroup>
 </Project>

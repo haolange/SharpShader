@@ -2,7 +2,7 @@ using System;
 using SharpShader.HLSLCrossCompiler;
 using Xunit;
 
-namespace Infinity.Rendering.Tests
+namespace SharpShader.Tests
 {
     /// <summary>
     /// Host-side SharpShader Raw HLSL compile smoke for Neural General (SM 6.6 wave intrinsics).
@@ -37,7 +37,7 @@ void main(uint3 id : SV_DispatchThreadID)
                 capabilities.IsProfileSupported(ShaderStageKind.Compute, new ShaderModelVersion(6, 6)),
                 "cs_6_6 must be available for Neural General compile smoke.");
 
-            ShaderCompileResult result = HLSLCrossCompiler.Compile(CreateGeneralRequest(ShaderTargetKind.SpirV));
+            ShaderCompileResult result = global::SharpShader.HLSLCrossCompiler.HLSLCrossCompiler.Compile(CreateGeneralRequest(ShaderTargetKind.SpirV));
 
             Assert.NotEmpty(result.Bytecode);
         }
@@ -56,7 +56,7 @@ void main(uint3 id : SV_DispatchThreadID)
                 capabilities.IsProfileSupported(ShaderStageKind.Compute, new ShaderModelVersion(6, 6)),
                 "cs_6_6 must be available for Neural General DXIL compile smoke.");
 
-            ShaderCompileResult result = HLSLCrossCompiler.Compile(CreateGeneralRequest(ShaderTargetKind.Dxil));
+            ShaderCompileResult result = global::SharpShader.HLSLCrossCompiler.HLSLCrossCompiler.Compile(CreateGeneralRequest(ShaderTargetKind.Dxil));
 
             Assert.NotEmpty(result.Bytecode);
         }

@@ -6,7 +6,7 @@ using SharpShader.HLSLCrossCompiler;
 using SharpShader.SharpGPU;
 using Xunit;
 
-namespace Infinity.Rendering.Tests
+namespace SharpShader.Tests
 {
     public sealed class CSharpShaderCompilerTests
     {
@@ -70,7 +70,7 @@ namespace Infinity.Rendering.Tests
                     "default",
                     "fs",
                     ShaderExecutionStage.Pixel,
-                    SharpGPU.ERHIBackend.DirectX12);
+                    global::SharpGPU.ERHIBackend.DirectX12);
             Assert.True(plan.BindingTableCount > 0);
         }
 
@@ -78,7 +78,7 @@ namespace Infinity.Rendering.Tests
         public void Compile_VariantDefine_ReparsesPreprocessor()
         {
             const string source = @"
-using Infinity.Mathmatics;
+using SharpMath;
 using SharpShader.CSharp.ShaderLib;
 public static class VariantShader {
     [Binding(0,0)] public static RWStructuredBuffer<uint> Output;

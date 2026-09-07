@@ -9,7 +9,7 @@ using SharpShader.Compilation.Internal;
 using SharpShader.HLSLCrossCompiler;
 using SharpShader.ShaderLab;
 
-namespace Infinity.Rendering.Tests
+namespace SharpShader.Internal.Tests
 {
     public sealed class ShaderLabCompilerTests
     {
@@ -293,7 +293,7 @@ void RayGen()
                     + "            ENDHLSL",
                     StringComparison.Ordinal);
 
-            ShaderLab shader = ShaderLabUtil.ParseShaderLabFromSource(source);
+            global::SharpShader.ShaderLab.ShaderLab shader = ShaderLabUtil.ParseShaderLabFromSource(source);
             ShaderAttachmentPhase phase = Assert.IsType<ShaderAttachmentPhase>(
                 Assert.Single(shader.Passes).Program.AttachmentPhase);
             Assert.Equal(0u, phase.Phase);
@@ -328,133 +328,6 @@ void RayGen()
 
             Assert.ThrowsAny<FormatException>(() =>
                 ShaderLabUtil.ParseShaderLabFromSource(source));
-        }
-
-        [Fact]
-        [Trait("Category", "SharpShaderAttachment")]
-        public void Compile_ShouldBuildAllFourteenCanonicalGraphicsAttachmentPasses()
-        {
-            string[] paths =
-            {
-                ResolveShaderPath(
-                    "Shaders", "ShaderLab", "Global", "DrawFullScreen.shader"),
-                ResolveShaderPath(
-                    "Shaders", "ShaderLab", "Global", "DrawSystemLUT.shader"),
-                ResolveShaderPath(
-                    "Shaders", "ShaderLab", "Global", "HybridFullscreen.shader"),
-                ResolveShaderPath(
-                    "Shaders", "ShaderLab", "Material", "InfinityLit.shader"),
-            };
-            int graphicsPassCount = 0;
-            foreach (string path in paths)
-            {
-                ShaderLab shader = ShaderLabUtil.ParseShaderLabFromFile(path);
-                var graphicsPasses = shader.Passes
-                    .Select(static (pass, index) => new
-                    {
-                        Pass = pass,
-                        Index = index,
-                    })
-                    .Where(static item => item.Pass.Program.Entries.Any(
-                        static entry => entry.Stage
-                            == EShaderLabShaderStage.ProgramFragment));
-                foreach (var graphicsPass in graphicsPasses)
-                {
-                    string sourceName =
-                        $"{path}.pass-{graphicsPass.Index}.hlsl";
-                    ShaderProgramCompilation compilation;
-                    try
-                    {
-                        compilation = ShaderLabCompiler.Shared.CompileProgram(
-                            graphicsPass.Pass.Program,
-                            sourceName,
-                            shader.SourcePath,
-                            new ShaderLabCompilerOptions(
-                                ShaderProgramTarget.All));
-                    }
-                    catch (ShaderCompilerException exception)
-                    {
-                        throw new InvalidOperationException(
-                            $"Canonical ShaderLab pass compile failed for "
-                            + $"'{path}' pass {graphicsPass.Index}: "
-                            + exception.Diagnostics,
-                            exception);
-                    }
-
-                    ++graphicsPassCount;
-                    Assert.Equal(
-                        ShaderProgramTarget.All,
-                        compilation.Manifest.Targets);
-                    ShaderAttachmentPhase expectedPhase =
-                        Assert.IsType<ShaderAttachmentPhase>(
-                            graphicsPass.Pass.Program.AttachmentPhase);
-                    foreach (ShaderInterfaceVariant variant in
-                             compilation.Manifest.Variants)
-                    {
-                        ShaderInterfaceEntry pixelEntry = Assert.Single(
-                            variant.Entries,
-                            static entry => entry.Stage
-                                == ShaderExecutionStage.Pixel);
-                        ShaderAttachmentPhase actualPhase =
-                            Assert.IsType<ShaderAttachmentPhase>(
-                                pixelEntry.AttachmentInterface.Phase);
-                        Assert.Equal(expectedPhase, actualPhase);
-                        Assert.Equal(
-                            new[]
-                            {
-                                ShaderArtifactKind.Dxil,
-                                ShaderArtifactKind.SpirV,
-                                ShaderArtifactKind.MslSource,
-                            },
-                            pixelEntry.Artifacts.Select(static artifact =>
-                                artifact.ArtifactKind));
-
-                        ShaderProgramArtifact dxil = AssertExactArtifact(
-                            compilation,
-                            variant.Key,
-                            pixelEntry,
-                            ShaderArtifactKind.Dxil);
-                        ShaderProgramArtifact spirv = AssertExactArtifact(
-                            compilation,
-                            variant.Key,
-                            pixelEntry,
-                            ShaderArtifactKind.SpirV);
-                        ShaderProgramArtifact msl = AssertExactArtifact(
-                            compilation,
-                            variant.Key,
-                            pixelEntry,
-                            ShaderArtifactKind.MslSource);
-
-                        AssertReflectionMatchesPhase(
-                            ReflectArtifact(
-                                graphicsPass.Pass.Program,
-                                shader.SourcePath,
-                                sourceName,
-                                variant,
-                                pixelEntry,
-                                dxil,
-                                ShaderTargetKind.Dxil),
-                            ShaderArtifactKind.Dxil,
-                            pixelEntry,
-                            actualPhase);
-                        AssertReflectionMatchesPhase(
-                            ReflectArtifact(
-                                graphicsPass.Pass.Program,
-                                shader.SourcePath,
-                                sourceName,
-                                variant,
-                                pixelEntry,
-                                spirv,
-                                ShaderTargetKind.SpirV),
-                            ShaderArtifactKind.SpirV,
-                            pixelEntry,
-                            actualPhase);
-                        AssertMslMatchesPhase(msl, pixelEntry, actualPhase);
-                    }
-                }
-            }
-
-            Assert.Equal(14, graphicsPassCount);
         }
 
         private static ShaderProgramArtifact AssertExactArtifact(
@@ -511,7 +384,7 @@ void RayGen()
             };
             if (target == ShaderTargetKind.Dxil)
             {
-                ShaderCompileResult compiled = HLSLCrossCompiler.Compile(request);
+                ShaderCompileResult compiled = global::SharpShader.HLSLCrossCompiler.HLSLCrossCompiler.Compile(request);
                 Assert.Equal(artifact.Content.ToArray(), compiled.Bytecode);
                 return DxilArtifactReflector.Reflect(request, compiled);
             }
@@ -694,7 +567,7 @@ void RayGen()
             return new ShaderLabCompiler(compiler);
         }
 
-        private static ShaderLab CreateShaderLab(string sourcePath)
+        private static global::SharpShader.ShaderLab.ShaderLab CreateShaderLab(string sourcePath)
         {
             ShaderLabProgram program = new ShaderLabProgram(
                 "float4 VSMain() : SV_Position { return 0; }",
@@ -708,7 +581,7 @@ void RayGen()
                 {
                     ["Name"] = "Forward/Main",
                 });
-            return new ShaderLab(
+            return new global::SharpShader.ShaderLab.ShaderLab(
                 string.Empty,
                 sourcePath,
                 new[] { pass },
@@ -754,27 +627,6 @@ void RayGen()
                 """;
         }
 
-        private static string ResolveShaderPath(params string[] parts)
-        {
-            DirectoryInfo? current = new(AppContext.BaseDirectory);
-            while (current is not null)
-            {
-                if (File.Exists(Path.Combine(
-                        current.FullName,
-                        "InfinityBrowser.sln")))
-                {
-                    return Path.Combine(
-                        new[] { current.FullName, "Engine" }
-                            .Concat(parts)
-                            .ToArray());
-                }
-
-                current = current.Parent;
-            }
-
-            throw new InvalidOperationException(
-                "Unable to resolve repository root.");
-        }
         private static StandaloneShaderProgram CreateStandaloneProgram(
             string sourcePath)
         {

@@ -2,7 +2,7 @@ using SharpShader.CSharp;
 using SharpShader.CSharp.Frontend;
 using Xunit;
 
-namespace Infinity.Rendering.Tests
+namespace SharpShader.Tests
 {
     public sealed class CSharpShaderFrontendTests
     {
@@ -75,7 +75,7 @@ namespace Infinity.Rendering.Tests
         public void Translate_TryCatch_ReportsUnsupported()
         {
             const string source = @"
-using Infinity.Mathmatics;
+using SharpMath;
 using SharpShader.CSharp.ShaderLib;
 public static class Bad {
     [Binding(0,0)] public static RWStructuredBuffer<float> Output;
@@ -93,7 +93,7 @@ public static class Bad {
         public void Translate_GpuLayoutMismatch_ReportsSSCS0006()
         {
             const string source = @"
-using Infinity.Mathmatics;
+using SharpMath;
 using SharpShader.CSharp.ShaderLib;
 [GpuLayout(GpuLayoutKind.ConstantBuffer)]
 public struct Packed { public float3 A; public float3 B; }
@@ -111,7 +111,7 @@ public static class LayoutShader {
         public void Translate_StructuredGpuLayout_AllowsFloat3Packing()
         {
             const string source = @"
-using Infinity.Mathmatics;
+using SharpMath;
 using SharpShader.CSharp.ShaderLib;
 [GpuLayout(GpuLayoutKind.StructuredBuffer)]
 public struct Packed { public float3 Normal; public float Roughness; }

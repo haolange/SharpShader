@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 using SharpShader.HLSLCrossCompiler.Internal;
 using Xunit;
 
-namespace Infinity.Rendering.Tests
+namespace SharpShader.Internal.Tests
 {
     public sealed class SharpShaderNativeLibraryResolverConcurrencyTests
     {

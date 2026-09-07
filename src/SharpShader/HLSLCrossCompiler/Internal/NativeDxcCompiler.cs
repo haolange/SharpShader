@@ -71,10 +71,8 @@ namespace SharpShader.HLSLCrossCompiler.Internal
                     s_ClsidDxcCompiler,
                     IDxcCompiler3.Guid,
                     nameof(IDxcCompiler3));
-                ComPtr<IDxcIncludeHandler> defaultIncludeHandler =
-                    CreateIncludeHandler(utils);
                 using DxcDependencyCaptureIncludeHandler captureHandler =
-                    new(ref defaultIncludeHandler, limits);
+                    CreateSourceHandler(utils, request.SourceName, sourceUtf8, limits);
                 using ComPtr<IDxcCompilerArgs> compilerArguments =
                     BuildCompilerArguments(
                         utils,
@@ -167,7 +165,8 @@ namespace SharpShader.HLSLCrossCompiler.Internal
             {
                 using ComPtr<IDxcUtils> utils = CreateInstance<IDxcUtils>(s_ClsidDxcUtils, IDxcUtils.Guid, nameof(IDxcUtils));
                 using ComPtr<IDxcCompiler3> compiler = CreateInstance<IDxcCompiler3>(s_ClsidDxcCompiler, IDxcCompiler3.Guid, nameof(IDxcCompiler3));
-                using ComPtr<IDxcIncludeHandler> includeHandler = CreateIncludeHandler(utils);
+                using DxcDependencyCaptureIncludeHandler includeHandler =
+                    CreateSourceHandler(utils, request.SourceName, sourceUtf8, null);
                 using ComPtr<IDxcCompilerArgs> compilerArguments = BuildCompilerArguments(
                     utils,
                     request,
@@ -175,9 +174,10 @@ namespace SharpShader.HLSLCrossCompiler.Internal
                     additionalArguments);
                 using ComPtr<IDxcResult> result = CompileSource(
                     compiler,
-                    includeHandler,
+                    includeHandler.Handler,
                     compilerArguments,
                     sourceUtf8);
+                _ = includeHandler.CompleteCapture();
 
                 string diagnostics = GetDiagnosticsOutput(result);
                 string warnings = ExtractWarnings(diagnostics);
@@ -257,6 +257,48 @@ namespace SharpShader.HLSLCrossCompiler.Internal
             }
 
             return new ComPtr<T>((T*)instance);
+        }
+
+        private static DxcDependencyCaptureIncludeHandler CreateSourceHandler(
+            ComPtr<IDxcUtils> utils,
+            string sourceName,
+            byte[] sourceUtf8,
+            DxcDependencyCaptureLimits? limits)
+        {
+            ComPtr<IDxcIncludeHandler> defaultHandler = default;
+            ComPtr<IDxcBlobEncoding> sourceBlob = default;
+            try
+            {
+                defaultHandler = CreateIncludeHandler(utils);
+                sourceBlob = CreateSourceBlob(utils, sourceUtf8);
+                return new DxcDependencyCaptureIncludeHandler(
+                    ref defaultHandler, limits, sourceName, ref sourceBlob);
+            }
+            finally
+            {
+                sourceBlob.Dispose();
+                defaultHandler.Dispose();
+            }
+        }
+
+        private static ComPtr<IDxcBlobEncoding> CreateSourceBlob(
+            ComPtr<IDxcUtils> utils,
+            byte[] sourceUtf8)
+        {
+            ComPtr<IDxcBlobEncoding> blob = default;
+            fixed (byte* source = sourceUtf8)
+            {
+                int result = utils.Get().CreateBlob(source, checked((uint)sourceUtf8.Length), DXC.CPUtf8,
+                    (IDxcBlobEncoding**)blob.GetAddressOf());
+                if (result < 0 || blob.Handle == null)
+                {
+                    blob.Dispose();
+                    throw new ShaderCompilerException(ShaderCompilerErrorCode.BackendUnavailable,
+                        $"Failed to preserve the DXC in-memory source. HRESULT=0x{result:X8}");
+                }
+            }
+
+            return blob;
         }
 
         private static ComPtr<IDxcIncludeHandler> CreateIncludeHandler(ComPtr<IDxcUtils> utils)

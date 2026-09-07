@@ -4,7 +4,7 @@ using System.Text.Json;
 using SharpShader.Compilation;
 using Xunit;
 
-namespace Infinity.Rendering.Tests
+namespace SharpShader.Tests
 {
     public sealed class ShaderInterfaceManifestTests
     {
@@ -53,23 +53,12 @@ namespace Infinity.Rendering.Tests
         }
 
         [Fact]
-        public void LayoutPool_ShouldRejectStructuralHashCollision()
+        public void Manifest_ShouldRejectAlteredStructureWithAnUnchangedSignature()
         {
-            ShaderLayoutSignature forcedSignature = new(new byte[ShaderLayoutSignature.ByteLength]);
-            ShaderInterfaceLayout first = new(
-                new[] { CreateTextureBinding() },
-                _ => forcedSignature);
-            ShaderInterfaceLayout second = new(
-                new[] { CreateTextureBinding(ShaderResourceDimension.Texture3D) },
-                _ => forcedSignature);
-
-            Assert.Throws<InvalidOperationException>(() => new ShaderInterfaceManifest(
-                SourceDigest,
-                CreateToolchain(),
-                new[] { first, second },
-                new[] { CreateVariant(forcedSignature) },
-                new[] { CreateBackendLayouts(first) },
-                ShaderProgramTarget.All));
+            string json = ShaderInterfaceManifestSerializer.Serialize(CreateManifest());
+            string altered = json.Replace("\"dimension\":\"Texture2D\"", "\"dimension\":\"Texture3D\"", StringComparison.Ordinal);
+            Assert.NotEqual(json, altered);
+            Assert.Throws<JsonException>(() => ShaderInterfaceManifestSerializer.Deserialize(altered));
         }
 
         [Fact]

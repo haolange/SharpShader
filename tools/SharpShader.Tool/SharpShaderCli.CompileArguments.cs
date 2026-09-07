@@ -1,12 +1,10 @@
 using System.Globalization;
 using System.Security.Cryptography;
-using System.Runtime.CompilerServices;
 using System.Text;
 
 using SharpShader.Compilation;
 using SharpShader.HLSLCrossCompiler;
 
-[assembly: InternalsVisibleTo("Infinity.Rendering.Tests")]
 
 namespace SharpShader.Tool
 {
@@ -24,6 +22,7 @@ namespace SharpShader.Tool
             private readonly Dictionary<ShaderBindingKey, uint> m_MetalCapacities = new();
 
             public string SourcePath { get; private set; } = string.Empty;
+            public string? SourceIdentity { get; private set; }
             public string OutputDirectory { get; private set; } = string.Empty;
             public string? CacheDirectory { get; private set; }
             public string? AttachmentInterfacePath { get; private set; }
@@ -51,6 +50,12 @@ namespace SharpShader.Tool
                         case "--source":
                             result.SourcePath = AssignOnce(
                                 result.SourcePath,
+                                ReadValue(args, ref index, option),
+                                option);
+                            break;
+                        case "--source-identity":
+                            result.SourceIdentity = AssignOnce(
+                                result.SourceIdentity,
                                 ReadValue(args, ref index, option),
                                 option);
                             break;
@@ -185,7 +190,8 @@ namespace SharpShader.Tool
                     attachmentInterfaces: AttachmentInterfacePath is null
                         ? Array.Empty<ShaderAttachmentInterface>()
                         : ShaderAttachmentInterfaceFile.Load(
-                            AttachmentInterfacePath));
+                            AttachmentInterfacePath),
+                    sourceIdentity: SourceIdentity);
             }
 
             private void Validate()

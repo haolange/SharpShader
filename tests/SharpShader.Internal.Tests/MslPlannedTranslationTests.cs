@@ -6,7 +6,7 @@ using SharpShader.HLSLCrossCompiler;
 using SharpShader.HLSLCrossCompiler.Internal;
 using Xunit;
 
-namespace Infinity.Rendering.Tests
+namespace SharpShader.Internal.Tests
 {
     public sealed class MslPlannedTranslationTests
     {
@@ -610,7 +610,7 @@ namespace Infinity.Rendering.Tests
             try
             {
                 ShaderCompileResult compiled =
-                    HLSLCrossCompiler.Compile(request);
+                    global::SharpShader.HLSLCrossCompiler.HLSLCrossCompiler.Compile(request);
                 Assert.NotEmpty(compiled.Bytecode);
                 return compiled;
             }

@@ -6,7 +6,7 @@ using SharpShader.Compilation;
 using SharpShader.SharpGPU;
 using Xunit;
 
-namespace Infinity.Rendering.Tests
+namespace SharpShader.Tests
 {
     public sealed class SharpGpuShaderInterfaceAdapterTests
     {
@@ -273,27 +273,68 @@ namespace Infinity.Rendering.Tests
                     ERHIBackend.Vulkan);
             TrackingBindingTableLayout first = new();
             int invocation = 0;
-
-            Assert.Throws<InvalidOperationException>(() =>
-                plan.CreateBindingTableLayouts(descriptor =>
-                {
-                    return invocation++ == 0
-                        ? first
-                        : throw new InvalidOperationException("synthetic failure");
-                }));
+            using BindingLayoutTestDevice device = new();
+            device.LayoutFactory = descriptor => invocation++ == 0
+                ? first : throw new InvalidOperationException("synthetic failure");
+            Assert.Throws<InvalidOperationException>(() => plan.CreateBindingTableLayouts(device));
             Assert.True(first.IsDisposed);
             Assert.Equal(1, first.ReleaseCount);
 
             TrackingBindingTableLayout second = new();
             TrackingBindingTableLayout third = new();
             invocation = 0;
-            SharpGpuBindingTableLayouts owner =
-                plan.CreateBindingTableLayouts(descriptor =>
-                    invocation++ == 0 ? second : third);
+            device.LayoutFactory = descriptor => invocation++ == 0 ? second : third;
+            SharpGpuBindingTableLayouts owner = plan.CreateBindingTableLayouts(device);
             owner.Dispose();
             owner.Dispose();
 
             Assert.True(owner.IsDisposed);
+            Assert.Equal(1, second.ReleaseCount);
+            Assert.Equal(1, third.ReleaseCount);
+        }
+
+        [Theory]
+        [InlineData(false)]
+        [InlineData(true)]
+        public void LayoutReleaseFailures_ShouldDrainAllOwnedResources(bool failDuringCreation)
+        {
+            ShaderInterfaceLayout layout = new(new[]
+            {
+                CreateConstantBuffer(table: 1, slot: 0),
+                CreateConstantBuffer(table: 2, slot: 0),
+                CreateConstantBuffer(table: 3, slot: 0),
+            });
+            SharpGpuBindingTableLayoutPlan plan = SharpGpuShaderInterfaceAdapter.CreateBindingTableLayoutPlan(
+                layout, ShaderBackendLayoutPlanner.Plan(layout), ERHIBackend.Vulkan);
+            InvalidOperationException creationFailure = new("create failure");
+            InvalidOperationException releaseFailure = new("release failure");
+            TrackingBindingTableLayout first = new();
+            TrackingBindingTableLayout second = new() { ReleaseFailure = releaseFailure };
+            TrackingBindingTableLayout third = new();
+            using BindingLayoutTestDevice device = new();
+            int invocation = 0;
+            device.LayoutFactory = _ => invocation++ switch
+            {
+                0 => first,
+                1 => second,
+                _ => failDuringCreation ? throw creationFailure : third,
+            };
+            if (failDuringCreation)
+            {
+                AggregateException error = Assert.Throws<AggregateException>(() => plan.CreateBindingTableLayouts(device));
+                Assert.Same(creationFailure, error.InnerExceptions[0]);
+                Assert.Contains(releaseFailure, error.InnerExceptions);
+                third.Dispose();
+            }
+            else
+            {
+                SharpGpuBindingTableLayouts owner = plan.CreateBindingTableLayouts(device);
+                AggregateException error = Assert.Throws<AggregateException>(() => owner.Dispose());
+                Assert.Contains(releaseFailure, error.InnerExceptions);
+                Assert.True(owner.IsDisposed);
+                owner.Dispose();
+            }
+            Assert.Equal(1, first.ReleaseCount);
             Assert.Equal(1, second.ReleaseCount);
             Assert.Equal(1, third.ReleaseCount);
         }
@@ -392,10 +433,12 @@ namespace Infinity.Rendering.Tests
             }
 
             public int ReleaseCount { get; private set; }
+            public Exception? ReleaseFailure { get; init; }
 
             protected override void Release()
             {
                 ++ReleaseCount;
+                if (ReleaseFailure is not null) throw ReleaseFailure;
             }
         }
     }

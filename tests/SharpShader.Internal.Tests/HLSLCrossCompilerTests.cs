@@ -8,7 +8,7 @@ using SharpShader.HLSLCrossCompiler;
 using System.Text.RegularExpressions;
 using SharpShader.HLSLCrossCompiler.Internal;
 
-namespace Infinity.Rendering.Tests
+namespace SharpShader.Internal.Tests
 {
     public class HLSLCrossCompilerTests
     {
@@ -70,63 +70,22 @@ namespace Infinity.Rendering.Tests
         }
 
         [Fact]
-        public void SpirvCrossCanonicalPath_ShouldUseExactThirdPartyLayout()
+        public void NativeConfiguration_ShouldRejectRelativeDirectories()
         {
-            string configuredRoot = Path.Combine(
-                Path.GetTempPath(),
-                $"SharpShader-third-party-{Guid.NewGuid():N}");
-
-            string exactPath = SpirvCrossNativeLibraryBootstrap.ResolveCanonicalLibraryPathForTesting(
-                configuredRoot,
-                Path.Combine(configuredRoot, "irrelevant-base"),
-                Path.Combine(configuredRoot, "irrelevant-assembly", "SharpShader.dll"));
-
-            string osFolder = OperatingSystem.IsWindows()
-                ? "Win"
-                : OperatingSystem.IsLinux()
-                    ? "Linux"
-                    : OperatingSystem.IsMacOS()
-                        ? "macOS"
-                        : throw new PlatformNotSupportedException();
-            string archFolder = System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture switch
-            {
-                System.Runtime.InteropServices.Architecture.X64 => "AMD64",
-                System.Runtime.InteropServices.Architecture.Arm64 => "ARM64",
-                _ => throw new PlatformNotSupportedException(),
-            };
-            string nativeFileName = OperatingSystem.IsWindows()
-                ? "spirv-cross.dll"
-                : OperatingSystem.IsLinux()
-                    ? "libspirv-cross.so"
-                    : "libspirv-cross.dylib";
-
-            string expectedPath = Path.GetFullPath(
-                Path.Combine(
-                    configuredRoot,
-                    "Khronos",
-                    "SPIRV-Cross",
-                    osFolder,
-                    archFolder,
-                    nativeFileName));
-
-            Assert.Equal(expectedPath, exactPath);
+            Assert.Throws<ArgumentException>(() => SharpShaderNativeLibraries.Configure(
+                "relative/compiler", AppContext.BaseDirectory));
+            Assert.Throws<ArgumentException>(() => SharpShaderNativeLibraries.Configure(
+                AppContext.BaseDirectory, "relative/spirv-cross"));
         }
 
         [Fact]
-        public void SpirvCrossCanonicalPath_ShouldNotSearchCurrentDirectory()
+        public void UnconfiguredNativeResolution_ShouldStayInApplicationDirectory()
         {
-            string neutralRoot = Path.Combine(
-                Path.GetTempPath(),
-                $"SharpShader-native-root-{Guid.NewGuid():N}");
-
-            ShaderCompilerException exception = Assert.Throws<ShaderCompilerException>(
-                () => SpirvCrossNativeLibraryBootstrap.ResolveCanonicalLibraryPathForTesting(
-                    null,
-                    Path.Combine(neutralRoot, "app"),
-                    Path.Combine(neutralRoot, "assembly", "SharpShader.dll")));
-
-            Assert.Equal(ShaderCompilerErrorCode.BackendUnavailable, exception.ErrorCode);
-            Assert.Contains("INFINITY_THIRDPARTY_NATIVE_ROOT", exception.Message, StringComparison.Ordinal);
+            string missingFile = "missing-native-" + Guid.NewGuid().ToString("N") + ".dll";
+            Assert.Equal(Path.Combine(AppContext.BaseDirectory, missingFile),
+                SharpShaderNativeLibraries.Resolve(false, missingFile));
+            Assert.Throws<InvalidOperationException>(() => SharpShaderNativeLibraries.Configure(
+                AppContext.BaseDirectory, AppContext.BaseDirectory));
         }
 
         [Fact]
@@ -156,7 +115,7 @@ void main(uint3 dispatchThreadId : SV_DispatchThreadID)
     Output[0] = dispatchThreadId.x + 42;
 }";
 
-            ShaderCompileResult result = HLSLCrossCompiler.Compile(new ShaderCompileRequest
+            ShaderCompileResult result = global::SharpShader.HLSLCrossCompiler.HLSLCrossCompiler.Compile(new ShaderCompileRequest
             {
                 Source = source,
                 SourceName = "spirv-cross-canonical-context-smoke.hlsl",
@@ -202,10 +161,10 @@ void main(uint3 dispatchThreadId : SV_DispatchThreadID)
 
             try
             {
-                ShaderCompileResult dxilResult = HLSLCrossCompiler.Compile(baseRequest);
+                ShaderCompileResult dxilResult = global::SharpShader.HLSLCrossCompiler.HLSLCrossCompiler.Compile(baseRequest);
                 Assert.NotEmpty(dxilResult.Bytecode);
 
-                ShaderCompileResult spirvResult = HLSLCrossCompiler.Compile(baseRequest with
+                ShaderCompileResult spirvResult = global::SharpShader.HLSLCrossCompiler.HLSLCrossCompiler.Compile(baseRequest with
                 {
                     Target = ShaderTargetKind.SpirV,
                     SpirvOptions = new SpirvCompileOptions
@@ -242,7 +201,7 @@ void main(uint3 dispatchThreadId : SV_DispatchThreadID)
 
             ShaderCompileRequest request = CreateRequest(ShaderStageKind.Vertex, shaderModel68, ShaderTargetKind.Dxil);
 
-            ShaderCompilerException exception = Assert.Throws<ShaderCompilerException>(() => HLSLCrossCompiler.Compile(request));
+            ShaderCompilerException exception = Assert.Throws<ShaderCompilerException>(() => global::SharpShader.HLSLCrossCompiler.HLSLCrossCompiler.Compile(request));
             if (exception.ErrorCode == ShaderCompilerErrorCode.BackendUnavailable)
             {
                 return;
@@ -270,7 +229,7 @@ void main(uint3 dispatchThreadId : SV_DispatchThreadID)
                 Target = ShaderTargetKind.Dxil,
             };
 
-            ShaderCompilerException exception = Assert.Throws<ShaderCompilerException>(() => HLSLCrossCompiler.Compile(request));
+            ShaderCompilerException exception = Assert.Throws<ShaderCompilerException>(() => global::SharpShader.HLSLCrossCompiler.HLSLCrossCompiler.Compile(request));
             if (exception.ErrorCode == ShaderCompilerErrorCode.BackendUnavailable)
             {
                 return;
@@ -307,8 +266,8 @@ void main(uint3 dispatchThreadId : SV_DispatchThreadID)
                 EnableDebugInfo = true,
             };
 
-            ShaderCompileResult first = HLSLCrossCompiler.Compile(request);
-            ShaderCompileResult second = HLSLCrossCompiler.Compile(request);
+            ShaderCompileResult first = global::SharpShader.HLSLCrossCompiler.HLSLCrossCompiler.Compile(request);
+            ShaderCompileResult second = global::SharpShader.HLSLCrossCompiler.HLSLCrossCompiler.Compile(request);
 
             Assert.NotEmpty(first.Bytecode);
             Assert.NotEmpty(first.ReflectionData);
@@ -364,7 +323,7 @@ void main(uint3 dispatchThreadId : SV_DispatchThreadID)
                 ShaderCompileResult result;
                 try
                 {
-                    result = HLSLCrossCompiler.Compile(request);
+                    result = global::SharpShader.HLSLCrossCompiler.HLSLCrossCompiler.Compile(request);
                 }
                 catch (ShaderCompilerException compileException)
                 {
@@ -380,7 +339,7 @@ void main(uint3 dispatchThreadId : SV_DispatchThreadID)
                 const string invalidSource = "float4 main() : SV_Target { return BuildColor(";
                 File.WriteAllText(sourcePath, invalidSource);
                 ShaderCompilerException exception = Assert.Throws<ShaderCompilerException>(
-                    () => HLSLCrossCompiler.Compile(request with
+                    () => global::SharpShader.HLSLCrossCompiler.HLSLCrossCompiler.Compile(request with
                     {
                         Source = invalidSource,
                     }));
@@ -396,137 +355,6 @@ void main(uint3 dispatchThreadId : SV_DispatchThreadID)
             {
                 Directory.Delete(temporaryDirectory, recursive: true);
             }
-        }
-
-        [Fact]
-        public void HybridShaders_DxilCompile_Sm68()
-        {
-            ShaderCompilerCapabilities capabilities = ShaderCompilerCapabilities.Probe();
-            if (!capabilities.IsAnyDxcAvailable)
-            {
-                return;
-            }
-
-            ShaderModelVersion shaderModel = new ShaderModelVersion(6, 8);
-            if (!capabilities.IsProfileSupported(ShaderStageKind.Vertex, shaderModel)
-                || !capabilities.IsProfileSupported(ShaderStageKind.Pixel, shaderModel)
-                || !capabilities.IsProfileSupported(ShaderStageKind.Compute, shaderModel))
-            {
-                return;
-            }
-
-            // Desktop Hybrid raster/compute now consumes Manifest + adapter.
-            // This Raw gate keeps compiler coverage of the same HLSL sources.
-            string repoRoot = ResolveRepositoryRoot();
-            string computePath = Path.Combine(repoRoot, "Engine", "Shaders", "Compute", "Global", "HybridCompute.compute");
-            string fullscreenPath = Path.Combine(repoRoot, "Engine", "Shaders", "ShaderLab", "Global", "HybridFullscreen.shader");
-            string sceneMeshPath = Path.Combine(repoRoot, "Engine", "Shaders", "ShaderLab", "Global", "HybridSceneMesh.shader");
-            string computeSource = ShaderLabUtil.ParseComputeProgramFromFile(computePath).Source;
-            string fullscreenSource = ShaderLabUtil.ParseShaderLabFromFile(fullscreenPath).Passes.Single().Program.Source;
-            string sceneMeshSource = ShaderLabUtil.ParseShaderLabFromFile(sceneMeshPath).Passes.Single().Program.Source;
-
-            ShaderCompileResult vertexResult = HLSLCrossCompiler.Compile(new ShaderCompileRequest
-            {
-                Source = fullscreenSource,
-                SourceName = fullscreenPath,
-                EntryPoint = "VSMain",
-                Stage = ShaderStageKind.Vertex,
-                ShaderModel = shaderModel,
-                Target = ShaderTargetKind.Dxil,
-                EnableDebugInfo = true,
-                DisableOptimizations = true,
-            });
-
-            ShaderCompileResult pixelResult = HLSLCrossCompiler.Compile(new ShaderCompileRequest
-            {
-                Source = fullscreenSource,
-                SourceName = fullscreenPath,
-                EntryPoint = "PSMain",
-                Stage = ShaderStageKind.Pixel,
-                ShaderModel = shaderModel,
-                Target = ShaderTargetKind.Dxil,
-                EnableDebugInfo = true,
-                DisableOptimizations = true,
-            });
-
-            ShaderCompileResult computeResult = HLSLCrossCompiler.Compile(new ShaderCompileRequest
-            {
-                Source = computeSource,
-                SourceName = computePath,
-                EntryPoint = "CSMain",
-                Stage = ShaderStageKind.Compute,
-                ShaderModel = shaderModel,
-                Target = ShaderTargetKind.Dxil,
-                EnableDebugInfo = true,
-                DisableOptimizations = true,
-            });
-
-            ShaderCompileResult sceneMeshVertexResult = HLSLCrossCompiler.Compile(new ShaderCompileRequest
-            {
-                Source = sceneMeshSource,
-                SourceName = sceneMeshPath,
-                EntryPoint = "VSSceneMesh",
-                Stage = ShaderStageKind.Vertex,
-                ShaderModel = shaderModel,
-                Target = ShaderTargetKind.Dxil,
-                EnableDebugInfo = true,
-                DisableOptimizations = true,
-            });
-
-            Assert.NotEmpty(vertexResult.Bytecode);
-            Assert.NotEmpty(pixelResult.Bytecode);
-            Assert.NotEmpty(computeResult.Bytecode);
-            Assert.NotEmpty(sceneMeshVertexResult.Bytecode);
-            Assert.NotEmpty(vertexResult.ReflectionData);
-            Assert.NotEmpty(pixelResult.ReflectionData);
-            Assert.NotEmpty(computeResult.ReflectionData);
-        }
-
-        [Fact]
-        public void HybridRayLibrary_DxilCompile_Sm68()
-        {
-            ShaderCompilerCapabilities capabilities = ShaderCompilerCapabilities.Probe();
-            if (!capabilities.IsAnyDxcAvailable)
-            {
-                return;
-            }
-
-            ShaderModelVersion shaderModel = new ShaderModelVersion(6, 8);
-            if (!capabilities.IsProfileSupported(ShaderStageKind.Library, shaderModel))
-            {
-                return;
-            }
-
-            string repoRoot = ResolveRepositoryRoot();
-            string rayPath = Path.Combine(repoRoot, "Engine", "Shaders", "RayTracing", "Global", "HybridPrimary.raytrace");
-            string hitPath = Path.Combine(repoRoot, "Engine", "Shaders", "ShaderLab", "Material", "HybridRayHit.shader");
-            StandaloneShaderProgram rayProgram = ShaderLabUtil.ParseRayTraceProgramFromFile(rayPath);
-            SharpShader.ShaderLab.ShaderLab hitShader = ShaderLabUtil.ParseShaderLabFromFile(hitPath);
-            ShaderLabPass hitPass = hitShader.Passes.Single(pass => string.Equals(pass.Name, "HybridRay", StringComparison.Ordinal));
-            string combinedSource = string.Concat(rayProgram.Source, Environment.NewLine, hitPass.Program.Source);
-            string[] includeDirs = new[]
-            {
-                Path.GetDirectoryName(rayPath)!,
-                Path.GetDirectoryName(hitPath)!,
-            }.Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
-
-            ShaderCompileResult result = HLSLCrossCompiler.Compile(new ShaderCompileRequest
-            {
-                Source = combinedSource,
-                SourceName = rayPath,
-                EntryPoint = string.Empty,
-                Stage = ShaderStageKind.Library,
-                ShaderModel = shaderModel,
-                Target = ShaderTargetKind.Dxil,
-                Exports = new[] { "RTKernel", "MissBlue", "MissOrange", "AabbGroup0Intersection", "AabbGroup1Intersection" },
-                IncludeDirs = includeDirs,
-            });
-
-            Assert.NotEmpty(result.Bytecode);
-            string diagnostics = result.Diagnostics ?? string.Empty;
-            Assert.DoesNotContain("incorrect number of entry parameters for raytracing stage 'raygeneration'", diagnostics, StringComparison.OrdinalIgnoreCase);
-            Assert.DoesNotContain("use of undeclared identifier 'ReportHit'", diagnostics, StringComparison.OrdinalIgnoreCase);
-            Assert.DoesNotContain("requires that it is annotated with the [raypayload] attribute", diagnostics, StringComparison.OrdinalIgnoreCase);
         }
 
         [Fact]
@@ -546,7 +374,7 @@ void main(uint3 dispatchThreadId : SV_DispatchThreadID)
                 return;
             }
 
-            ShaderCompileResult vertexResult = HLSLCrossCompiler.Compile(new ShaderCompileRequest
+            ShaderCompileResult vertexResult = global::SharpShader.HLSLCrossCompiler.HLSLCrossCompiler.Compile(new ShaderCompileRequest
             {
                 Source = HybridVertexShaderSource,
                 EntryPoint = "VSMain",
@@ -559,7 +387,7 @@ void main(uint3 dispatchThreadId : SV_DispatchThreadID)
                 },
             });
 
-            ShaderCompileResult pixelResult = HLSLCrossCompiler.Compile(new ShaderCompileRequest
+            ShaderCompileResult pixelResult = global::SharpShader.HLSLCrossCompiler.HLSLCrossCompiler.Compile(new ShaderCompileRequest
             {
                 Source = HybridPixelShaderSource,
                 EntryPoint = "PSMain",
@@ -572,7 +400,7 @@ void main(uint3 dispatchThreadId : SV_DispatchThreadID)
                 },
             });
 
-            ShaderCompileResult computeResult = HLSLCrossCompiler.Compile(new ShaderCompileRequest
+            ShaderCompileResult computeResult = global::SharpShader.HLSLCrossCompiler.HLSLCrossCompiler.Compile(new ShaderCompileRequest
             {
                 Source = HybridComputeShaderSource,
                 EntryPoint = "CSMain",
@@ -615,7 +443,7 @@ void main(uint3 dispatchThreadId : SV_DispatchThreadID)
                 },
             };
 
-            ShaderCompilerException exception = Assert.Throws<ShaderCompilerException>(() => HLSLCrossCompiler.Compile(request));
+            ShaderCompilerException exception = Assert.Throws<ShaderCompilerException>(() => global::SharpShader.HLSLCrossCompiler.HLSLCrossCompiler.Compile(request));
             if (exception.ErrorCode == ShaderCompilerErrorCode.BackendUnavailable)
             {
                 return;
@@ -639,7 +467,7 @@ void main(uint3 dispatchThreadId : SV_DispatchThreadID)
                 IsNativeDxcAvailableOverride = () => false,
             };
 
-            ShaderCompilerException exception = Assert.Throws<ShaderCompilerException>(() => HLSLCrossCompiler.CompileForTesting(request, context));
+            ShaderCompilerException exception = Assert.Throws<ShaderCompilerException>(() => global::SharpShader.HLSLCrossCompiler.HLSLCrossCompiler.CompileForTesting(request, context));
             Assert.Equal(ShaderCompilerErrorCode.BackendUnavailable, exception.ErrorCode);
             Assert.Contains("Native DXC unavailable", exception.Message, StringComparison.Ordinal);
         }
@@ -652,7 +480,7 @@ void main(uint3 dispatchThreadId : SV_DispatchThreadID)
                 IsNativeDxcAvailableOverride = () => false,
             };
 
-            ShaderCompilerCapabilities capabilities = HLSLCrossCompiler.ProbeCapabilitiesForTesting(context);
+            ShaderCompilerCapabilities capabilities = global::SharpShader.HLSLCrossCompiler.HLSLCrossCompiler.ProbeCapabilitiesForTesting(context);
             Assert.False(capabilities.NativeDxcAvailable);
             Assert.False(capabilities.IsAnyDxcAvailable);
             Assert.Empty(capabilities.ProfileSupport);
@@ -676,7 +504,7 @@ void main(uint3 dispatchThreadId : SV_DispatchThreadID)
                 try
                 {
                     ShaderCompileRequest request = CreateRequest(stage, shaderModel, target);
-                    ShaderCompileResult result = HLSLCrossCompiler.Compile(request);
+                    ShaderCompileResult result = global::SharpShader.HLSLCrossCompiler.HLSLCrossCompiler.Compile(request);
                     Assert.NotEmpty(result.Bytecode);
                     count++;
                 }
@@ -710,7 +538,7 @@ void main(uint3 dispatchThreadId : SV_DispatchThreadID)
                 try
                 {
                     ShaderCompileRequest request = CreateRequest(stage, shaderModel, target);
-                    ShaderCompileResult result = HLSLCrossCompiler.Compile(request);
+                    ShaderCompileResult result = global::SharpShader.HLSLCrossCompiler.HLSLCrossCompiler.Compile(request);
                     Assert.NotEmpty(result.Bytecode);
                     Assert.False(string.IsNullOrWhiteSpace(result.Text));
                     return 1;

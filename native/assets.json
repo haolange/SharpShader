@@ -1,0 +1,247 @@
+{
+  "schemaVersion": 1,
+  "assets": [
+    {
+      "library": "DXC",
+      "rid": "linux-x64",
+      "path": "native/runtimes/linux-x64/native/libdxcompiler.so",
+      "sha256": "f64b6a9cf32ecb6b456e3f492d736ce41c250845e2dba282f4fc1c4cbeaa0f04",
+      "bytes": 31076672,
+      "deployment": "Microsoft/DXC/Linux/AMD64/libdxcompiler.so",
+      "source": {
+        "kind": "archive",
+        "version": "v1.9.2602",
+        "archiveUrl": "https://github.com/microsoft/DirectXShaderCompiler/releases/download/v1.9.2602/linux_dxc_2026_02_20.x86_64.tar.gz",
+        "archiveSha256": "a1d3e3b5e1c5685b3eb27d5e8890e41d87df45def05112a2d6f1a63a931f7d60",
+        "format": "tar.gz",
+        "member": "./lib/libdxcompiler.so",
+        "redistribution": "TODO(UNVERIFIED): review preserved license terms before public release"
+      }
+    },
+    {
+      "library": "DXC",
+      "rid": "linux-x64",
+      "path": "native/runtimes/linux-x64/native/libdxil.so",
+      "sha256": "4a6a3e77b37b75e4d8cf44e430cc15e4e1ef96961c7cba35a0d6f14d7c1afda7",
+      "bytes": 2428952,
+      "deployment": "Microsoft/DXC/Linux/AMD64/libdxil.so",
+      "source": {
+        "kind": "archive",
+        "version": "v1.9.2602",
+        "archiveUrl": "https://github.com/microsoft/DirectXShaderCompiler/releases/download/v1.9.2602/linux_dxc_2026_02_20.x86_64.tar.gz",
+        "archiveSha256": "a1d3e3b5e1c5685b3eb27d5e8890e41d87df45def05112a2d6f1a63a931f7d60",
+        "format": "tar.gz",
+        "member": "./lib/libdxil.so",
+        "redistribution": "TODO(UNVERIFIED): review preserved license terms before public release"
+      }
+    },
+    {
+      "library": "DXC",
+      "rid": "osx-x64",
+      "path": "native/runtimes/osx-x64/native/libdxcompiler.dylib",
+      "sha256": "eedfd358597f8b33bdb076d545f5db37641007da127f6465e9485c1e1f3c1ba1",
+      "bytes": 56258880,
+      "deployment": "Microsoft/DXC/macOS/AMD64/libdxcompiler.dylib",
+      "source": {
+        "kind": "existing-payload",
+        "path": "Microsoft/DXC/macOS/AMD64/libdxcompiler.dylib",
+        "version": "TODO(UNVERIFIED)",
+        "redistribution": "TODO(UNVERIFIED)",
+        "originGitCommit": "7689191334cf562bd34d4a420149bde12e8b66b6",
+        "originGitPath": "Engine/Binaries/ThirdParty/Microsoft/DXC/macOS/AMD64/libdxcompiler.dylib"
+      }
+    },
+    {
+      "library": "DXC",
+      "rid": "osx-arm64",
+      "path": "native/runtimes/osx-arm64/native/libdxcompiler.dylib",
+      "sha256": "eedfd358597f8b33bdb076d545f5db37641007da127f6465e9485c1e1f3c1ba1",
+      "bytes": 56258880,
+      "deployment": "Microsoft/DXC/macOS/ARM64/libdxcompiler.dylib",
+      "source": {
+        "kind": "existing-payload",
+        "path": "Microsoft/DXC/macOS/ARM64/libdxcompiler.dylib",
+        "version": "TODO(UNVERIFIED)",
+        "redistribution": "TODO(UNVERIFIED)",
+        "originGitCommit": "7689191334cf562bd34d4a420149bde12e8b66b6",
+        "originGitPath": "Engine/Binaries/ThirdParty/Microsoft/DXC/macOS/ARM64/libdxcompiler.dylib"
+      }
+    },
+    {
+      "library": "DXC",
+      "rid": "win-x64",
+      "path": "native/runtimes/win-x64/native/dxcompiler.dll",
+      "sha256": "b86a738ece4c05dbe2d9bbb29668a2ccb28a0740773c9b027cdc61e8d07b4d75",
+      "bytes": 17951808,
+      "deployment": "Microsoft/DXC/Win/AMD64/dxcompiler.dll",
+      "source": {
+        "kind": "archive",
+        "version": "v1.9.2602",
+        "archiveUrl": "https://github.com/microsoft/DirectXShaderCompiler/releases/download/v1.9.2602/dxc_2026_02_20.zip",
+        "archiveSha256": "a1e89031421cf3c1fca6627766ab3020ca4f962ac7e2caa7fab2b33a8436151e",
+        "format": "zip",
+        "member": "bin/x64/dxcompiler.dll",
+        "redistribution": "TODO(UNVERIFIED): review preserved license terms before public release"
+      }
+    },
+    {
+      "library": "DXC",
+      "rid": "win-x64",
+      "path": "native/runtimes/win-x64/native/dxil.dll",
+      "sha256": "058f2f52a680c38b223a5615b7df969def21f77e577562e5099d971dede992de",
+      "bytes": 1503304,
+      "deployment": "Microsoft/DXC/Win/AMD64/dxil.dll",
+      "source": {
+        "kind": "archive",
+        "version": "v1.9.2602",
+        "archiveUrl": "https://github.com/microsoft/DirectXShaderCompiler/releases/download/v1.9.2602/dxc_2026_02_20.zip",
+        "archiveSha256": "a1e89031421cf3c1fca6627766ab3020ca4f962ac7e2caa7fab2b33a8436151e",
+        "format": "zip",
+        "member": "bin/x64/dxil.dll",
+        "redistribution": "TODO(UNVERIFIED): review preserved license terms before public release"
+      }
+    },
+    {
+      "library": "DXC",
+      "rid": "win-arm64",
+      "path": "native/runtimes/win-arm64/native/dxcompiler.dll",
+      "sha256": "7bce55ceb9438e5d8d3d147cc5b2cd0327908070ec67c428a71622a41d7a99a6",
+      "bytes": 22724640,
+      "deployment": "Microsoft/DXC/Win/ARM64/dxcompiler.dll",
+      "source": {
+        "kind": "archive",
+        "version": "v1.9.2602",
+        "archiveUrl": "https://github.com/microsoft/DirectXShaderCompiler/releases/download/v1.9.2602/dxc_2026_02_20.zip",
+        "archiveSha256": "a1e89031421cf3c1fca6627766ab3020ca4f962ac7e2caa7fab2b33a8436151e",
+        "format": "zip",
+        "member": "bin/arm64/dxcompiler.dll",
+        "redistribution": "TODO(UNVERIFIED): review preserved license terms before public release"
+      }
+    },
+    {
+      "library": "DXC",
+      "rid": "win-arm64",
+      "path": "native/runtimes/win-arm64/native/dxil.dll",
+      "sha256": "1716db89daa2c0e7acfd7dccbde368de7d8d5e6de45279155a4ce68e3cfc6ca5",
+      "bytes": 1797192,
+      "deployment": "Microsoft/DXC/Win/ARM64/dxil.dll",
+      "source": {
+        "kind": "archive",
+        "version": "v1.9.2602",
+        "archiveUrl": "https://github.com/microsoft/DirectXShaderCompiler/releases/download/v1.9.2602/dxc_2026_02_20.zip",
+        "archiveSha256": "a1e89031421cf3c1fca6627766ab3020ca4f962ac7e2caa7fab2b33a8436151e",
+        "format": "zip",
+        "member": "bin/arm64/dxil.dll",
+        "redistribution": "TODO(UNVERIFIED): review preserved license terms before public release"
+      }
+    },
+    {
+      "library": "SPIRV-Cross",
+      "rid": "linux-x64",
+      "path": "native/runtimes/linux-x64/native/libspirv-cross.so",
+      "sha256": "513de25783914c2193577e36c5623543eaf970b4e8c5abb1ed97e002aa5f874c",
+      "bytes": 3894480,
+      "deployment": "Khronos/SPIRV-Cross/Linux/AMD64/libspirv-cross.so",
+      "source": {
+        "kind": "archive",
+        "package": "silk.net.spirv.cross.native",
+        "version": "2.23.0",
+        "archiveUrl": "https://api.nuget.org/v3-flatcontainer/silk.net.spirv.cross.native/2.23.0/silk.net.spirv.cross.native.2.23.0.nupkg",
+        "archiveSha256": "5c8ea3fcf588584950be018cd47e728ac2d7d4cbbe07b205c0cc6a47c53a06a9",
+        "format": "zip",
+        "member": "runtimes/linux-x64/native/libspirv-cross.so",
+        "redistribution": "TODO(UNVERIFIED): package declares Apache-2.0; upstream source commit metadata needs verification"
+      }
+    },
+    {
+      "library": "SPIRV-Cross",
+      "rid": "linux-arm64",
+      "path": "native/runtimes/linux-arm64/native/libspirv-cross.so",
+      "sha256": "7c78355e34d3953364770652818cb8bd76ea8dd6621c00dbda55994a6f79e9e4",
+      "bytes": 3687056,
+      "deployment": "Khronos/SPIRV-Cross/Linux/ARM64/libspirv-cross.so",
+      "source": {
+        "kind": "archive",
+        "package": "silk.net.spirv.cross.native",
+        "version": "2.23.0",
+        "archiveUrl": "https://api.nuget.org/v3-flatcontainer/silk.net.spirv.cross.native/2.23.0/silk.net.spirv.cross.native.2.23.0.nupkg",
+        "archiveSha256": "5c8ea3fcf588584950be018cd47e728ac2d7d4cbbe07b205c0cc6a47c53a06a9",
+        "format": "zip",
+        "member": "runtimes/linux-arm64/native/libspirv-cross.so",
+        "redistribution": "TODO(UNVERIFIED): package declares Apache-2.0; upstream source commit metadata needs verification"
+      }
+    },
+    {
+      "library": "SPIRV-Cross",
+      "rid": "osx-x64",
+      "path": "native/runtimes/osx-x64/native/libspirv-cross.dylib",
+      "sha256": "b8a6ce9bc707d15b7bbbee139fb2363cec116bf8aad58e181642a39ef4fed189",
+      "bytes": 3691387,
+      "deployment": "Khronos/SPIRV-Cross/macOS/AMD64/libspirv-cross.dylib",
+      "source": {
+        "kind": "archive",
+        "package": "silk.net.spirv.cross.native",
+        "version": "2.23.0",
+        "archiveUrl": "https://api.nuget.org/v3-flatcontainer/silk.net.spirv.cross.native/2.23.0/silk.net.spirv.cross.native.2.23.0.nupkg",
+        "archiveSha256": "5c8ea3fcf588584950be018cd47e728ac2d7d4cbbe07b205c0cc6a47c53a06a9",
+        "format": "zip",
+        "member": "runtimes/osx-x64/native/libspirv-cross.dylib",
+        "redistribution": "TODO(UNVERIFIED): package declares Apache-2.0; upstream source commit metadata needs verification"
+      }
+    },
+    {
+      "library": "SPIRV-Cross",
+      "rid": "osx-arm64",
+      "path": "native/runtimes/osx-arm64/native/libspirv-cross.dylib",
+      "sha256": "071c4ef2a38c5fd78ccdda419cb79ec4fded6f85ed3bdeeae5bb09c3401eb093",
+      "bytes": 3864888,
+      "deployment": "Khronos/SPIRV-Cross/macOS/ARM64/libspirv-cross.dylib",
+      "source": {
+        "kind": "archive",
+        "package": "silk.net.spirv.cross.native",
+        "version": "2.23.0",
+        "archiveUrl": "https://api.nuget.org/v3-flatcontainer/silk.net.spirv.cross.native/2.23.0/silk.net.spirv.cross.native.2.23.0.nupkg",
+        "archiveSha256": "5c8ea3fcf588584950be018cd47e728ac2d7d4cbbe07b205c0cc6a47c53a06a9",
+        "format": "zip",
+        "member": "runtimes/osx-arm64/native/libspirv-cross.dylib",
+        "redistribution": "TODO(UNVERIFIED): package declares Apache-2.0; upstream source commit metadata needs verification"
+      }
+    },
+    {
+      "library": "SPIRV-Cross",
+      "rid": "win-x64",
+      "path": "native/runtimes/win-x64/native/spirv-cross.dll",
+      "sha256": "1b00f8c042d4eb4060b1f4b2c1ee1ef2f0935c7857efe60c62d9cea236ea834e",
+      "bytes": 2961408,
+      "deployment": "Khronos/SPIRV-Cross/Win/AMD64/spirv-cross.dll",
+      "source": {
+        "kind": "archive",
+        "package": "silk.net.spirv.cross.native",
+        "version": "2.23.0",
+        "archiveUrl": "https://api.nuget.org/v3-flatcontainer/silk.net.spirv.cross.native/2.23.0/silk.net.spirv.cross.native.2.23.0.nupkg",
+        "archiveSha256": "5c8ea3fcf588584950be018cd47e728ac2d7d4cbbe07b205c0cc6a47c53a06a9",
+        "format": "zip",
+        "member": "runtimes/win-x64/native/spirv-cross.dll",
+        "redistribution": "TODO(UNVERIFIED): package declares Apache-2.0; upstream source commit metadata needs verification"
+      }
+    },
+    {
+      "library": "SPIRV-Cross",
+      "rid": "win-arm64",
+      "path": "native/runtimes/win-arm64/native/spirv-cross.dll",
+      "sha256": "4d6143fd7ae2dd75edf22ddcc8085749614ca36cbdc968af3d2f073c8272b9f1",
+      "bytes": 2699776,
+      "deployment": "Khronos/SPIRV-Cross/Win/ARM64/spirv-cross.dll",
+      "source": {
+        "kind": "archive",
+        "package": "silk.net.spirv.cross.native",
+        "version": "2.23.0",
+        "archiveUrl": "https://api.nuget.org/v3-flatcontainer/silk.net.spirv.cross.native/2.23.0/silk.net.spirv.cross.native.2.23.0.nupkg",
+        "archiveSha256": "5c8ea3fcf588584950be018cd47e728ac2d7d4cbbe07b205c0cc6a47c53a06a9",
+        "format": "zip",
+        "member": "runtimes/win-arm64/native/spirv-cross.dll",
+        "redistribution": "TODO(UNVERIFIED): package declares Apache-2.0; upstream source commit metadata needs verification"
+      }
+    }
+  ]
+}

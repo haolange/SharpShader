@@ -11,7 +11,7 @@ using SharpShader.Compilation.Internal;
 using SharpShader.HLSLCrossCompiler;
 using Xunit;
 
-namespace Infinity.Rendering.Tests
+namespace SharpShader.Internal.Tests
 {
     public sealed class ShaderProgramCacheHardeningTests
     {
@@ -147,7 +147,7 @@ namespace Infinity.Rendering.Tests
                 compile: nativeRequest =>
                 {
                     Interlocked.Increment(ref warmInvocationCount);
-                    return HLSLCrossCompiler.Compile(nativeRequest);
+                    return global::SharpShader.HLSLCrossCompiler.HLSLCrossCompiler.Compile(nativeRequest);
                 }).Compile(request);
             Assert.Equal(0, Volatile.Read(ref warmInvocationCount));
             Assert.Equal(republished.CacheKey, warm.CacheKey);
@@ -162,7 +162,7 @@ namespace Infinity.Rendering.Tests
                         "Timed out waiting for the valid cache republisher.");
                 }
 
-                return HLSLCrossCompiler.Compile(nativeRequest);
+                return global::SharpShader.HLSLCrossCompiler.HLSLCrossCompiler.Compile(nativeRequest);
             }
         }
 
@@ -441,7 +441,7 @@ namespace Infinity.Rendering.Tests
                 new ShaderProgramCompilerOptions(cacheDirectory, limits),
                 new ShaderProgramCompilerExecutionContext
                 {
-                    CompileOverride = compile ?? HLSLCrossCompiler.Compile,
+                    CompileOverride = compile ?? global::SharpShader.HLSLCrossCompiler.HLSLCrossCompiler.Compile,
                     ToolchainComponentsOverride = _ => new[]
                     {
                         new ShaderToolchainComponent(

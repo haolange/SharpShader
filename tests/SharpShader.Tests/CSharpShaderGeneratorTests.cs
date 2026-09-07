@@ -6,7 +6,7 @@ using SharpShader.CSharp;
 using SharpShader.CSharp.Generators;
 using Xunit;
 
-namespace Infinity.Rendering.Tests
+namespace SharpShader.Tests
 {
     public sealed class CSharpShaderGeneratorTests
     {
@@ -17,7 +17,7 @@ namespace Infinity.Rendering.Tests
             CSharpGeneratorDriver driver = CSharpGeneratorDriver.Create(new SharpSLGenerator());
             driver.RunGeneratorsAndUpdateCompilation(
                 compilation,
-                out Compilation updated,
+                out Microsoft.CodeAnalysis.Compilation updated,
                 out ImmutableArray<Diagnostic> diagnostics);
 
             Assert.DoesNotContain(

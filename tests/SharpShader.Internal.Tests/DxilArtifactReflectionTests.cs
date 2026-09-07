@@ -5,7 +5,7 @@ using SharpShader.Compilation.Internal;
 using SharpShader.HLSLCrossCompiler;
 using Xunit;
 
-namespace Infinity.Rendering.Tests
+namespace SharpShader.Internal.Tests
 {
     public sealed class DxilArtifactReflectionTests
     {
@@ -263,7 +263,7 @@ namespace Infinity.Rendering.Tests
                 void CSMain() { Output[0] = 1; }
                 """,
                 "invalid-reflection-negative.hlsl");
-            ShaderCompileResult compiled = HLSLCrossCompiler.Compile(request);
+            ShaderCompileResult compiled = global::SharpShader.HLSLCrossCompiler.HLSLCrossCompiler.Compile(request);
 
             ShaderCompilerException empty = Assert.Throws<ShaderCompilerException>(
                 () => DxilArtifactReflector.Reflect(
@@ -307,7 +307,7 @@ namespace Infinity.Rendering.Tests
 
         private static ShaderArtifactReflection CompileAndReflect(ShaderCompileRequest request)
         {
-            ShaderCompileResult compiled = HLSLCrossCompiler.Compile(request);
+            ShaderCompileResult compiled = global::SharpShader.HLSLCrossCompiler.HLSLCrossCompiler.Compile(request);
             Assert.NotEmpty(compiled.ReflectionData);
             return DxilArtifactReflector.Reflect(request, compiled);
         }

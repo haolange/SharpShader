@@ -4,7 +4,7 @@ using System.Linq;
 using SharpShader.Compilation;
 using Xunit;
 
-namespace Infinity.Rendering.Tests
+namespace SharpShader.Tests
 {
     public sealed class ShaderBackendLayoutPlannerTests
     {

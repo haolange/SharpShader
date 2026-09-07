@@ -27,12 +27,24 @@ namespace SharpShader.SharpGPU
                 return;
             }
 
+            m_IsDisposed = true;
+            List<Exception>? failures = null;
             for (int index = m_Layouts.Count - 1; index >= 0; --index)
             {
-                m_Layouts[index].Dispose();
+                try
+                {
+                    m_Layouts[index].Dispose();
+                }
+                catch (Exception error)
+                {
+                    (failures ??= new()).Add(error);
+                }
             }
 
-            m_IsDisposed = true;
+            if (failures is not null)
+            {
+                throw new AggregateException("One or more SharpGPU binding layouts failed to release.", failures);
+            }
         }
     }
 }

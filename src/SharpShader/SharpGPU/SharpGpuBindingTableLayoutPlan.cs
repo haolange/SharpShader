@@ -108,13 +108,26 @@ namespace SharpShader.SharpGPU
 
                 return new SharpGpuBindingTableLayouts(layouts.ToArray());
             }
-            catch
+            catch (Exception creationError)
             {
+                List<Exception>? failures = null;
                 for (int index = layouts.Count - 1; index >= 0; --index)
                 {
-                    layouts[index].Dispose();
+                    try
+                    {
+                        layouts[index].Dispose();
+                    }
+                    catch (Exception releaseError)
+                    {
+                        failures ??= new() { creationError };
+                        failures.Add(releaseError);
+                    }
                 }
 
+                if (failures is not null)
+                {
+                    throw new AggregateException("Binding layout creation and rollback failed.", failures);
+                }
                 throw;
             }
         }

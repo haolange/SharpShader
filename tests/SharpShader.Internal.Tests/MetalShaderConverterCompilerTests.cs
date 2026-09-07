@@ -11,7 +11,7 @@ using System.Collections.Generic;
 using SharpShader.HLSLCrossCompiler;
 using SharpShader.HLSLCrossCompiler.Internal;
 
-namespace Infinity.Rendering.Tests
+namespace SharpShader.Internal.Tests
 {
     [Collection("MetalShaderConverterSerial")]
     public sealed class MetalShaderConverterCompilerTests
@@ -42,7 +42,7 @@ namespace Infinity.Rendering.Tests
                 return;
             }
 
-            ShaderCompileResult result = HLSLCrossCompiler.CompileMetalLibrary(
+            ShaderCompileResult result = global::SharpShader.HLSLCrossCompiler.HLSLCrossCompiler.CompileMetalLibrary(
                 CreateRequest(converterPath));
 
             Assert.True(result.Bytecode.Length >= 4);
@@ -63,7 +63,7 @@ namespace Infinity.Rendering.Tests
             ShaderCompilerExecutionContext context = CreateDxilOverrideContext();
 
             ShaderCompilerException exception = Assert.Throws<ShaderCompilerException>(
-                () => HLSLCrossCompiler.CompileForTesting(request, context));
+                () => global::SharpShader.HLSLCrossCompiler.HLSLCrossCompiler.CompileForTesting(request, context));
 
             Assert.Equal(ShaderCompilerErrorCode.InvalidRequest, exception.ErrorCode);
             Assert.Contains("fully-qualified path", exception.Message, StringComparison.Ordinal);
@@ -90,7 +90,7 @@ namespace Infinity.Rendering.Tests
             HashSet<string> before = SnapshotTemporaryDirectories();
 
             Assert.ThrowsAny<OperationCanceledException>(
-                () => HLSLCrossCompiler.CompileForTesting(request, context));
+                () => global::SharpShader.HLSLCrossCompiler.HLSLCrossCompiler.CompileForTesting(request, context));
 
             Assert.False(nativeCompileInvoked);
             AssertNoNewTemporaryDirectories(before);
@@ -113,7 +113,7 @@ namespace Infinity.Rendering.Tests
             try
             {
                 ShaderCompilerException exception = Assert.Throws<ShaderCompilerException>(
-                    () => HLSLCrossCompiler.CompileForTesting(
+                    () => global::SharpShader.HLSLCrossCompiler.HLSLCrossCompiler.CompileForTesting(
                         CreateRequest(invalidExecutablePath),
                         CreateDxilOverrideContext()));
 
@@ -249,7 +249,7 @@ namespace Infinity.Rendering.Tests
             HashSet<string> before = SnapshotTemporaryDirectories();
 
             ShaderCompilerException exception = Assert.Throws<ShaderCompilerException>(
-                () => HLSLCrossCompiler.CompileForTesting(
+                () => global::SharpShader.HLSLCrossCompiler.HLSLCrossCompiler.CompileForTesting(
                     request,
                     CreateDxilOverrideContext()));
 
@@ -275,7 +275,7 @@ namespace Infinity.Rendering.Tests
             HashSet<string> before = SnapshotTemporaryDirectories();
 
             Assert.ThrowsAny<OperationCanceledException>(
-                () => HLSLCrossCompiler.CompileForTesting(
+                () => global::SharpShader.HLSLCrossCompiler.HLSLCrossCompiler.CompileForTesting(
                     request,
                     CreateDxilOverrideContext()));
 

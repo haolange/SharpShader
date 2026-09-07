@@ -1,0 +1,32 @@
+{
+  "sourceRepository": "https://github.com/haolange/InfinityBrowser.git",
+  "sourceCommit": "7689191334cf562bd34d4a420149bde12e8b66b6",
+  "extractedCommit": "4973a93ebe0cff95583e917ccf9bdb4939af4453",
+  "routes": [
+    {
+      "source": "Source/Graphics/SharpShader/",
+      "destination": "src/SharpShader/"
+    },
+    {
+      "source": "Engine/Source/Runtime/Graphics/SharpShader/",
+      "destination": "src/SharpShader/"
+    },
+    {
+      "source": "Engine/Source/Developer/Tools/SharpShader.CSharp.Generators/",
+      "destination": "tools/SharpShader.CSharp.Generators/"
+    },
+    {
+      "source": "Engine/Source/Programs/SharpShader.Tool/",
+      "destination": "tools/SharpShader.Tool/"
+    },
+    {
+      "source": "docs/SharpShader/",
+      "destination": "docs/SharpShader/"
+    }
+  ],
+  "verifiedCurrentFiles": 279,
+  "reachableCommits": 41,
+  "previousRemoteMain": "a00958b70f7c473588ecf7b4b672e966592d34f0",
+  "adoptedCommit": "523a84292db327a55c1c794eae0e063e855da215",
+  "targetRepository": "https://github.com/haolange/SharpShader.git"
+}

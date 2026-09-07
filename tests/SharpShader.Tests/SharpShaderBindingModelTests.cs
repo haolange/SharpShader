@@ -3,7 +3,7 @@ using System.Linq;
 using SharpShader.Compilation;
 using Xunit;
 
-namespace Infinity.Rendering.Tests
+namespace SharpShader.Tests
 {
     public class SharpShaderBindingModelTests
     {
@@ -323,7 +323,8 @@ namespace Infinity.Rendering.Tests
         [Theory]
         [InlineData(0u)]
         [InlineData(1u)]
-        [InlineData(3u)]
+        [InlineData(2u)]
+        [InlineData(ShaderArtifactReflection.CurrentSchemaVersion + 1)]
         public void ArtifactReflection_ShouldRejectNonCurrentSchema(uint schemaVersion)
         {
             ShaderEntryPointReflection entry = new(

@@ -9,7 +9,7 @@ using System.Xml.Linq;
 using SharpShader.Tool;
 using Xunit;
 
-namespace Infinity.Rendering.Tests
+namespace SharpShader.Tests
 {
     public sealed class SharpShaderPackageValidationTests
     {
@@ -164,10 +164,7 @@ namespace Infinity.Rendering.Tests
             string repositoryRoot = ResolveRepositoryRoot();
             string projectPath = Path.Combine(
                 repositoryRoot,
-                "Engine",
-                "Source",
-                "Runtime",
-                "Graphics",
+                "src",
                 "SharpShader",
                 "SharpShader.csproj");
             AssertSharpShaderDependencyDirection(repositoryRoot, projectPath);
@@ -182,6 +179,7 @@ namespace Infinity.Rendering.Tests
                 };
             string packageOutput = Path.Combine(temporary.Path, "nupkg");
             Directory.CreateDirectory(packageOutput);
+            string isolatedProductRoot = Path.Combine(temporary.Path, "build");
             string packageVersionOverride =
                 $"0.0.0-w5-{Guid.NewGuid():N}";
             ProcessResult packResult = await RunDotnetAsync(
@@ -193,9 +191,12 @@ namespace Infinity.Rendering.Tests
                 "-c",
                 "Release",
                 $"-p:Platform={platform}",
+                "-p:StackReferenceMode=Source",
+                $"-p:StackProductRoot={isolatedProductRoot}",
+                $"-p:StackLocalProps={Path.Combine(repositoryRoot, "stack.local.props")}",
+                "-p:RestoreUseStaticGraphEvaluation=false",
                 "-p:NuGetAudit=false",
                 $"-p:PackageVersion={packageVersionOverride}",
-                "--no-restore",
                 "-o",
                 packageOutput);
             AssertProcessSucceeded("SharpShader dotnet pack", packResult);
@@ -370,11 +371,7 @@ namespace Infinity.Rendering.Tests
             ProcessResult runResult = await RunDotnetAsync(
                 consumerDirectory,
                 TimeSpan.FromMinutes(2),
-                Path.Combine(
-                    repositoryRoot,
-                    "Engine",
-                    "Binaries",
-                    "ThirdParty"),
+                null,
                 "run",
                 "--project",
                 consumerProjectPath,
@@ -394,18 +391,15 @@ namespace Infinity.Rendering.Tests
             string repositoryRoot,
             string sharpShaderProjectPath)
         {
-            string graphicsRoot = Path.Combine(
-                repositoryRoot,
-                "Engine",
-                "Source",
-                "Runtime",
-                "Graphics");
             string sharpGpuProjectPath = Path.Combine(
-                graphicsRoot,
+                Directory.GetParent(repositoryRoot)!.FullName,
+                "SharpGPU",
+                "src",
                 "SharpGPU",
                 "SharpGPU.csproj");
             string adapterProjectPath = Path.Combine(
-                graphicsRoot,
+                repositoryRoot,
+                "src",
                 "SharpShader",
                 "SharpGPU",
                 "SharpShader.SharpGPU.csproj");
@@ -575,21 +569,44 @@ namespace Infinity.Rendering.Tests
             string StandardError);
         private static string ResolveRepositoryRoot()
         {
-            DirectoryInfo? current = new(AppContext.BaseDirectory);
-            while (current is not null)
+            string? configured = Environment.GetEnvironmentVariable(
+                "INFINITYSTACK_SHARPSHADER_ROOT");
+            if (!string.IsNullOrWhiteSpace(configured))
             {
+                string configuredRoot = Path.GetFullPath(configured);
                 if (File.Exists(Path.Combine(
-                        current.FullName,
-                        "InfinityBrowser.sln")))
+                        configuredRoot,
+                        "SharpShader.product.props")))
                 {
-                    return current.FullName;
+                    return configuredRoot;
                 }
 
-                current = current.Parent;
+                throw new InvalidOperationException(
+                    $"INFINITYSTACK_SHARPSHADER_ROOT does not point to a SharpShader checkout: '{configuredRoot}'.");
+            }
+
+            foreach (string startPath in new[]
+            {
+                AppContext.BaseDirectory,
+                Environment.CurrentDirectory,
+            })
+            {
+                DirectoryInfo? current = new(startPath);
+                while (current is not null)
+                {
+                    if (File.Exists(Path.Combine(
+                            current.FullName,
+                            "SharpShader.product.props")))
+                    {
+                        return current.FullName;
+                    }
+
+                    current = current.Parent;
+                }
             }
 
             throw new InvalidOperationException(
-                "Unable to resolve repository root.");
+                "Unable to resolve repository root. Set INFINITYSTACK_SHARPSHADER_ROOT to the SharpShader checkout.");
         }
         private static string ResolveGlobalNuGetPackagesFolder()
         {

@@ -1,0 +1,18 @@
+<Project>
+  <PropertyGroup>
+    <SharpShaderCoreRoot>$(MSBuildThisFileDirectory)../src/SharpShader/</SharpShaderCoreRoot>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="$(SharpShaderCoreRoot)**/*.cs"
+             Exclude="$(SharpShaderCoreRoot)CSharp/**/*.cs;$(SharpShaderCoreRoot)SharpGPU/**/*.cs;$(SharpShaderCoreRoot)**/obj/**/*.cs;$(SharpShaderCoreRoot)**/bin/**/*.cs" />
+    <Compile Update="$(SharpShaderCoreRoot)Shaderlab/Frontend/Generated/**/*.cs" AutoGen="true" DesignTime="true" />
+    <PackageReference Include="Antlr4.Runtime.Standard" Version="4.13.1" />
+    <PackageReference Include="Silk.NET.Direct3D12" Version="2.23.0" />
+    <PackageReference Include="Silk.NET.Direct3D.Compilers" Version="2.23.0" />
+    <PackageReference Include="Silk.NET.SPIRV.Cross" Version="2.23.0" />
+    <Content Include="$(SharpShaderCoreRoot)Includes/AttachmentABI.hlsl"
+             Link="Includes/AttachmentABI.hlsl" CopyToOutputDirectory="PreserveNewest"
+             Pack="true" PackagePath="contentFiles/any/any/SharpShader/Includes/AttachmentABI.hlsl"
+             PackageCopyToOutput="true" />
+  </ItemGroup>
+</Project>

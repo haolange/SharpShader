@@ -12,7 +12,7 @@ using SharpShader.HLSLCrossCompiler;
 using SharpShader.HLSLCrossCompiler.Internal;
 using Xunit;
 
-namespace Infinity.Rendering.Tests
+namespace SharpShader.Internal.Tests
 {
     public sealed class ShaderProgramCompilerTests
     {
@@ -329,7 +329,7 @@ namespace Infinity.Rendering.Tests
                 request =>
                 {
                     Interlocked.Increment(ref invocationCount);
-                    return HLSLCrossCompiler.Compile(request);
+                    return global::SharpShader.HLSLCrossCompiler.HLSLCrossCompiler.Compile(request);
                 });
             ShaderProgramCompileRequest request = CreateComputeRequest(
                 "RWStructuredBuffer<uint> Output : register(u0); "
@@ -364,7 +364,7 @@ namespace Infinity.Rendering.Tests
                             "Timed out waiting to release the injected native compiler.");
                     }
 
-                    return HLSLCrossCompiler.Compile(request);
+                    return global::SharpShader.HLSLCrossCompiler.HLSLCrossCompiler.Compile(request);
                 });
             ShaderProgramCompileRequest request = CreateComputeRequest(
                 "RWStructuredBuffer<uint> Output : register(u0); "
@@ -460,7 +460,7 @@ namespace Infinity.Rendering.Tests
                             "Timed out waiting to release the injected native compiler.");
                     }
 
-                    return HLSLCrossCompiler.Compile(nativeRequest);
+                    return global::SharpShader.HLSLCrossCompiler.HLSLCrossCompiler.Compile(nativeRequest);
                 });
 
             Task<ShaderProgramCompilation> compilation = compiler.CompileAsync(request);
@@ -517,7 +517,7 @@ namespace Infinity.Rendering.Tests
                 spirvOptions: new SpirvCompileOptions(),
                 mslOptions: mslOptions);
             ShaderProgramCompilation expected =
-                CreateCountingCompiler(HLSLCrossCompiler.Compile)
+                CreateCountingCompiler(global::SharpShader.HLSLCrossCompiler.HLSLCrossCompiler.Compile)
                     .Compile(baselineRequest);
 
             Assert.Equal(2, Volatile.Read(ref invocationCount));
@@ -545,7 +545,7 @@ namespace Infinity.Rendering.Tests
                 nativeRequest =>
                 {
                     Interlocked.Increment(ref coldInvocationCount);
-                    return HLSLCrossCompiler.Compile(nativeRequest);
+                    return global::SharpShader.HLSLCrossCompiler.HLSLCrossCompiler.Compile(nativeRequest);
                 },
                 directory.Path,
                 preprocess: (nativeRequest, limits) =>
@@ -597,7 +597,7 @@ namespace Infinity.Rendering.Tests
                 nativeRequest =>
                 {
                     Interlocked.Increment(ref invocationCount);
-                    return HLSLCrossCompiler.Compile(nativeRequest);
+                    return global::SharpShader.HLSLCrossCompiler.HLSLCrossCompiler.Compile(nativeRequest);
                 },
                 cacheLimits: limits);
             ShaderProgramCompileRequest first = CreateComputeRequest(
@@ -643,7 +643,7 @@ namespace Infinity.Rendering.Tests
                 nativeRequest =>
                 {
                     Interlocked.Increment(ref compileCount);
-                    return HLSLCrossCompiler.Compile(nativeRequest);
+                    return global::SharpShader.HLSLCrossCompiler.HLSLCrossCompiler.Compile(nativeRequest);
                 },
                 cacheLimits: limits,
                 preprocess: (nativeRequest, captureLimits) =>
@@ -702,7 +702,7 @@ namespace Infinity.Rendering.Tests
                 ShaderProgramTarget.DirectX12,
                 "corrupt-cache.hlsl");
             ShaderProgramCompilation initial = CreateCountingCompiler(
-                HLSLCrossCompiler.Compile,
+                global::SharpShader.HLSLCrossCompiler.HLSLCrossCompiler.Compile,
                 directory.Path).Compile(request);
             string cachePath = Directory
                 .EnumerateFiles(
@@ -717,7 +717,7 @@ namespace Infinity.Rendering.Tests
                 nativeRequest =>
                 {
                     Interlocked.Increment(ref rebuildCount);
-                    return HLSLCrossCompiler.Compile(nativeRequest);
+                    return global::SharpShader.HLSLCrossCompiler.HLSLCrossCompiler.Compile(nativeRequest);
                 },
                 directory.Path).Compile(request);
 
@@ -783,7 +783,7 @@ namespace Infinity.Rendering.Tests
             ShaderCompileResult CompileAndSynchronize(
                 ShaderCompileRequest nativeRequest)
             {
-                ShaderCompileResult result = HLSLCrossCompiler.Compile(nativeRequest);
+                ShaderCompileResult result = global::SharpShader.HLSLCrossCompiler.HLSLCrossCompiler.Compile(nativeRequest);
                 Interlocked.Increment(ref nativeInvocationCount);
                 if (!publishBarrier.SignalAndWait(TimeSpan.FromSeconds(20)))
                 {
@@ -810,7 +810,7 @@ namespace Infinity.Rendering.Tests
                             "injected retryable failure");
                     }
 
-                    return HLSLCrossCompiler.Compile(request);
+                    return global::SharpShader.HLSLCrossCompiler.HLSLCrossCompiler.Compile(request);
                 });
             ShaderProgramCompileRequest request = CreateComputeRequest(
                 "RWStructuredBuffer<uint> Output : register(u0); "
@@ -879,14 +879,14 @@ namespace Infinity.Rendering.Tests
                 request =>
                 {
                     Interlocked.Increment(ref leftNativeCount);
-                    return HLSLCrossCompiler.Compile(request);
+                    return global::SharpShader.HLSLCrossCompiler.HLSLCrossCompiler.Compile(request);
                 });
             int rightNativeCount = 0;
             ShaderProgramCompiler rightCompiler = CreateCountingCompiler(
                 request =>
                 {
                     Interlocked.Increment(ref rightNativeCount);
-                    return HLSLCrossCompiler.Compile(request);
+                    return global::SharpShader.HLSLCrossCompiler.HLSLCrossCompiler.Compile(request);
                 });
 
             ShaderProgramCompilation left = leftCompiler.Compile(first);
@@ -938,7 +938,7 @@ namespace Infinity.Rendering.Tests
                 nativeRequest =>
                 {
                     Interlocked.Increment(ref invocationCount);
-                    return HLSLCrossCompiler.Compile(nativeRequest);
+                    return global::SharpShader.HLSLCrossCompiler.HLSLCrossCompiler.Compile(nativeRequest);
                 });
             string first = compiler.Compile(request).CacheKey;
 
@@ -995,7 +995,7 @@ namespace Infinity.Rendering.Tests
                             "Timed out waiting to release the injected native compiler.");
                     }
 
-                    return HLSLCrossCompiler.Compile(nativeRequest);
+                    return global::SharpShader.HLSLCrossCompiler.HLSLCrossCompiler.Compile(nativeRequest);
                 });
 
             Task<ShaderProgramCompilation> firstAttempt =
@@ -1080,7 +1080,7 @@ namespace Infinity.Rendering.Tests
                     nativeRequest =>
                     {
                         Interlocked.Increment(ref nativeInvocationCount);
-                        return HLSLCrossCompiler.Compile(nativeRequest);
+                        return global::SharpShader.HLSLCrossCompiler.HLSLCrossCompiler.Compile(nativeRequest);
                     },
                     cacheDirectory.Path);
 
@@ -1128,7 +1128,7 @@ namespace Infinity.Rendering.Tests
                 nativeRequest =>
                 {
                     Interlocked.Increment(ref compileCount);
-                    return HLSLCrossCompiler.Compile(nativeRequest);
+                    return global::SharpShader.HLSLCrossCompiler.HLSLCrossCompiler.Compile(nativeRequest);
                 },
                 cacheDirectory.Path,
                 preprocess: (nativeRequest, limits) =>
@@ -1218,7 +1218,7 @@ namespace Infinity.Rendering.Tests
                 nativeRequest =>
                 {
                     Interlocked.Increment(ref invocationCount);
-                    return HLSLCrossCompiler.Compile(nativeRequest);
+                    return global::SharpShader.HLSLCrossCompiler.HLSLCrossCompiler.Compile(nativeRequest);
                 });
 
             foreach (MslCompileOptions mslOptions in options)
@@ -1267,7 +1267,7 @@ namespace Infinity.Rendering.Tests
                 nativeRequest =>
                 {
                     Interlocked.Increment(ref invocationCount);
-                    return HLSLCrossCompiler.Compile(nativeRequest);
+                    return global::SharpShader.HLSLCrossCompiler.HLSLCrossCompiler.Compile(nativeRequest);
                 });
 
             foreach (SpirvCompileOptions spirvOptions in options)

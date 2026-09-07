@@ -5,7 +5,7 @@ using SharpShader.Compilation;
 using SharpShader.Tool;
 using Xunit;
 
-namespace Infinity.Rendering.Tests
+namespace SharpShader.Tests
 {
     public sealed class SharpShaderCliTests
     {

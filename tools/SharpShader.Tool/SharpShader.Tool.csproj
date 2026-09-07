@@ -16,8 +16,22 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\Runtime\Graphics\SharpShader\SharpShader.csproj" />
-    <ProjectReference Include="..\..\Runtime\Graphics\SharpShader\CSharp\SharpShader.CSharp.csproj" />
+    <InternalsVisibleTo Include="Infinity.Rendering.Tests" />
+    <ProjectReference Include="../../src/SharpShader/SharpShader.csproj" Condition="'$(StackReferenceMode)' == 'Source'" />
+    <ProjectReference Include="../../src/SharpShader/CSharp/SharpShader.CSharp.csproj" Condition="'$(StackReferenceMode)' == 'Source'" />
   </ItemGroup>
 
+
+  <PropertyGroup><Version>$(StackPackageVersion)</Version><RepositoryUrl>https://github.com/haolange/SharpShader</RepositoryUrl></PropertyGroup>
+  <PropertyGroup>
+    <PackageId>SharpShader.Tool</PackageId>
+    <PackageLicenseExpression>MPL-2.0</PackageLicenseExpression>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="SharpShader" Version="$(StackPackageVersion)" Condition="'$(StackReferenceMode)' == 'Package'" />
+    <PackageReference Include="SharpShader.CSharp" Version="$(StackPackageVersion)" Condition="'$(StackReferenceMode)' == 'Package'" />
+    <None Include="../../README.md" Pack="true" PackagePath="README.md" Visible="false" />
+    <None Include="../../LICENSE" Pack="true" PackagePath="/" Visible="false" />
+  </ItemGroup>
 </Project>

@@ -1,0 +1,23 @@
+{
+  "sourceCommit": "7689191334cf562bd34d4a420149bde12e8b66b6",
+  "sourcePaths": [
+    "Engine/Source/Developer/Tests/Infinity.Rendering.Tests/CSharpShaderSources.cs",
+    "Engine/Source/Developer/Tests/Infinity.Rendering.Tests/CSharpShaderBaselineTests.cs",
+    "Engine/Source/Developer/Tests/Infinity.Rendering.Tests/CSharpShaderFrontendTests.cs",
+    "Engine/Source/Developer/Tests/Infinity.Rendering.Tests/CSharpShaderGeneratorTests.cs",
+    "Engine/Source/Developer/Tests/Infinity.Rendering.Tests/CSharpShaderLibLayoutTests.cs",
+    "Engine/Source/Developer/Tests/Infinity.Rendering.Tests/CSharpShaderCompilerTests.cs",
+    "Engine/Source/Developer/Tests/Infinity.Rendering.Tests/ShaderBackendLayoutPlannerTests.cs",
+    "Engine/Source/Developer/Tests/Infinity.Rendering.Tests/ShaderInterfaceManifestTests.cs",
+    "Engine/Source/Developer/Tests/Infinity.Rendering.Tests/SharpNeuralGeneralShaderCompileTests.cs",
+    "Engine/Source/Developer/Tests/Infinity.Rendering.Tests/SharpShaderBindingModelTests.cs",
+    "Engine/Source/Developer/Tests/Infinity.Rendering.Tests/SharpGpuShaderInterfaceAdapterTests.cs",
+    "Engine/Source/Developer/Tests/Infinity.Rendering.Tests/SharpGpuShaderInterfaceManifestAdapterTests.cs",
+    "Engine/Source/Developer/Tests/Infinity.Rendering.Tests/SharpGpuWaveAndCooperativeMatrixAdapterTests.cs"
+  ],
+  "destination": "tests/SharpShader.Tests/",
+  "previousHead": "523a84292db327a55c1c794eae0e063e855da215",
+  "extractedCommit": "027ac90b3e807971b9d7782ba98d58bf11c621c9",
+  "mergeCommit": "cd615ad8230edf81c34f07bcd4fbfbe4da4a8a01",
+  "verifiedCurrentFiles": 13
+}

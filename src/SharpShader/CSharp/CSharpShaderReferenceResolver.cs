@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using Infinity.Mathmatics;
+using SharpMath;
 using SharpShader.CSharp.ShaderLib;
 
 namespace SharpShader.CSharp

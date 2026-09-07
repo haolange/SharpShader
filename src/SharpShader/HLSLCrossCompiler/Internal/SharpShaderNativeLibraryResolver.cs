@@ -310,60 +310,18 @@ namespace SharpShader.HLSLCrossCompiler.Internal
 
     internal static class SharpShaderNativeLibraryLayout
     {
-        public const string ThirdPartyNativeRootEnvironmentVariableName =
-            "INFINITY_THIRDPARTY_NATIVE_ROOT";
-
-        private const string ThirdPartyVendorRootName = "Microsoft";
-        private const string ThirdPartyRootName = "DXC";
-
         private enum NativeLibraryKey
         {
             Dxc,
         }
 
-        public static IEnumerable<string> EnumerateLibraryCandidates(
-            string libraryName,
-            Assembly assembly)
+        public static IEnumerable<string> EnumerateLibraryCandidates(string libraryName, Assembly assembly)
         {
-            if (!TryResolveLibraryKey(libraryName, out NativeLibraryKey key))
+            ArgumentNullException.ThrowIfNull(assembly);
+            if (TryResolveLibraryKey(libraryName, out NativeLibraryKey key)
+                && ResolvePlatformNativeFileName(key) is string fileName)
             {
-                yield break;
-            }
-
-            string? nativeFileName = ResolvePlatformNativeFileName(key);
-            if (string.IsNullOrWhiteSpace(nativeFileName))
-            {
-                yield break;
-            }
-
-            string baseDirectory = AppContext.BaseDirectory;
-            string assemblyDirectory =
-                Path.GetDirectoryName(assembly.Location) ?? baseDirectory;
-            string? osFolder = ResolveBuildOsFolder();
-            string? archFolder = ResolveBuildArchFolder();
-            if (string.IsNullOrWhiteSpace(osFolder)
-                || string.IsNullOrWhiteSpace(archFolder))
-            {
-                yield break;
-            }
-
-            HashSet<string> emitted = new(StringComparer.OrdinalIgnoreCase);
-            foreach (string thirdPartyNativeRoot in
-                     EnumerateThirdPartyNativeRoots(baseDirectory, assemblyDirectory))
-            {
-                string thirdPartyCandidate = Path.Combine(
-                    thirdPartyNativeRoot,
-                    ThirdPartyVendorRootName,
-                    ThirdPartyRootName,
-                    osFolder,
-                    archFolder,
-                    nativeFileName);
-
-                string canonicalCandidate = Path.GetFullPath(thirdPartyCandidate);
-                if (emitted.Add(canonicalCandidate))
-                {
-                    yield return canonicalCandidate;
-                }
+                yield return SharpShaderNativeLibraries.Resolve(true, fileName);
             }
         }
 
@@ -385,122 +343,6 @@ namespace SharpShader.HLSLCrossCompiler.Internal
         public static bool IsDxcLibraryName(string libraryName)
         {
             return TryResolveLibraryKey(libraryName, out _);
-        }
-
-        private static IEnumerable<string> EnumerateThirdPartyNativeRoots(
-            params string[] locations)
-        {
-            string? configuredRoot = Environment.GetEnvironmentVariable(
-                ThirdPartyNativeRootEnvironmentVariableName);
-            if (!string.IsNullOrWhiteSpace(configuredRoot))
-            {
-                yield return Path.GetFullPath(configuredRoot.Trim());
-                yield break;
-            }
-
-            foreach (string binariesRoot in EnumerateCanonicalBinariesRoots(locations))
-            {
-                yield return Path.Combine(binariesRoot, "ThirdParty");
-            }
-        }
-
-        private static IEnumerable<string> EnumerateCanonicalBinariesRoots(
-            params string[] locations)
-        {
-            HashSet<string> emitted = new(StringComparer.OrdinalIgnoreCase);
-            string marker =
-                $"{Path.DirectorySeparatorChar}Binaries{Path.DirectorySeparatorChar}";
-
-            foreach (string location in locations)
-            {
-                string fullPath;
-                try
-                {
-                    fullPath = Path.GetFullPath(location);
-                }
-                catch (Exception ex) when (
-                    ex is ArgumentException
-                    or NotSupportedException
-                    or PathTooLongException)
-                {
-                    continue;
-                }
-
-                string normalized = fullPath.TrimEnd(
-                    Path.DirectorySeparatorChar,
-                    Path.AltDirectorySeparatorChar)
-                    + Path.DirectorySeparatorChar;
-                int markerIndex = normalized.IndexOf(
-                    marker,
-                    StringComparison.OrdinalIgnoreCase);
-                if (markerIndex >= 0)
-                {
-                    string binariesRoot = normalized.Substring(
-                        0,
-                        markerIndex + marker.Length - 1);
-                    if (emitted.Add(binariesRoot))
-                    {
-                        yield return binariesRoot;
-                    }
-                }
-
-                foreach (string ancestorRoot in EnumerateAncestorBinariesRoots(fullPath))
-                {
-                    if (emitted.Add(ancestorRoot))
-                    {
-                        yield return ancestorRoot;
-                    }
-                }
-            }
-        }
-
-        private static IEnumerable<string> EnumerateAncestorBinariesRoots(string location)
-        {
-            DirectoryInfo? current = Directory.Exists(location)
-                ? new DirectoryInfo(location)
-                : Directory.GetParent(location);
-            while (current is not null)
-            {
-                string binariesRoot = Path.Combine(current.FullName, "Binaries");
-                if (Directory.Exists(
-                    Path.Combine(binariesRoot, "ThirdParty", "Microsoft", "DXC")))
-                {
-                    yield return Path.GetFullPath(binariesRoot);
-                    yield break;
-                }
-
-                current = current.Parent;
-            }
-        }
-
-        private static string? ResolveBuildOsFolder()
-        {
-            if (OperatingSystem.IsWindows())
-            {
-                return "Win";
-            }
-
-            if (OperatingSystem.IsLinux())
-            {
-                return "Linux";
-            }
-
-            if (OperatingSystem.IsMacOS())
-            {
-                return "macOS";
-            }
-
-            return null;
-        }
-
-        private static string? ResolveBuildArchFolder()
-        {
-            return RuntimeInformation.ProcessArchitecture switch
-            {
-                Architecture.X64 => "AMD64",
-                Architecture.Arm64 => "ARM64",
-                _ => null,
-            };
         }
 
         private static bool TryResolveLibraryKey(

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Collections.ObjectModel;
 using SharpShader.HLSLCrossCompiler;
 
@@ -17,6 +18,8 @@ namespace SharpShader.Compilation
 
         public string Source { get; }
         public string SourceName { get; }
+        /// <summary>Stable resource identity used by artifact caches, independent of checkout paths.</summary>
+        public string SourceIdentity { get; }
         public IReadOnlyList<ShaderProgramEntry> Entries => m_Entries;
         public IReadOnlyList<ShaderProgramVariant> Variants => m_Variants;
         public IReadOnlyList<ShaderDefine> GlobalDefines => m_GlobalDefines;
@@ -52,9 +55,11 @@ namespace SharpShader.Compilation
             int optimizationLevel = 3,
             bool skipValidation = false,
             bool treatWarningsAsErrors = false,
-            IEnumerable<ShaderAttachmentInterface>? attachmentInterfaces = null)
+            IEnumerable<ShaderAttachmentInterface>? attachmentInterfaces = null,
+            string? sourceIdentity = null)
         {
             ArgumentNullException.ThrowIfNull(source);
+            ArgumentException.ThrowIfNullOrWhiteSpace(sourceName);
             ArgumentNullException.ThrowIfNull(entries);
             ArgumentNullException.ThrowIfNull(variants);
 
@@ -90,6 +95,15 @@ namespace SharpShader.Compilation
 
             Source = source;
             SourceName = sourceName;
+            SourceIdentity = (sourceIdentity ?? (System.IO.Path.IsPathRooted(sourceName)
+                ? System.IO.Path.GetFileName(sourceName)
+                : sourceName)).Replace('\\', '/');
+            if (string.IsNullOrWhiteSpace(SourceIdentity) || SourceIdentity.StartsWith('/')
+                || (SourceIdentity.Length >= 2 && char.IsAsciiLetter(SourceIdentity[0]) && SourceIdentity[1] == ':')
+                || SourceIdentity.Any(char.IsControl))
+            {
+                throw new ArgumentException("Source identity must be a non-empty logical resource name.", nameof(sourceIdentity));
+            }
             m_Entries = Array.AsReadOnly(entryCopy);
             m_Variants = Array.AsReadOnly(variantCopy);
             m_GlobalDefines = Array.AsReadOnly(globalDefineCopy);

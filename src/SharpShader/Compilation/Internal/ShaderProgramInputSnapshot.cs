@@ -7,6 +7,7 @@ using System.Linq;
 using System.Reflection;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.RegularExpressions;
 using SharpShader.HLSLCrossCompiler;
 using SharpShader.HLSLCrossCompiler.Internal;
 
@@ -26,6 +27,11 @@ namespace SharpShader.Compilation.Internal
     internal sealed class ShaderProgramInputSnapshot
     {
         private static readonly UTF8Encoding s_StrictUtf8 = new(false, true);
+
+        private static readonly Regex s_LineDirective = new(
+            @"^(?<prefix>[^\S\r\n]*#[^\S\r\n]*(?:line[^\S\r\n]+)?[0-9]+[^\S\r\n]+"")(?<path>[^""\r\n]+)(?<suffix>""[^\r\n]*)$",
+            RegexOptions.Multiline | RegexOptions.CultureInvariant,
+            TimeSpan.FromSeconds(1));
 
         private readonly ShaderProgramCacheLimits m_Limits;
         private readonly bool m_IncludeSourceDirectoryTopology;
@@ -93,7 +99,8 @@ namespace SharpShader.Compilation.Internal
                 preprocessed));
             return request with
             {
-                Source = preprocessed.Source,
+                Source = NormalizeLineDirectives(preprocessed.Source),
+                SourceName = Request.SourceIdentity,
                 Defines = Array.Empty<ShaderDefine>(),
                 IncludeDirs = Array.Empty<string>(),
             };
@@ -117,7 +124,9 @@ namespace SharpShader.Compilation.Internal
             Array.Sort(units, static (left, right) =>
                 CompareCompileUnitIdentities(left.Identity, right.Identity));
             string sourceDigest = ComputeFrozenSourceDigest(units);
-            string finalKey = ComputeFinalKey(ProvisionalKey, sourceDigest);
+            string finalKey = ComputeFinalKey(
+                ComputeRequestKey(Request, IncludeDirectories, ToolchainComponents, portable: true),
+                sourceDigest);
             ShaderProgramDependencySnapshot dependencies =
                 ShaderProgramDependencySnapshot.Create(
                     ProvisionalKey,
@@ -164,10 +173,11 @@ namespace SharpShader.Compilation.Internal
                 string.CompareOrdinal(left?.Name, right?.Name));
             ValidateToolchain(toolchainCopy);
 
-            string provisionalKey = ComputeProvisionalKey(
+            string provisionalKey = ComputeRequestKey(
                 normalizedRequest,
                 includeDirectories,
-                toolchainCopy);
+                toolchainCopy,
+                portable: false);
             return new ShaderProgramInputSnapshot(
                 normalizedRequest,
                 Array.AsReadOnly(includeDirectories),
@@ -546,7 +556,8 @@ namespace SharpShader.Compilation.Internal
                 request.OptimizationLevel,
                 request.SkipValidation,
                 request.TreatWarningsAsErrors,
-                request.AttachmentInterfaces);
+                request.AttachmentInterfaces,
+                request.SourceIdentity);
         }
 
         private void EnsureInitialTopologyCapture()
@@ -601,12 +612,13 @@ namespace SharpShader.Compilation.Internal
                     right.EntryIdentity);
         }
 
-        private static string ComputeFrozenSourceDigest(
+        private string ComputeFrozenSourceDigest(
             IReadOnlyList<ShaderProgramFrozenCompileUnit> units)
         {
             using IncrementalHash hash =
                 IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
-            AppendString(hash, "SharpShader.FrozenSource.v2");
+            AppendString(hash, "SharpShader.FrozenSource");
+            AppendInt32(hash, 3);
             AppendUInt64(hash, checked((ulong)units.Count));
             foreach (ShaderProgramFrozenCompileUnit unit in units)
             {
@@ -614,16 +626,18 @@ namespace SharpShader.Compilation.Internal
                 AppendInt32(hash, (int)unit.Identity.Target);
                 AppendInt32(hash, (int)unit.Identity.Stage);
                 AppendString(hash, unit.Identity.EntryIdentity);
-                AppendContent(hash, unit.PreprocessedSource.CopyContent());
-                AppendUInt64(
-                    hash,
-                    checked((ulong)unit.PreprocessedSource.Includes.Count));
-                foreach (DxcCapturedInclude include in
-                         unit.PreprocessedSource.Includes)
+                AppendString(hash, NormalizeLineDirectives(unit.PreprocessedSource.Source));
+                DxcCapturedInclude[] includes = unit.PreprocessedSource.Includes
+                    .Where(include => !string.Equals(NormalizeHashPath(include.RequestedPath),
+                        NormalizeHashPath(Request.SourceName), OperatingSystem.IsWindows()
+                            ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal))
+                    .ToArray();
+                AppendUInt64(hash, checked((ulong)includes.Length));
+                foreach (DxcCapturedInclude include in includes)
                 {
                     AppendString(
                         hash,
-                        NormalizeHashPath(include.RequestedPath));
+                        LogicalDependencyName(include.RequestedPath));
                     AppendContent(hash, include.CopyContent());
                 }
             }
@@ -632,13 +646,14 @@ namespace SharpShader.Compilation.Internal
         }
 
         private static string ComputeFinalKey(
-            string provisionalKey,
+            string requestKey,
             string sourceDigest)
         {
             using IncrementalHash hash =
                 IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
-            AppendString(hash, "SharpShader.ProgramCache.v3.Final");
-            AppendString(hash, provisionalKey);
+            AppendString(hash, "SharpShader.ProgramCache.Final");
+            AppendInt32(hash, 4);
+            AppendString(hash, requestKey);
             AppendString(hash, sourceDigest);
             return Convert.ToHexStringLower(hash.GetHashAndReset());
         }
@@ -649,6 +664,80 @@ namespace SharpShader.Compilation.Internal
         {
             AppendUInt64(hash, checked((ulong)content.LongLength));
             hash.AppendData(content);
+        }
+
+        private string NormalizeLineDirectives(string source)
+        {
+            // File names used as shader data (for example __FILE__) remain observable.
+            // Only compiler line directives are remapped to logical resource names.
+            return s_LineDirective.Replace(source.Replace("\r\n", "\n", StringComparison.Ordinal), match =>
+                match.Groups["prefix"].Value
+                + LogicalDependencyName(DecodeLineFileName(match.Groups["path"].Value)).Replace("\"", "\\\"", StringComparison.Ordinal)
+                + match.Groups["suffix"].Value);
+        }
+
+        private static string DecodeLineFileName(string value)
+        {
+            // DXC follows C string escaping here, including octal UTF-8 bytes.
+            byte[] encoded = s_StrictUtf8.GetBytes(value);
+            byte[] decoded = new byte[encoded.Length];
+            int count = 0;
+            for (int index = 0; index < encoded.Length; index++)
+            {
+                byte current = encoded[index];
+                if (current == (byte)'\\' && index + 1 < encoded.Length)
+                {
+                    byte next = encoded[index + 1];
+                    if (next is >= (byte)'0' and <= (byte)'7')
+                    {
+                        int octal = 0;
+                        int digits = 0;
+                        while (index + 1 < encoded.Length && digits < 3
+                            && encoded[index + 1] is >= (byte)'0' and <= (byte)'7')
+                        {
+                            octal = octal * 8 + encoded[++index] - (byte)'0';
+                            digits++;
+                        }
+                        decoded[count++] = checked((byte)octal);
+                        continue;
+                    }
+                    if (next is (byte)'\\' or (byte)'"')
+                    {
+                        decoded[count++] = next;
+                        index++;
+                        continue;
+                    }
+                }
+                decoded[count++] = current;
+            }
+            return s_StrictUtf8.GetString(decoded.AsSpan(0, count));
+        }
+
+        private string LogicalDependencyName(string path)
+        {
+            string normalized = NormalizeHashPath(path);
+            StringComparison comparison = OperatingSystem.IsWindows()
+                ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
+            if (string.Equals(normalized, NormalizeHashPath(Request.SourceName), comparison))
+            {
+                return Request.SourceIdentity;
+            }
+            if (!Path.IsPathRooted(path)) return normalized;
+
+            string? sourceDirectory = Path.GetDirectoryName(Request.SourceName);
+            if (Path.IsPathRooted(Request.SourceName) && sourceDirectory is not null)
+            {
+                string prefix = NormalizeHashPath(sourceDirectory).TrimEnd('/') + "/";
+                if (normalized.StartsWith(prefix, comparison)) return "source/" + normalized[prefix.Length..];
+            }
+            for (int index = 0; index < IncludeDirectories.Count; index++)
+            {
+                string prefix = NormalizeHashPath(IncludeDirectories[index]).TrimEnd('/') + "/";
+                if (normalized.StartsWith(prefix, comparison)) return $"include/{index}/" + normalized[prefix.Length..];
+            }
+            // An explicit absolute include outside configured roots is still identified by
+            // its content in the digest; this mapping never participates in file resolution.
+            return "external/" + Path.GetFileName(path);
         }
 
         private static string NormalizeHashPath(string path)
@@ -732,15 +821,22 @@ namespace SharpShader.Compilation.Internal
             }
         }
 
-        private static string ComputeProvisionalKey(
+        private static string ComputeRequestKey(
             ShaderProgramCompileRequest request,
             IReadOnlyList<string> includeDirectories,
-            IReadOnlyList<ShaderToolchainComponent> components)
+            IReadOnlyList<ShaderToolchainComponent> components,
+            bool portable)
         {
             using IncrementalHash hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
-            AppendString(hash, "SharpShader.ProgramCache.v3.Provisional");
-            AppendString(hash, request.Source);
-            AppendString(hash, request.SourceName);
+            AppendString(hash, portable ? "SharpShader.ProgramCache.Resource" : "SharpShader.ProgramCache.Provisional");
+            AppendInt32(hash, 4);
+            AppendString(hash, request.SourceIdentity);
+            if (!portable)
+            {
+                AppendString(hash, request.Source);
+                AppendString(hash, request.SourceName);
+                AppendStrings(hash, includeDirectories);
+            }
             AppendUInt64(hash, (ulong)request.Targets);
             AppendInt32(hash, request.ShaderModel.Major);
             AppendInt32(hash, request.ShaderModel.Minor);
@@ -755,7 +851,6 @@ namespace SharpShader.Compilation.Internal
             AppendVariants(hash, request.Variants);
             AppendAttachmentInterfaces(hash, request.AttachmentInterfaces);
             AppendDefines(hash, request.GlobalDefines);
-            AppendStrings(hash, includeDirectories);
             AppendSpirvOptions(hash, request.SpirvOptions);
             AppendMslOptions(hash, request.MslOptions);
             AppendMetalCapacities(hash, request.MetalArrayCapacities);

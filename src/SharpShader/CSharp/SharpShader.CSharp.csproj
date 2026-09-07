@@ -15,14 +15,14 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\SharpShader.csproj" />
-    <ProjectReference Include="Frontend\SharpShader.CSharp.Frontend.csproj" />
-    <ProjectReference Include="ShaderLib\SharpShader.CSharp.ShaderLib.csproj" />
-    <ProjectReference Include="..\..\..\Core\Infinity.Core.csproj" />
+    <InternalsVisibleTo Include="Infinity.Rendering.Tests" />
+    <ProjectReference Include="../SharpShader.csproj" Condition="'$(StackReferenceMode)' == 'Source'" />
+    <ProjectReference Include="Frontend/SharpShader.CSharp.Frontend.csproj" Condition="'$(StackReferenceMode)' == 'Source'" />
+    <ProjectReference Include="ShaderLib/SharpShader.CSharp.ShaderLib.csproj" Condition="'$(StackReferenceMode)' == 'Source'" />
+    <ProjectReference Include="$(SharpMathRoot)/src/SharpMath/SharpMath.csproj"  Condition="'$(StackReferenceMode)' == 'Source'" StackProduct="SharpMath" StackRoot="$(SharpMathRoot)" />
   </ItemGroup>
 
   <ItemGroup>
-    <InternalsVisibleTo Include="Infinity.Rendering.Tests" />
   </ItemGroup>
 
   <ItemGroup>
@@ -30,4 +30,20 @@
     <Compile Remove="ShaderLib\**\*.cs" />
   </ItemGroup>
 
+
+  <PropertyGroup><Version>$(StackPackageVersion)</Version><RepositoryUrl>https://github.com/haolange/SharpShader</RepositoryUrl></PropertyGroup>
+  <PropertyGroup>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageLicenseExpression>MPL-2.0</PackageLicenseExpression>
+  </PropertyGroup>
+  <ItemGroup>
+    <None Include="../../../README.md" Pack="true" PackagePath="README.md" Visible="false" />
+    <None Include="../../../LICENSE" Pack="true" PackagePath="/" Visible="false" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="SharpShader" Version="$(StackPackageVersion)" Condition="'$(StackReferenceMode)' == 'Package'" />
+    <PackageReference Include="SharpShader.CSharp.Frontend" Version="$(StackPackageVersion)" Condition="'$(StackReferenceMode)' == 'Package'" />
+    <PackageReference Include="SharpShader.CSharp.ShaderLib" Version="$(StackPackageVersion)" Condition="'$(StackReferenceMode)' == 'Package'" />
+    <PackageReference Include="SharpMath" Version="$(StackPackageVersion)" Condition="'$(StackReferenceMode)' == 'Package'" />
+  </ItemGroup>
 </Project>

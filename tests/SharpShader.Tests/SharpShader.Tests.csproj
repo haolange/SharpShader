@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><TargetFramework>net10.0</TargetFramework><IsPackable>false</IsPackable><Nullable>enable</Nullable><ImplicitUsings>enable</ImplicitUsings></PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../../tools/SharpShader.Tool/**/*.cs" Exclude="../../tools/SharpShader.Tool/Program.cs;../../tools/SharpShader.Tool/**/obj/**/*.cs;../../tools/SharpShader.Tool/**/bin/**/*.cs" />
+    <ProjectReference Include="../../src/SharpShader/SharpShader.csproj" Condition="'$(StackReferenceMode)' == 'Source'" />
+    <ProjectReference Include="../../src/SharpShader/CSharp/SharpShader.CSharp.csproj" Condition="'$(StackReferenceMode)' == 'Source'" />
+    <ProjectReference Include="../../src/SharpShader/SharpGPU/SharpShader.SharpGPU.csproj" Condition="'$(StackReferenceMode)' == 'Source'" />
+    <ProjectReference Include="../../tools/SharpShader.CSharp.Generators/SharpShader.CSharp.Generators.csproj" Condition="'$(StackReferenceMode)' == 'Source'" />
+    <PackageReference Include="SharpShader" Version="$(StackPackageVersion)" Condition="'$(StackReferenceMode)' == 'Package'" />
+    <PackageReference Include="SharpShader.CSharp" Version="$(StackPackageVersion)" Condition="'$(StackReferenceMode)' == 'Package'" />
+    <PackageReference Include="SharpShader.SharpGPU" Version="$(StackPackageVersion)" Condition="'$(StackReferenceMode)' == 'Package'" />
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="5.6.0" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.12.0" />
+    <PackageReference Include="xunit" Version="2.9.2" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" PrivateAssets="all" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(StackReferenceMode)' == 'Package'">
+    <!-- The generator namespace is intentionally analyzer-only; its source API is
+         covered in Source mode, while Package mode validates the shipped analyzer
+         payload through the package manifest tests. -->
+    <Compile Remove="CSharpShaderGeneratorTests.cs" />
+  </ItemGroup>
+</Project>

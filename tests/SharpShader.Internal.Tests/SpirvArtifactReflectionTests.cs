@@ -6,7 +6,7 @@ using SharpShader.HLSLCrossCompiler;
 using Silk.NET.SPIRV;
 using Xunit;
 
-namespace Infinity.Rendering.Tests
+namespace SharpShader.Internal.Tests
 {
     public sealed class SpirvArtifactReflectionTests
     {
@@ -273,7 +273,7 @@ namespace Infinity.Rendering.Tests
             ShaderCompileRequest request = CreateComputeRequest(
                 source,
                 "spirv-missing-set-negative.hlsl");
-            ShaderCompileResult compiled = HLSLCrossCompiler.Compile(request);
+            ShaderCompileResult compiled = global::SharpShader.HLSLCrossCompiler.HLSLCrossCompiler.Compile(request);
             byte[] withoutDescriptorSets = RemoveDecorations(
                 compiled.Bytecode,
                 Decoration.DescriptorSet);
@@ -302,7 +302,7 @@ namespace Infinity.Rendering.Tests
             ShaderCompileRequest request = CreateComputeRequest(
                 source,
                 "spirv-compute-raster-builtin-negative.hlsl");
-            ShaderCompileResult compiled = HLSLCrossCompiler.Compile(request);
+            ShaderCompileResult compiled = global::SharpShader.HLSLCrossCompiler.HLSLCrossCompiler.Compile(request);
             byte[] withRasterBuiltIn = ReplaceBuiltIn(
                 compiled.Bytecode,
                 BuiltIn.GlobalInvocationId,
@@ -335,7 +335,7 @@ namespace Infinity.Rendering.Tests
             ShaderCompileRequest request = CreateComputeRequest(
                 source,
                 "spirv-compute-location-stage-io-negative.hlsl");
-            ShaderCompileResult compiled = HLSLCrossCompiler.Compile(request);
+            ShaderCompileResult compiled = global::SharpShader.HLSLCrossCompiler.HLSLCrossCompiler.Compile(request);
             byte[] withLocation = AddLocationDecorationToBuiltIn(
                 compiled.Bytecode,
                 BuiltIn.GlobalInvocationId);
@@ -389,7 +389,7 @@ namespace Infinity.Rendering.Tests
         {
             try
             {
-                ShaderCompileResult compiled = HLSLCrossCompiler.Compile(request);
+                ShaderCompileResult compiled = global::SharpShader.HLSLCrossCompiler.HLSLCrossCompiler.Compile(request);
                 Assert.NotEmpty(compiled.Bytecode);
                 return SpirvArtifactReflector.Reflect(
                     request,

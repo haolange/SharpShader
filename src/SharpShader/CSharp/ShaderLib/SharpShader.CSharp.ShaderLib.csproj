@@ -19,4 +19,14 @@
     <InternalsVisibleTo Include="Infinity.Rendering.Tests" />
   </ItemGroup>
 
+
+  <PropertyGroup><Version>$(StackPackageVersion)</Version><RepositoryUrl>https://github.com/haolange/SharpShader</RepositoryUrl></PropertyGroup>
+  <PropertyGroup>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageLicenseExpression>MPL-2.0</PackageLicenseExpression>
+  </PropertyGroup>
+  <ItemGroup>
+    <None Include="../../../../README.md" Pack="true" PackagePath="README.md" Visible="false" />
+    <None Include="../../../../LICENSE" Pack="true" PackagePath="/" Visible="false" />
+  </ItemGroup>
 </Project>

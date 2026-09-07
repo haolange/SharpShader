@@ -9,7 +9,7 @@ using SharpShader.HLSLCrossCompiler;
 using Silk.NET.SPIRV;
 using Xunit;
 
-namespace Infinity.Rendering.Tests
+namespace SharpShader.Internal.Tests
 {
     public sealed class SpirvBindingRemapperTests
     {
@@ -408,7 +408,7 @@ namespace Infinity.Rendering.Tests
         {
             try
             {
-                return HLSLCrossCompiler.Compile(request);
+                return global::SharpShader.HLSLCrossCompiler.HLSLCrossCompiler.Compile(request);
             }
             catch (ShaderCompilerException exception)
             {

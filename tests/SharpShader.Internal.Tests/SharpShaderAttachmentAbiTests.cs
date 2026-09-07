@@ -7,7 +7,7 @@ using SharpShader.HLSLCrossCompiler;
 using SharpShader.HLSLCrossCompiler.Internal;
 using Xunit;
 
-namespace Infinity.Rendering.Tests
+namespace SharpShader.Internal.Tests
 {
     public sealed class SharpShaderAttachmentAbiTests
     {
@@ -599,7 +599,7 @@ namespace Infinity.Rendering.Tests
             };
             try
             {
-                ShaderCompileResult compiled = HLSLCrossCompiler.Compile(
+                ShaderCompileResult compiled = global::SharpShader.HLSLCrossCompiler.HLSLCrossCompiler.Compile(
                     request);
                 return DxilArtifactReflector.Reflect(request, compiled);
             }
@@ -749,33 +749,15 @@ namespace Infinity.Rendering.Tests
 
         private static string ResolveIncludeDirectory()
         {
-            return Path.Combine(
-                ResolveRepositoryRoot(),
-                "Engine",
-                "Source",
-                "Runtime",
-                "Graphics",
-                "SharpShader",
-                "Includes");
-        }
-
-        private static string ResolveRepositoryRoot()
-        {
-            DirectoryInfo? current = new(AppContext.BaseDirectory);
-            while (current is not null)
+            string directory = Path.Combine(AppContext.BaseDirectory, "Includes");
+            if (!File.Exists(Path.Combine(directory, "AttachmentABI.hlsl")))
             {
-                if (File.Exists(Path.Combine(
-                        current.FullName,
-                        "InfinityBrowser.sln")))
-                {
-                    return current.FullName;
-                }
-
-                current = current.Parent;
+                throw new FileNotFoundException(
+                    "The internal harness did not receive the canonical AttachmentABI include.",
+                    Path.Combine(directory, "AttachmentABI.hlsl"));
             }
 
-            throw new InvalidOperationException(
-                "Unable to resolve repository root.");
+            return directory;
         }
     }
 }

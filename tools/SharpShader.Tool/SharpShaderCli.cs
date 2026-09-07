@@ -1,13 +1,11 @@
 using System.Globalization;
 using System.Security.Cryptography;
-using System.Runtime.CompilerServices;
 using System.Text;
 
 using SharpShader.Compilation;
 using SharpShader.CSharp;
 using SharpShader.HLSLCrossCompiler;
 
-[assembly: InternalsVisibleTo("Infinity.Rendering.Tests")]
 
 namespace SharpShader.Tool
 {
@@ -120,7 +118,8 @@ namespace SharpShader.Tool
                             variants: parsed.CreateVariantsForCSharp(),
                             enableDebugInfo: parsed.EnableDebugInfo,
                             disableOptimizations: parsed.DisableOptimizations,
-                            optimizationLevel: parsed.OptimizationLevel));
+                            optimizationLevel: parsed.OptimizationLevel),
+                        sourceIdentity: parsed.SourceIdentity);
                 return compilation.Primary.Program;
             }
 
@@ -155,6 +154,7 @@ namespace SharpShader.Tool
             writer.WriteLine("SharpShader.Tool inspect <package-directory|manifest.json>");
             writer.WriteLine("SharpShader.Tool validate <package-directory|manifest.json>");
             writer.WriteLine("Compile options:");
+            writer.WriteLine("  --source-identity <name>                Stable logical resource name; default: source file name.");
             writer.WriteLine("  --entry <stage>:<name>                 Repeat for every entry.");
             writer.WriteLine("  --target <dx12|vulkan|metal|all>[,...] Default: all.");
             writer.WriteLine("  --variant <key>                        Repeat for every variant; default: default.");

@@ -6,7 +6,7 @@ namespace SharpShader.CSharp.Frontend
 {
     internal static class CSharpShaderNameMap
     {
-        internal const string MathNamespace = "Infinity.Mathmatics";
+        internal const string MathNamespace = "SharpMath";
         internal const string ShaderLibNamespace = "SharpShader.CSharp.ShaderLib";
 
         internal static readonly Dictionary<string, string> MathTypes =

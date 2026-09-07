@@ -5,6 +5,7 @@ using System.Runtime.CompilerServices;
 using System.Runtime.ExceptionServices;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
+using System.Text;
 using System.Threading;
 using Silk.NET.Core.Native;
 using Silk.NET.Direct3D.Compilers;
@@ -64,7 +65,9 @@ namespace SharpShader.HLSLCrossCompiler.Internal
 
         public DxcDependencyCaptureIncludeHandler(
             ref ComPtr<IDxcIncludeHandler> defaultHandler,
-            DxcDependencyCaptureLimits limits)
+            DxcDependencyCaptureLimits? limits,
+            string sourceName,
+            ref ComPtr<IDxcBlobEncoding> sourceBlob)
         {
             if (defaultHandler.Handle == null)
             {
@@ -73,25 +76,41 @@ namespace SharpShader.HLSLCrossCompiler.Internal
                     nameof(defaultHandler));
             }
 
-            ComPtr<IDxcIncludeHandler> ownedDefaultHandler = defaultHandler;
-            defaultHandler = default;
-            m_State = new CaptureState(ownedDefaultHandler, limits);
-            GCHandle stateHandle = GCHandle.Alloc(m_State, GCHandleType.Normal);
-            IncludeHandlerInstance* instance =
-                (IncludeHandlerInstance*)NativeMemory.Alloc(
-                    (nuint)sizeof(IncludeHandlerInstance));
-            if (instance == null)
+            if (sourceBlob.Handle == null)
             {
-                stateHandle.Free();
-                m_State.Dispose();
-                throw new InvalidOperationException(
-                    "Failed to allocate the DXC dependency-capture include handler.");
+                throw new ArgumentException("The in-memory source blob must not be null.", nameof(sourceBlob));
             }
 
-            instance->Vtable = s_Vtable;
-            instance->StateHandle = GCHandle.ToIntPtr(stateHandle);
-            instance->ReferenceCount = 1;
-            m_Handler = new ComPtr<IDxcIncludeHandler>((IDxcIncludeHandler*)instance);
+            m_State = new CaptureState(defaultHandler, limits, sourceName, sourceBlob);
+            defaultHandler = default;
+            sourceBlob = default;
+            GCHandle stateHandle = default;
+            IncludeHandlerInstance* instance = null;
+            try
+            {
+                stateHandle = GCHandle.Alloc(m_State, GCHandleType.Normal);
+                instance = (IncludeHandlerInstance*)NativeMemory.Alloc((nuint)sizeof(IncludeHandlerInstance));
+                if (instance == null)
+                {
+                    throw new InvalidOperationException("Failed to allocate the DXC include handler.");
+                }
+
+                instance->Vtable = s_Vtable;
+                instance->StateHandle = GCHandle.ToIntPtr(stateHandle);
+                instance->ReferenceCount = 1;
+                m_Handler = new ComPtr<IDxcIncludeHandler>((IDxcIncludeHandler*)instance);
+            }
+            catch
+            {
+                NativeMemory.Free(instance);
+                if (stateHandle.IsAllocated)
+                {
+                    stateHandle.Free();
+                }
+
+                m_State.Dispose();
+                throw;
+            }
         }
 
         public IReadOnlyList<DxcCapturedInclude> CompleteCapture()
@@ -208,6 +227,14 @@ namespace SharpShader.HLSLCrossCompiler.Internal
             IDxcBlob* loaded = null;
             try
             {
+                string requestedPath = DecodeWideString(fileName);
+                // DXC may ask the include handler for its main file. The caller's
+                // in-memory source remains authoritative even when a disk file exists.
+                if (state.TryLoadMainSource(requestedPath, includeSource))
+                {
+                    return 0;
+                }
+
                 int result = state.DefaultHandler.Get().LoadSource(
                     fileName,
                     &loaded);
@@ -216,9 +243,6 @@ namespace SharpShader.HLSLCrossCompiler.Internal
                     return result < 0 ? result : EFail;
                 }
 
-                string requestedPath = Marshal.PtrToStringUni((nint)fileName)
-                    ?? throw new InvalidOperationException(
-                        "DXC supplied a null include path.");
                 nuint length = loaded->GetBufferSize();
                 if (length > int.MaxValue)
                 {
@@ -260,6 +284,22 @@ namespace SharpShader.HLSLCrossCompiler.Internal
             }
         }
 
+        private static string DecodeWideString(char* value)
+        {
+            if (OperatingSystem.IsWindows())
+            {
+                return new string(value);
+            }
+
+            StringBuilder result = new();
+            for (int* codePoint = (int*)value; *codePoint != 0; codePoint++)
+            {
+                result.Append(char.ConvertFromUtf32(*codePoint));
+            }
+
+            return result.ToString();
+        }
+
         private static bool IsPhysicalIncludeFile(string path)
         {
             return !string.IsNullOrWhiteSpace(path)
@@ -294,7 +334,9 @@ namespace SharpShader.HLSLCrossCompiler.Internal
             private readonly object m_Sync = new();
             private readonly Dictionary<string, DxcCapturedInclude> m_Captures;
             private ComPtr<IDxcIncludeHandler> m_DefaultHandler;
-            private readonly DxcDependencyCaptureLimits m_Limits;
+            private readonly DxcDependencyCaptureLimits? m_Limits;
+            private readonly string m_SourceName;
+            private ComPtr<IDxcBlobEncoding> m_SourceBlob;
             private ExceptionDispatchInfo? m_CallbackFailure;
             private long m_TotalBytes;
             private bool m_Disposed;
@@ -303,18 +345,51 @@ namespace SharpShader.HLSLCrossCompiler.Internal
 
             public CaptureState(
                 ComPtr<IDxcIncludeHandler> defaultHandler,
-                DxcDependencyCaptureLimits limits)
+                DxcDependencyCaptureLimits? limits,
+                string sourceName,
+                ComPtr<IDxcBlobEncoding> sourceBlob)
             {
                 m_DefaultHandler = defaultHandler;
                 m_Limits = limits;
+                m_SourceName = NormalizeSourceName(sourceName);
+                m_SourceBlob = sourceBlob;
                 m_Captures = new Dictionary<string, DxcCapturedInclude>(
                     OperatingSystem.IsWindows()
                         ? StringComparer.OrdinalIgnoreCase
                         : StringComparer.Ordinal);
             }
 
+            public bool TryLoadMainSource(string requestedPath, IDxcBlob** result)
+            {
+                if (!string.Equals(m_SourceName, NormalizeSourceName(requestedPath),
+                        OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal))
+                {
+                    return false;
+                }
+
+                m_SourceBlob.Get().AddRef();
+                *result = (IDxcBlob*)m_SourceBlob.Handle;
+                return true;
+            }
+
+            private static string NormalizeSourceName(string name)
+            {
+                string normalized = name.Replace('\\', '/');
+                while (normalized.StartsWith("./", StringComparison.Ordinal))
+                {
+                    normalized = normalized[2..];
+                }
+
+                return normalized;
+            }
+
             public void Record(string requestedPath, ReadOnlySpan<byte> content)
             {
+                if (m_Limits is null)
+                {
+                    return;
+                }
+
                 lock (m_Sync)
                 {
                     if (!m_Captures.TryGetValue(
@@ -353,14 +428,15 @@ namespace SharpShader.HLSLCrossCompiler.Internal
                 string requestedPath,
                 int byteLength)
             {
-                if (m_Captures.Count >= m_Limits.MaximumFileCount)
+                DxcDependencyCaptureLimits limits = m_Limits ?? throw new InvalidOperationException("Dependency capture is disabled.");
+                if (m_Captures.Count >= limits.MaximumFileCount)
                 {
                     throw new ShaderCompilerException(
                         ShaderCompilerErrorCode.InvalidRequest,
                         "DXC include dependency count exceeds the configured limit.");
                 }
 
-                if (byteLength > m_Limits.MaximumFileBytes)
+                if (byteLength > limits.MaximumFileBytes)
                 {
                     throw new ShaderCompilerException(
                         ShaderCompilerErrorCode.InvalidRequest,
@@ -380,7 +456,7 @@ namespace SharpShader.HLSLCrossCompiler.Internal
                         innerException: exception);
                 }
 
-                if (m_TotalBytes > m_Limits.MaximumTotalBytes)
+                if (m_TotalBytes > limits.MaximumTotalBytes)
                 {
                     throw new ShaderCompilerException(
                         ShaderCompilerErrorCode.InvalidRequest,
@@ -426,6 +502,8 @@ namespace SharpShader.HLSLCrossCompiler.Internal
                 m_Disposed = true;
                 m_DefaultHandler.Dispose();
                 m_DefaultHandler = default;
+                m_SourceBlob.Dispose();
+                m_SourceBlob = default;
             }
         }
     }
