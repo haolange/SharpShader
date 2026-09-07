@@ -17,7 +17,7 @@ RWStructuredBuffer<uint> Output : register(u0);
         public async Task RelocatedResources_ShouldProduceIdenticalKeysAndArtifacts()
         {
             string first = CreateSource("original", 41);
-            string second = CreateSource("ÖÐÎÄ relocated root", 41);
+            string second = CreateSource("ä¸­æ–‡ relocated root", 41);
             ShaderProgramCompiler compiler = new(new ShaderProgramCompilerOptions(Path.Combine(m_Root, "cache")));
             ShaderProgramCompilation[] result = await Task.WhenAll(
                 compiler.CompileAsync(Request(first)), compiler.CompileAsync(Request(second)));
