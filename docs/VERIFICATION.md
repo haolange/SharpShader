@@ -5,7 +5,7 @@ public and internal harnesses are separate: public tests exercise the supported
 surface, while the internal harness keeps compiler lifetime and native seams
 source linked without shipping test-only APIs. All commands use the .NET 10 SDK
 and select `Source` or `Package` for the complete graph. `stack.local.props` is
-an ignored machine path mapping and `stack.lock.json` is the shareable revision
+an ignored machine path mapping and the consuming workspace revision manifest is the shareable revision
 set.
 
 ```powershell
@@ -60,5 +60,11 @@ launching a configured executable. A malformed or non executable file therefore
 fails quickly with `ToolLaunchFailed`; a valid installed converter is exercised
 by the Metal compiler tests. Before accepting a revision, run `git diff --check`,
 inspect generated package dependencies and native paths, and update
-`stack.lock.json` after the final commit. Any source or package change
+the consuming workspace revision manifest after the final commit. Any source or package change
 invalidates the corresponding evidence.
+
+Source handoff records this repository HEAD and every mapped dependency HEAD in
+the consuming workspace manifest. IE uses its root stack.lock.json; standalone
+consumers own their manifest and do not need an IE checkout. Package consumers
+use the project dependency versions and NuGet lock files. There is no product-local
+stack.lock.json: the removed copies were not read by any build or setup tool.
