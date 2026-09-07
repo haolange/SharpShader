@@ -48,4 +48,13 @@
     <None Include="../../README.md" Pack="true" PackagePath="README.md" Visible="false" />
     <None Include="../../LICENSE" Pack="true" PackagePath="/" Visible="false" />
   </ItemGroup>
+  <!-- Roslyn resolves analyzer dependencies from the analyzer input set, including source project consumers. -->
+  <Target Name="IncludeShaderGeneratorDependencies" AfterTargets="GetTargetPathWithTargetPlatformMoniker">
+    <ItemGroup>
+      <TargetPathWithTargetPlatformMoniker Include="$(TargetDir)SharpShader.CSharp.Frontend.dll;$(TargetDir)SharpShader.CSharp.ShaderLib.dll">
+        <TargetFrameworkIdentifier>$(TargetFrameworkIdentifier)</TargetFrameworkIdentifier>
+        <TargetFrameworkVersion>$(TargetFrameworkVersion)</TargetFrameworkVersion>
+      </TargetPathWithTargetPlatformMoniker>
+    </ItemGroup>
+  </Target>
 </Project>

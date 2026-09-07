@@ -37,9 +37,13 @@ namespace SharpShader.CSharp.Frontend
                 new CSharpCompilationOptions(
                     OutputKind.DynamicallyLinkedLibrary,
                     allowUnsafe: true));
-            return Translate(compilation);
+            return CSharpShaderLowerer.Run(compilation, includeHostDiagnostics: true, cancellationToken: default);
         }
 
+        /// <summary>
+        /// Translates reachable shader declarations in a host compilation. Host
+        /// diagnostics remain owned by Roslyn and may resolve after generation.
+        /// </summary>
         public CSharpShaderTranslation Translate(
             Compilation compilation,
             CancellationToken cancellationToken = default)
@@ -49,7 +53,7 @@ namespace SharpShader.CSharp.Frontend
                 throw new System.ArgumentNullException(nameof(compilation));
             }
 
-            return CSharpShaderLowerer.Run(compilation, cancellationToken);
+            return CSharpShaderLowerer.Run(compilation, includeHostDiagnostics: false, cancellationToken);
         }
     }
 }

@@ -25,38 +25,30 @@ namespace SharpShader.CSharp.Frontend
             new HashSet<IMethodSymbol>(SymbolEqualityComparer.Default);
         private bool m_UsesRayQuery;
         private bool m_UsesWaveOperations;
+        private readonly bool m_IncludeHostDiagnostics;
 
-        private CSharpShaderLowerer(Compilation compilation, CancellationToken cancellationToken)
+        private CSharpShaderLowerer(Compilation compilation, bool includeHostDiagnostics, CancellationToken cancellationToken)
         {
             m_Compilation = compilation;
             m_CancellationToken = cancellationToken;
+            m_IncludeHostDiagnostics = includeHostDiagnostics;
         }
 
         internal static CSharpShaderTranslation Run(
             Compilation compilation,
+            bool includeHostDiagnostics,
             CancellationToken cancellationToken)
         {
-            return new CSharpShaderLowerer(compilation, cancellationToken).Translate();
+            return new CSharpShaderLowerer(compilation, includeHostDiagnostics, cancellationToken).Translate();
         }
 
         private CSharpShaderTranslation Translate()
         {
-            foreach (Diagnostic diagnostic in m_Compilation.GetDiagnostics())
-            {
-                m_CancellationToken.ThrowIfCancellationRequested();
-                if (diagnostic.Severity != DiagnosticSeverity.Error)
-                {
-                    continue;
-                }
-
-                m_Diagnostics.Add(CSharpShaderDiagnostic.FromLocation(
-                    CSharpShaderDiagnosticIds.CSharpError,
-                    CSharpShaderDiagnosticSeverity.Error,
-                    diagnostic.GetMessage(),
-                    diagnostic.Location));
-            }
-
             List<EntryModel> entries = DiscoverEntries();
+            if (m_IncludeHostDiagnostics)
+            {
+                CollectCompilationDiagnostics(entries);
+            }
             if (entries.Count == 0 && !HasErrors())
             {
                 m_Diagnostics.Add(new CSharpShaderDiagnostic(
@@ -71,6 +63,11 @@ namespace SharpShader.CSharp.Frontend
                 {
                     CollectMethod(entries[index].Method, entries[index].Method.DeclaringSyntaxReferences);
                 }
+            }
+
+            if (!m_IncludeHostDiagnostics)
+            {
+                CollectCompilationDiagnostics(entries);
             }
 
             string hlsl = HasErrors() ? string.Empty : EmitHlsl(entries);
@@ -121,6 +118,74 @@ namespace SharpShader.CSharp.Frontend
                 entryTranslations,
                 resources,
                 m_Diagnostics);
+        }
+
+        private void CollectCompilationDiagnostics(List<EntryModel> entries)
+        {
+            foreach (Diagnostic diagnostic in m_Compilation.GetDiagnostics(m_CancellationToken))
+            {
+                if (diagnostic.Severity != DiagnosticSeverity.Error
+                    || (!m_IncludeHostDiagnostics && !IsShaderDiagnostic(diagnostic.Location, entries)))
+                {
+                    continue;
+                }
+
+                m_Diagnostics.Add(CSharpShaderDiagnostic.FromLocation(
+                    CSharpShaderDiagnosticIds.CSharpError,
+                    CSharpShaderDiagnosticSeverity.Error,
+                    diagnostic.GetMessage(),
+                    diagnostic.Location));
+            }
+        }
+
+        private bool IsShaderDiagnostic(Location location, List<EntryModel> entries)
+        {
+            if (!location.IsInSource)
+            {
+                return true;
+            }
+            foreach (EntryModel entry in entries)
+            {
+                if (ContainsDiagnostic(entry.Method, location))
+                {
+                    return true;
+                }
+            }
+            foreach (IMethodSymbol method in m_Methods.Keys)
+            {
+                if (ContainsDiagnostic(method, location))
+                {
+                    return true;
+                }
+            }
+            foreach (INamedTypeSymbol type in m_Structs.Keys)
+            {
+                if (ContainsDiagnostic(type, location))
+                {
+                    return true;
+                }
+            }
+            foreach (ISymbol resource in m_Resources.Keys)
+            {
+                if (ContainsDiagnostic(resource, location))
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        private bool ContainsDiagnostic(ISymbol symbol, Location location)
+        {
+            foreach (SyntaxReference reference in symbol.DeclaringSyntaxReferences)
+            {
+                if (reference.SyntaxTree == location.SourceTree
+                    && reference.GetSyntax(m_CancellationToken).FullSpan.IntersectsWith(location.SourceSpan))
+                {
+                    return true;
+                }
+            }
+            return false;
         }
 
         private List<EntryModel> DiscoverEntries()
