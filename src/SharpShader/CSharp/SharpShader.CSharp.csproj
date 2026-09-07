@@ -15,7 +15,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <InternalsVisibleTo Include="Infinity.Rendering.Tests" />
     <ProjectReference Include="../SharpShader.csproj" Condition="'$(StackReferenceMode)' == 'Source'" />
     <ProjectReference Include="Frontend/SharpShader.CSharp.Frontend.csproj" Condition="'$(StackReferenceMode)' == 'Source'" />
     <ProjectReference Include="ShaderLib/SharpShader.CSharp.ShaderLib.csproj" Condition="'$(StackReferenceMode)' == 'Source'" />
