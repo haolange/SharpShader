@@ -38,12 +38,13 @@ The seven source packages are `SharpShader`, `SharpShader.CSharp`,
 `SharpShader.CSharp.ShaderLib`, `SharpShader.SharpGPU`, and
 `SharpShader.Tool`.
 
-Package validation restores a fresh Release/x64 assets file into an isolated
-cache using the local SharpShader, SharpGPU, SharpMath, SharpMetal and IE feeds.
-The public package graph passed **117/117** and the package
-`CompileAndReflect` sample passed with the same DXIL output. The matching logs
-are under `artifacts/verification-r12/test-public-package-release.log` and
-`sample-package-release.log`. Always pass `Configuration`, `Platform`,
+Package validation restores a fresh Release/x64 assets file into the isolated
+`artifacts/verification-r12/nuget-cache-package-shader-final` cache using the
+final local SharpShader feed (`packages-release-final`) plus SharpGPU, SharpMath,
+SharpMetal and IE feeds. The public package graph passed **117/117** and the
+package `CompileAndReflect` sample passed with the same DXIL output. The
+matching logs are `artifacts/verification-r12/test-public-package-release-final.log`
+and `sample-package-release-final.log`. Always pass `Configuration`, `Platform`,
 `StackReferenceMode` and `RestorePackagesPath` together; a global-cache or
 different-configuration assets file is not package evidence.
 
