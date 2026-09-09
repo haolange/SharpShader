@@ -173,7 +173,7 @@ A notice-only correction package is generated from the recorded clean source com
 
 ```powershell
 # Local notice-correction candidate; Source graph and isolated output are mandatory.
-dotnet pack src/SharpShader/SharpShader.csproj -c Release -p:StackReferenceMode=Source -p:PackageVersion=0.4.0-preview.2 -p:RestoreLockedMode=true -p:StackLocalProps=<absolute-local-props> -p:StackProductRoot=<new-output-root> -o <new-feed>
+dotnet pack src/SharpShader/SharpShader.csproj -c Release -p:StackReferenceMode=Source -p:PackageVersion=0.4.0-preview.3 -p:RestoreLockedMode=true -p:StackLocalProps=<absolute-local-props> -p:StackProductRoot=<new-output-root> -o <new-feed>
 ```
 
 This command qualifies metadata and unchanged native contents only when followed by the isolated consumer and byte comparison recorded in the consuming workspace's provenance report. Other-platform execution remains separate. Historical test-count paragraphs above remain historical snapshots; current evidence is linked from the workspace task ledger.
