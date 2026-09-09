@@ -150,7 +150,10 @@
         "archiveSha256": "5c8ea3fcf588584950be018cd47e728ac2d7d4cbbe07b205c0cc6a47c53a06a9",
         "format": "zip",
         "member": "runtimes/linux-x64/native/libspirv-cross.so",
-        "redistribution": "TODO(UNVERIFIED): package declares Apache-2.0; upstream source commit metadata needs verification"
+        "redistribution": "Publisher Apache-2.0 declaration and upstream license/header materials preserved; source and payload identities verified. Toolchain-linked runtime notice review remains separate.",
+        "packagingRepository": "https://github.com/dotnet/Silk.NET",
+        "packagingCommit": "94605142f7b7bd6e69c9201e8e721d245c69eb7e",
+        "upstreamCommit": "998146d76fc5cbb2726f44c55e25fa28a573a782"
       }
     },
     {
@@ -168,7 +171,10 @@
         "archiveSha256": "5c8ea3fcf588584950be018cd47e728ac2d7d4cbbe07b205c0cc6a47c53a06a9",
         "format": "zip",
         "member": "runtimes/linux-arm64/native/libspirv-cross.so",
-        "redistribution": "TODO(UNVERIFIED): package declares Apache-2.0; upstream source commit metadata needs verification"
+        "redistribution": "Publisher Apache-2.0 declaration and upstream license/header materials preserved; source and payload identities verified. Toolchain-linked runtime notice review remains separate.",
+        "packagingRepository": "https://github.com/dotnet/Silk.NET",
+        "packagingCommit": "94605142f7b7bd6e69c9201e8e721d245c69eb7e",
+        "upstreamCommit": "998146d76fc5cbb2726f44c55e25fa28a573a782"
       }
     },
     {
@@ -186,7 +192,10 @@
         "archiveSha256": "5c8ea3fcf588584950be018cd47e728ac2d7d4cbbe07b205c0cc6a47c53a06a9",
         "format": "zip",
         "member": "runtimes/osx-x64/native/libspirv-cross.dylib",
-        "redistribution": "TODO(UNVERIFIED): package declares Apache-2.0; upstream source commit metadata needs verification"
+        "redistribution": "Publisher Apache-2.0 declaration and upstream license/header materials preserved; source and payload identities verified. Toolchain-linked runtime notice review remains separate.",
+        "packagingRepository": "https://github.com/dotnet/Silk.NET",
+        "packagingCommit": "94605142f7b7bd6e69c9201e8e721d245c69eb7e",
+        "upstreamCommit": "998146d76fc5cbb2726f44c55e25fa28a573a782"
       }
     },
     {
@@ -204,7 +213,10 @@
         "archiveSha256": "5c8ea3fcf588584950be018cd47e728ac2d7d4cbbe07b205c0cc6a47c53a06a9",
         "format": "zip",
         "member": "runtimes/osx-arm64/native/libspirv-cross.dylib",
-        "redistribution": "TODO(UNVERIFIED): package declares Apache-2.0; upstream source commit metadata needs verification"
+        "redistribution": "Publisher Apache-2.0 declaration and upstream license/header materials preserved; source and payload identities verified. Toolchain-linked runtime notice review remains separate.",
+        "packagingRepository": "https://github.com/dotnet/Silk.NET",
+        "packagingCommit": "94605142f7b7bd6e69c9201e8e721d245c69eb7e",
+        "upstreamCommit": "998146d76fc5cbb2726f44c55e25fa28a573a782"
       }
     },
     {
@@ -222,7 +234,10 @@
         "archiveSha256": "5c8ea3fcf588584950be018cd47e728ac2d7d4cbbe07b205c0cc6a47c53a06a9",
         "format": "zip",
         "member": "runtimes/win-x64/native/spirv-cross.dll",
-        "redistribution": "TODO(UNVERIFIED): package declares Apache-2.0; upstream source commit metadata needs verification"
+        "redistribution": "Publisher Apache-2.0 declaration and upstream license/header materials preserved; source and payload identities verified. Toolchain-linked runtime notice review remains separate.",
+        "packagingRepository": "https://github.com/dotnet/Silk.NET",
+        "packagingCommit": "94605142f7b7bd6e69c9201e8e721d245c69eb7e",
+        "upstreamCommit": "998146d76fc5cbb2726f44c55e25fa28a573a782"
       }
     },
     {
@@ -240,7 +255,10 @@
         "archiveSha256": "5c8ea3fcf588584950be018cd47e728ac2d7d4cbbe07b205c0cc6a47c53a06a9",
         "format": "zip",
         "member": "runtimes/win-arm64/native/spirv-cross.dll",
-        "redistribution": "TODO(UNVERIFIED): package declares Apache-2.0; upstream source commit metadata needs verification"
+        "redistribution": "Publisher Apache-2.0 declaration and upstream license/header materials preserved; source and payload identities verified. Toolchain-linked runtime notice review remains separate.",
+        "packagingRepository": "https://github.com/dotnet/Silk.NET",
+        "packagingCommit": "94605142f7b7bd6e69c9201e8e721d245c69eb7e",
+        "upstreamCommit": "998146d76fc5cbb2726f44c55e25fa28a573a782"
       }
     }
   ]

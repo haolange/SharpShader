@@ -164,3 +164,16 @@ workload also passed from the published directory. Platform claims remain separa
 ## Mode-isolated NuGet locks
 
 After deliberately generating and reviewing packages.<StackReferenceMode>.<RID-or-portable>.lock.json, append -p:RestoreLockedMode=true to the normal restore command. Alternate Source/Package restores and compare lock hashes. New RIDs need separate locks and matching-host qualification.
+
+## Provenance preservation qualification (2026-09-09)
+
+The current source audit is docs/provenance/native-origin-audit.json. It resolves the SPIRV-Cross nuspec repository/commit mismatch through the exact Silk.NET v2.23.0 checkout and pinned Khronos submodule. All six native binaries match upstream tracked files. macOS DXC build provenance remains unresolved; keep its bytes unchanged until the original recipe is recovered and matching-host qualification passes.
+
+A notice-only correction package is generated from the recorded clean source commit with an explicit new PackageVersion; this does not bump runtime API or dependency versions. It is a supplemental candidate pending workspace adoption, not a silently replaced preview.1 archive. Use the package provenance manifest to select its exact version and bytes.
+
+```powershell
+# Local notice-correction candidate; Source graph and isolated output are mandatory.
+dotnet pack src/SharpShader/SharpShader.csproj -c Release -p:StackReferenceMode=Source -p:PackageVersion=0.4.0-preview.2 -p:RestoreLockedMode=true -p:StackLocalProps=<absolute-local-props> -p:StackProductRoot=<new-output-root> -o <new-feed>
+```
+
+This command qualifies metadata and unchanged native contents only when followed by the isolated consumer and byte comparison recorded in the consuming workspace's provenance report. Other-platform execution remains separate. Historical test-count paragraphs above remain historical snapshots; current evidence is linked from the workspace task ledger.

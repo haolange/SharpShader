@@ -1,0 +1,77 @@
+{
+  "schemaVersion": 1,
+  "date": "2026-09-09",
+  "spirvCross": {
+    "archive": "Silk.NET.SPIRV.Cross.Native 2.23.0",
+    "packagingRepository": "https://github.com/dotnet/Silk.NET",
+    "packagingCommit": "94605142f7b7bd6e69c9201e8e721d245c69eb7e",
+    "upstreamRepository": "https://github.com/KhronosGroup/SPIRV-Cross",
+    "upstreamCommit": "998146d76fc5cbb2726f44c55e25fa28a573a782",
+    "recipe": "build/nuke/Native/SPIRVCross.cs",
+    "workflow": ".github/workflows/spirv-cross.yml",
+    "toolchain": "Zig 0.15.2 (workflow declaration)",
+    "optimization": "ReleaseFast",
+    "enabledCBackends": [
+      "GLSL",
+      "HLSL",
+      "MSL",
+      "CPP",
+      "REFLECT"
+    ],
+    "exports": "SPVC_EXPORT_SYMBOLS=1; SPVC_PUBLIC_API=__declspec(dllexport) on Windows",
+    "sourceIdentity": "VERIFIED",
+    "sixTrackedBinaryMatches": [
+      {
+        "rid": "linux-x64",
+        "actual": "513DE25783914C2193577E36C5623543EAF970B4E8C5ABB1ED97E002AA5F874C",
+        "match": true,
+        "expected": "513de25783914c2193577e36c5623543eaf970b4e8c5abb1ed97e002aa5f874c"
+      },
+      {
+        "rid": "linux-arm64",
+        "actual": "7C78355E34D3953364770652818CB8BD76EA8DD6621C00DBDA55994A6F79E9E4",
+        "match": true,
+        "expected": "7c78355e34d3953364770652818cb8bd76ea8dd6621c00dbda55994a6f79e9e4"
+      },
+      {
+        "rid": "osx-x64",
+        "actual": "B8A6CE9BC707D15B7BBBEE139FB2363CEC116BF8AAD58E181642A39EF4FED189",
+        "match": true,
+        "expected": "b8a6ce9bc707d15b7bbbee139fb2363cec116bf8aad58e181642a39ef4fed189"
+      },
+      {
+        "rid": "osx-arm64",
+        "actual": "071C4EF2A38C5FD78CCDDA419CB79EC4FDED6F85ED3BDEEAE5BB09C3401EB093",
+        "match": true,
+        "expected": "071c4ef2a38c5fd78ccdda419cb79ec4fded6f85ed3bdeeae5bb09c3401eb093"
+      },
+      {
+        "rid": "win-x64",
+        "actual": "1B00F8C042D4EB4060B1F4B2C1EE1EF2F0935C7857EFE60C62D9CEA236EA834E",
+        "match": true,
+        "expected": "1b00f8c042d4eb4060b1f4b2c1ee1ef2f0935c7857efe60c62d9cea236ea834e"
+      },
+      {
+        "rid": "win-arm64",
+        "actual": "4D6143FD7AE2DD75EDF22DDCC8085749614CA36CBDC968AF3D2F073C8272B9F1",
+        "match": true,
+        "expected": "4d6143fd7ae2dd75edf22ddcc8085749614ca36cbdc968af3d2f073c8272b9f1"
+      }
+    ],
+    "freshRebuild": "NOT_PERFORMED: original upstream tracked bytes retained",
+    "redistribution": "Publisher and upstream license/header materials plus Zig 0.15.2 libc++/libc++abi/MinGW materials preserved. Source and tracked binary identities verified. No fresh rebuild or blanket legal clearance is claimed."
+  },
+  "macDxc": {
+    "sha256": "eedfd358597f8b33bdb076d545f5db37641007da127f6465e9485c1e1f3c1ba1",
+    "slices": [
+      "x86_64",
+      "arm64"
+    ],
+    "embeddedVersion": "dxc(private) 1.9.0.5180 (e35541826)",
+    "sourceIdentity": "UNRESOLVED: embedded revision does not establish build patches or recipe",
+    "history": "0b590cac is a directory rename; earlier acb8af46/3b01c202/ea412c2d record relocation; ADR-0008 has no actual build recipe",
+    "action": "Preserve exact payload; require original archive/build records before reconstruction or redistribution clearance",
+    "runtime": "BLOCKED_PLATFORM: matching macOS required"
+  },
+  "preservation": "All original native asset hashes unchanged. Build recipe is a capability baseline, not permission to drop untested backends."
+}

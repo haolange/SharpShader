@@ -30,3 +30,7 @@ NuGet locks are named packages.<StackReferenceMode>.<RID-or-portable>.lock.json 
 CI checks out only this product's build/test dependency closure: SharpMath, SharpMetal and the GPU/Shader peer needed by integration tests. Neural and LLM are not checkout prerequisites for this product. Runtime product dependency direction remains unchanged.
 
 Transitive application deployment Content is excluded from downstream packing. A consumer must not repack another product's notice assets into framework-specific contentFiles that can hide its own portable resources.
+
+## Source provenance and capability preservation
+
+The complete current product surface, including functionality unused by IE, is the preservation boundary. Source identity, distribution evidence, reproducible build and matching-platform execution are separate qualifications. Current evidence is in docs/provenance/native-origin-audit.json. Never replace payloads based only on an IE smoke test or relabel an unresolved upstream license.
