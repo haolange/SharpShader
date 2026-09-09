@@ -33,7 +33,7 @@
         "type": "Direct",
         "requested": "[0.4.0-preview.1, )",
         "resolved": "0.4.0-preview.1",
-        "contentHash": "wOaSyzuTNNhgW/MPsxGqhEGg2yHAh7/caLbweC3jdQ/YBOzvrNCbzxeGOcflM35HWNpSZToEdnr26t+PzJY6kA=="
+        "contentHash": "L04TaPa2MeVoRV7Vdbcsn8qcR6Ucwn9ZukampIFm5kUzW8Cu0/QKQeT2xEKI8Hgxjh05R+7Qbfknz69uFUCPtw=="
       },
       "Microsoft.CodeAnalysis.Analyzers": {
         "type": "Transitive",

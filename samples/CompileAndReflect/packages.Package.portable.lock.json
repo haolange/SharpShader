@@ -6,7 +6,7 @@
         "type": "Direct",
         "requested": "[0.4.0-preview.1, )",
         "resolved": "0.4.0-preview.1",
-        "contentHash": "HtiVa3zE3JmTBn2k267/Y1013kqrIS4ulgRGsQwOlTLnCZzLE6Ig8MIdPWtPwUD/DsaeHX1qDnjIrAJhQTlSoA==",
+        "contentHash": "B2LFIZHRlMJzRLgMfhPlc2paBMyNSv2dKhPkzUlNYyrm84DHUdvEwdUUp3+tgY5C/iX57H8LHLSFXC4/RKqsdA==",
         "dependencies": {
           "Antlr4.Runtime.Standard": "4.13.1",
           "Silk.NET.Direct3D.Compilers": "2.23.0",

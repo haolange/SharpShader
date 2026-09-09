@@ -6,13 +6,13 @@
         "type": "Direct",
         "requested": "[0.4.0-preview.1, )",
         "resolved": "0.4.0-preview.1",
-        "contentHash": "dd6SfZnb4eC0pJlPHuCcY0kzlK5kMeq5CeCMfxo2cVWrSQG3EQj0Bi6D561krMtgsdDcu6W2FaBVq1non+VLsQ=="
+        "contentHash": "3uCWFQSC/+UngCawtLofEa6XxseAfoD6F1dr7I+dFPO2Vsi1N38e3V2ik9g+DJqOOE9QyRHlkjIpKc3IOVEnOA=="
       },
       "SharpShader": {
         "type": "Direct",
         "requested": "[0.4.0-preview.1, )",
         "resolved": "0.4.0-preview.1",
-        "contentHash": "HtiVa3zE3JmTBn2k267/Y1013kqrIS4ulgRGsQwOlTLnCZzLE6Ig8MIdPWtPwUD/DsaeHX1qDnjIrAJhQTlSoA==",
+        "contentHash": "B2LFIZHRlMJzRLgMfhPlc2paBMyNSv2dKhPkzUlNYyrm84DHUdvEwdUUp3+tgY5C/iX57H8LHLSFXC4/RKqsdA==",
         "dependencies": {
           "Antlr4.Runtime.Standard": "4.13.1",
           "Silk.NET.Direct3D.Compilers": "2.23.0",
@@ -24,7 +24,7 @@
         "type": "Direct",
         "requested": "[0.4.0-preview.1, )",
         "resolved": "0.4.0-preview.1",
-        "contentHash": "+X+sOgrsOg5FCV9WqS3uM279F/GVw3BZKHQzPRzPrBbqXUPe2zz5OXLkGCUCA3Wd37918nyfR087BTV9mjj3tA==",
+        "contentHash": "Ajw5j85vHzzauGo5+Uk6K3loNmOzNnHHjGPDrsG5DnYXkJqIyR4fOs2yBA2pTfOvBe/m01B2NhW9NGWtkdvz4A==",
         "dependencies": {
           "Microsoft.CodeAnalysis.CSharp": "5.6.0",
           "SharpShader.CSharp.ShaderLib": "0.4.0-preview.1"
@@ -34,7 +34,7 @@
         "type": "Direct",
         "requested": "[0.4.0-preview.1, )",
         "resolved": "0.4.0-preview.1",
-        "contentHash": "wOaSyzuTNNhgW/MPsxGqhEGg2yHAh7/caLbweC3jdQ/YBOzvrNCbzxeGOcflM35HWNpSZToEdnr26t+PzJY6kA=="
+        "contentHash": "L04TaPa2MeVoRV7Vdbcsn8qcR6Ucwn9ZukampIFm5kUzW8Cu0/QKQeT2xEKI8Hgxjh05R+7Qbfknz69uFUCPtw=="
       },
       "Antlr4.Runtime.Standard": {
         "type": "Transitive",
