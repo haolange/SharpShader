@@ -106,11 +106,7 @@ assets and pinned dependency revisions must be available in the remote
 checkouts, and clean-checkout lock convergence is still required before remote
 qualification. No packages or native payloads are uploaded by this workflow.
 
-The new source-graph CI currently FAILS at the CompileAndReflect sample's
-locked Source restore (NU1004, old Package lock). Evidence is
-D:/Projects/InfinityStackVerification/ci-graph-shader-release. Keep this gate
-failed until the pending lock-mode migration is applied and revalidated; do
-not remove the sample or turn off locked restore to obtain green CI.
+The earlier ci-graph-shader-release run failed with NU1004 because it shared a Package lock. The mode-isolated lock migration is now applied; CompileAndReflect Source locked restore, Release build and actual DXIL execution pass. The final pinned CI matrix is a separate gate and must be rerun against its selected commits.
 
 ## Isolated package runtime CI
 
@@ -145,3 +141,26 @@ Resolved package counts are 31 for GPU, 12 for Shader and 28 for Neural, with
 zero source projects. Empty-feed Shader restore was also verified to fail
 NU1101 and produce no PASS result. These are runtime sample gates, not a
 replacement for the complete product test matrices or platform observation.
+
+## Application notice deployment
+
+After the normal source or package consumer restore/build, publish that same
+fixture in both configurations, preserving its graph properties and package cache:
+
+```powershell
+dotnet publish $consumerProject -c $configuration --no-restore `
+  -o $publishDirectory @consumerGraphProperties
+```
+
+Compare ThirdPartyNotices/<product>/... in build and publish output against the
+source/package license inputs by exact relative paths and SHA-256. Do not accept
+counts alone or package-cache files as application output. Test source and package
+modes separately and run the published workload outside its source directory.
+The 2026-09-08 Windows notice-deployment-r2 evidence in the extraction ledger
+covers both configurations, both modes and build/publish: 25 combined files
+(13 SharpGPU, 12 SharpShader), with every path/hash matching; the package GPU
+workload also passed from the published directory. Platform claims remain separate.
+
+## Mode-isolated NuGet locks
+
+After deliberately generating and reviewing packages.<StackReferenceMode>.<RID-or-portable>.lock.json, append -p:RestoreLockedMode=true to the normal restore command. Alternate Source/Package restores and compare lock hashes. New RIDs need separate locks and matching-host qualification.

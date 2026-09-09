@@ -27,8 +27,9 @@
     <None Include="../../README.md" Pack="true" PackagePath="README.md" Visible="false" />
 
     <None Include="../../native/assets.json" Pack="true" PackagePath="native/assets.json" />
-    <None Include="../../LICENSE" Link="SharpShader.LICENSE.txt" Pack="true" PackagePath="licenses/" />
-    <None Include="../../docs/provenance/InfinityBrowser.LICENSE" Pack="true" PackagePath="licenses/InfinityBrowser.LICENSE" />
+    <Content Include="../../LICENSE" Pack="true" PackagePath="licenses/" Link="ThirdPartyNotices/SharpShader/LICENSE" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="../../docs/provenance/InfinityBrowser.LICENSE" Pack="true" PackagePath="licenses/InfinityBrowser.LICENSE" Link="ThirdPartyNotices/SharpShader/InfinityBrowser.LICENSE" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <None Include="../../buildTransitive/SharpShader.targets" Pack="true" PackagePath="buildTransitive/SharpShader.targets" />
   </ItemGroup>
   <PropertyGroup><PackageLicenseExpression>MPL-2.0</PackageLicenseExpression></PropertyGroup>
   <Import Project="../../native/SharpShader.NativeAssets.props" />

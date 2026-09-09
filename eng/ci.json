@@ -12,14 +12,6 @@
     "SharpGPU": {
       "repository": "haolange/SharpGPU",
       "commit": "8da468db78fdc56d06a6302f99da13e12d81e217"
-    },
-    "SharpNeural": {
-      "repository": "haolange/SharpNeural",
-      "commit": "c53a406130f690eb1124f53fc5e5d778971f3fb0"
-    },
-    "SharpLLM": {
-      "repository": "haolange/SharpLLM",
-      "commit": "94fcfc2743bd31628891ed5aab8a85a42b5c9c8f"
     }
   },
   "projects": [

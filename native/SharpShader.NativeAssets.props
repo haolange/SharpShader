@@ -104,7 +104,7 @@
   </ItemGroup>
   <ItemGroup>
     <Content Include="@(SharpShaderNativeAsset-&gt;Exists())" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Pack="true" />
-    <None Include="$(MSBuildThisFileDirectory)licenses/**/*" Pack="true" PackagePath="licenses/%(RecursiveDir)%(Filename)%(Extension)" />
+    <Content Include="$(MSBuildThisFileDirectory)licenses/**/*" Pack="true" PackagePath="licenses/%(RecursiveDir)%(Filename)%(Extension)" Link="ThirdPartyNotices/SharpShader/%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
   <Target Name="VerifySharpShaderBuildNativeAssets" BeforeTargets="PrepareForBuild">
     <Error Condition="('%(SharpShaderNativeAsset.RuntimeIdentifier)' == '$(NETCoreSdkRuntimeIdentifier)' or '%(SharpShaderNativeAsset.RuntimeIdentifier)' == '$(RuntimeIdentifier)') and !Exists('%(SharpShaderNativeAsset.Identity)')" Text="Missing native asset %(SharpShaderNativeAsset.Identity). Run build/Restore-NativeAssets.ps1 for the host and target RID." />

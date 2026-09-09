@@ -1,0 +1,55 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2012/06/nuspec.xsd">
+  <metadata>
+    <id>Silk.NET.SPIRV.Cross.Native</id>
+    <version>2.23.0</version>
+    <authors>.NET Foundation and Contributors</authors>
+    <requireLicenseAcceptance>true</requireLicenseAcceptance>
+    <license type="expression">Apache-2.0</license>
+    <licenseUrl>https://licenses.nuget.org/Apache-2.0</licenseUrl>
+    <icon>silkdotnet_v3.png</icon>
+    <readme>README.md</readme>
+    <projectUrl>https://github.com/dotnet/Silk.NET</projectUrl>
+    <description>Multi-platform native library for SPIRV-Cross.</description>
+    <releaseNotes>Silk.NET Winter 2025 Update
+
+            - Added missing GenerateBoundingBoxes flag in Assimp. (thanks @LittleCodingFox) 
+            - Added full coverage of AV1 and VP9 support in Vulkan Video bindings.
+            - Updated to Direct3D 12 Agility SDK 1.618.5.
+            - Updated to DirectStorage 1.3.0.
+            - Updated to Windows SDK 10.26100.
+            - Updated to Vulkan 1.4.336.
+            - Updated to OpenXR 1.1.54.
+            - Updated to Assimp 6.0.2.
+            - Updated to MoltenVK 1.4.1.
+            - Updated to OpenAL Soft 1.24.3.
+            - Updated to latest ANGLE.
+            - Updated to latest OpenGL specifications.
+            - Updated to latest OpenCL specifications.
+            - Updated to SDL 2.32.10 binaries.
+            - Updated dependency versions, reducing the number of overrides required to satisfy vulnerability scans.
+            - Removed manual `[RequiresLocationAttribute] in` in favour `ref readonly`.
+            - Fixed UTF-8 string marshalling for a specific OpenGL ShaderSource overload.
+            - Fixed erroneous mapping of the LeftDown joystick hat on the GLFW backend. (thanks @Spacelord-XaN)
+            - Fixed string SilkMarshal methods not respecting the platform-native definition of wide characters. (thanks @Exanite)
+            - Fixed PtrToStringArray ignoring encoding parameter. (thanks @Exanite)
+            - Fixed Android native library duplication, resulting in Android build failures.
+            - Fixed a marshalling exception when calling DelegateToPtr in some circumstances. (primarily NativeAOT, thanks @aquagoose)
+            - Fixed UTF-8 characters not being accepted in OpenAL bindings. (thanks @Morilli)
+            - Fixed native libraries not loading property on Pop!_OS. (thanks @WNP78)
+            - Fixed inconsistencies and bugs across matrices of different sizes. (thanks @otac0n)
+            - Fixed NullReferenceException in WGL. (thanks @Morilli)
+            - Fixed unknown key names resulting in an ImGui extension crash. (thanks @Tweety-Lab)
+            - Fixed a minor memory leak in GlfwPlatform/SdlPlatform IsApplicable checks. (thanks @Aragas)
+            - Miscellaneous bugfixes and improvements.
+
+            The Silk.NET team are hard at work on 3.0, with 2.X updates continuing with the support of contributors and sponsors.
+            Learn more at https://github.com/dotnet/Silk.NET</releaseNotes>
+    <tags>OpenCL OpenGL OpenAL OpenGLES GLES Vulkan Assimp DirectX GLFW SDL Windowing Input Gamepad Joystick Keyboard Mouse SilkTouch Source Generator C# F# .NET DotNet Mono Vector Math Maths Numerics Game Graphics Compute Audio Sound Engine Silk Silk.NET Slim.NET ElgarTK GPU Sharp Science Scientific Visualization Visual Audiovisual Windows macOS Linux Android Bindings OSX Wrapper Native</tags>
+    <repository type="git" url="https://github.com/KhronosGroup/SPIRV-Cross" commit="94605142f7b7bd6e69c9201e8e721d245c69eb7e" />
+    <dependencies>
+      <group targetFramework=".NETFramework4.6.1" />
+      <group targetFramework=".NETStandard2.0" />
+    </dependencies>
+  </metadata>
+</package>
