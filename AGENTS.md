@@ -16,7 +16,7 @@ Compiler core must not reference SharpGPU. Keep GPU integration in SharpShader.S
 - Keep a single implementation path. Do not introduce legacy aliases, forwarding assemblies, compatibility shims or silent dependency fallbacks.
 - Source/Package selection is graph-wide. Keep local checkout paths in ignored `stack.local.props`; update the portable template when its contract changes. Do not commit developer drive paths.
 - Use current build/test/runtime evidence for behavior changes. Test the relevant error, cancellation and lifetime paths. Mark unavailable matching-platform execution `TODO(UNVERIFIED)` or `BLOCKED_PLATFORM`.
-- Preserve [LICENSE](LICENSE), source attribution and third-party notices. Update README/design/verification when their contracts change.
+- First-party code and package metadata use Mozilla Public License 2.0 (MPL-2.0); preserve [LICENSE](LICENSE), source attribution and third-party licenses and notices. Update README/design/verification when their contracts change.
 
 ## 工程洁净度：第一性原则
 
