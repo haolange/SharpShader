@@ -70,8 +70,9 @@
     "embeddedVersion": "dxc(private) 1.9.0.5180 (e35541826)",
     "sourceIdentity": "UNRESOLVED: embedded revision does not establish build patches or recipe",
     "history": "0b590cac is a directory rename; earlier acb8af46/3b01c202/ea412c2d record relocation; ADR-0008 has no actual build recipe",
-    "action": "Preserve exact payload; require original archive/build records before reconstruction or redistribution clearance",
+    "action": "Preserve authorized payload and notices; qualify on matching macOS. Historical build metadata does not block consumption or delivery.",
     "runtime": "BLOCKED_PLATFORM: matching macOS required"
   },
-  "preservation": "All original native asset hashes unchanged. Build recipe is a capability baseline, not permission to drop untested backends."
+  "preservation": "All original native asset hashes unchanged. Build recipe is a capability baseline, not permission to drop untested backends.",
+  "authorization": "CONFIRMED_BY_USER on 2026-09-09 for the existing DLL/dylib assets; no pending native authorization input"
 }

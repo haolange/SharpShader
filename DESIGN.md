@@ -34,3 +34,5 @@ Transitive application deployment Content is excluded from downstream packing. A
 ## Source provenance and capability preservation
 
 The complete current product surface, including functionality unused by IE, is the preservation boundary. Source identity, distribution evidence, reproducible build and matching-platform execution are separate qualifications. Current evidence is in docs/provenance/native-origin-audit.json. Never replace payloads based only on an IE smoke test or relabel an unresolved upstream license.
+
+The user confirmed authorization for the current DLL/dylib assets on 2026-09-09. Preserve their full capabilities and notices. Unknown historical build metadata is not a pending authorization or delivery prerequisite; matching-platform execution is qualified separately.

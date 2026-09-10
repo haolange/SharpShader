@@ -1,5 +1,11 @@
 # SharpShader verification
 
+## Checkout setup and evidence retention
+
+Copy `stack.local.props.example` to `stack.local.props` and adjust dependency paths before Source gates. The template assumes sibling repositories and contains no developer-specific drive paths. Existing local maps are preserved. Use an explicit package feed for Package gates; do not rely on a previously populated isolated cache.
+
+On 2026-09-11, local build outputs, package inspection caches and raw historical run evidence were intentionally deleted. Results below are historical summaries tied to their original inputs; old `artifacts/` and `.verification/` paths are reproducible output locations, not retained deliverables. Build and pack the required dependency versions before running examples that consume a local feed. Do not mark a new checkout or platform verified based on those summaries.
+
 This file is the authority for the independent SharpShader repository. The
 public and internal harnesses are separate: public tests exercise the supported
 surface, while the internal harness keeps compiler lifetime and native seams
@@ -167,7 +173,7 @@ After deliberately generating and reviewing packages.<StackReferenceMode>.<RID-o
 
 ## Provenance preservation qualification (2026-09-09)
 
-The current source audit is docs/provenance/native-origin-audit.json. It resolves the SPIRV-Cross nuspec repository/commit mismatch through the exact Silk.NET v2.23.0 checkout and pinned Khronos submodule. All six native binaries match upstream tracked files. macOS DXC build provenance remains unresolved; keep its bytes unchanged until the original recipe is recovered and matching-host qualification passes.
+The current source audit is docs/provenance/native-origin-audit.json. It resolves the SPIRV-Cross nuspec repository/commit mismatch through the exact Silk.NET v2.23.0 checkout and pinned Khronos submodule. All six native binaries match upstream tracked files. The user confirmed authorization for the existing DLL/dylib assets on 2026-09-09. Preserve the current binaries and notices; authorization and original build-recipe recovery are not pending inputs. Matching-host runtime qualification remains required and separate from authorization.
 
 A notice-only correction package is generated from the recorded clean source commit with an explicit new PackageVersion; this does not bump runtime API or dependency versions. It is a supplemental candidate pending workspace adoption, not a silently replaced preview.1 archive. Use the package provenance manifest to select its exact version and bytes.
 
